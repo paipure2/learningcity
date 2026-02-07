@@ -1951,9 +1951,9 @@ if (!defined('ABSPATH')) exit;
       source: PLACES_SOURCE_ID,
       filter: ["has", "point_count"],
       paint: {
-        "circle-color": "#10b981",
+        "circle-color": "#00744B",
         "circle-radius": ["step", ["get", "point_count"], 18, 100, 22, 300, 26],
-        "circle-opacity": 0.9,
+        "circle-opacity": 1,
         "circle-stroke-width": 2,
         "circle-stroke-color": "#ffffff"
       }
@@ -1966,7 +1966,7 @@ if (!defined('ABSPATH')) exit;
       filter: ["has", "point_count"],
       layout: {
         "text-field": "{point_count_abbreviated}",
-        "text-font": ["Anuphan SemiBold", "Anuphan Semibold", "Anuphan", "Open Sans Bold", "Arial Unicode MS Bold"],
+        "text-font": ["Anuphan-SemiBold", "Anuphan SemiBold"],
         "text-size": 14
       },
       paint: { "text-color": "#ffffff" }
