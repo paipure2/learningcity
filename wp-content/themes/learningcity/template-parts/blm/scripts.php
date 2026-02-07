@@ -411,14 +411,14 @@ if (!defined('ABSPATH')) exit;
   async function loadFullForId(id) {
     if (fullCache.has(id)) return fullCache.get(id);
     try {
-      setApiLoading(true, "กำลังโหลดรายละเอียด...");
+      setApiLoading(true, "กำลังโหลดรายละเอียด...", "drawer");
       const res = await fetch(`/learningcity/wp-json/blm/v1/location/${id}`);
       if (!res.ok) return null;
       const full = await res.json();
       fullCache.set(id, full);
       return full;
     } finally {
-      setApiLoading(false);
+      setApiLoading(false, "", "drawer");
     }
   }
 
@@ -436,6 +436,8 @@ if (!defined('ABSPATH')) exit;
   let searchQuery = "";
   let mobileView = "map";
   let isSearching = false;
+  const DRAWER_ANIM_MS = 280;
+  let drawerHideTimer = null;
 
   let listLimit = LIST_PAGE_SIZE;
   let lastVisible = [];
@@ -447,11 +449,11 @@ if (!defined('ABSPATH')) exit;
   const LAYER_UNCLUSTERED_LABEL = "places-unclustered-label";
 
   // ================= HELPERS =================
-  function setApiLoading(on, text = "กำลังโหลดข้อมูล...") {
-    const box = el("apiLoading");
+  function setApiLoading(on, text = "กำลังโหลดข้อมูล...", scope = "global") {
+    const box = scope === "drawer" ? el("drawerLoading") : el("apiLoading");
     if (!box) return;
     const label = box.querySelector("div.text-sm");
-    if (label) label.textContent = text;
+    if (label && on && text) label.textContent = text;
     box.classList.toggle("hidden", !on);
   }
 
@@ -949,13 +951,13 @@ if (!defined('ABSPATH')) exit;
           state.nearMeEnabled = false;
           el("nearMeRadiusWrap").classList.add("hidden");
           el("chipNearMe").textContent = "ใกล้ฉัน: ปิด";
-          el("chipNearMe").className = "px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50";
+          el("chipNearMe").className = "px-3 py-2 rounded-lg border text-sm font-semibold";
         }
       });
     }
 
     if (chips.length === 0) {
-      wrap.innerHTML = `<span class="text-xs text-slate-400">ยังไม่ได้ใช้ตัวกรอง</span>`;
+      wrap.innerHTML = "";
       return;
     }
 
@@ -1031,23 +1033,25 @@ if (!defined('ABSPATH')) exit;
     }
 
     items.forEach(p => {
-      const dist = userLocation ? ` • ${formatKm(p._distanceKm)}` : "";
+      const dist = userLocation ? formatKm(p._distanceKm) : "";
       const primaryCat = getPrimaryCategory(p);
       const meta = catMeta(primaryCat);
       const iconKey = getIconKeyFromCategory(primaryCat);
+      const districtText = (p.district || "").trim();
+      const subText = districtText ? `${meta.label} : ${districtText}` : meta.label;
 
       const row = document.createElement("button");
       row.className = "w-full text-left px-3 py-3 hover:bg-slate-50 border-b last:border-b-0";
       row.innerHTML = `
-        <div class="flex items-center justify-between gap-2">
-          <div class="min-w-0">
-            <div class="font-semibold text-sm truncate flex items-center gap-2">
-              <span style="color: ${meta.color}">${svgForDom(iconKey, "icon-18")}</span>
-              <span>${p.name}</span>
+        <div class="search-result-row">
+          <span class="result-icon" style="color: ${meta.color}">${svgForDom(iconKey, "icon-18")}</span>
+          <div class="result-main">
+            <div class="result-title">${p.name}</div>
+            <div class="result-meta-row">
+              <div class="result-sub truncate">${subText}</div>
+              <div class="result-distance">${dist}</div>
             </div>
-            <div class="text-xs text-slate-500 truncate">${p.district || ""}${dist}</div>
           </div>
-          <div class="text-xs text-slate-500 whitespace-nowrap">${meta.label}</div>
         </div>
       `;
 
@@ -1486,11 +1490,20 @@ if (!defined('ABSPATH')) exit;
     const { forceMapOnMobile = false } = options;
 
     const drawer = el("drawer");
+    if (!drawer) return;
+
+    if (drawerHideTimer) {
+      clearTimeout(drawerHideTimer);
+      drawerHideTimer = null;
+    }
 
     selectedId = place.id;
     writeUrlFromState("push");
 
     drawer.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      drawer.classList.add("is-open");
+    });
 
     if (isMobile() && forceMapOnMobile) setMobileView("map");
 
@@ -1737,8 +1750,16 @@ if (!defined('ABSPATH')) exit;
   }
 
   function closeDrawer() {
+    const drawer = el("drawer");
+    if (!drawer) return;
+
     selectedId = null;
-    el("drawer").classList.add("hidden");
+    drawer.classList.remove("is-open");
+    if (drawerHideTimer) clearTimeout(drawerHideTimer);
+    drawerHideTimer = setTimeout(() => {
+      drawer.classList.add("hidden");
+      drawerHideTimer = null;
+    }, DRAWER_ANIM_MS);
     writeUrlFromState("replace");
   }
 
@@ -1865,7 +1886,7 @@ if (!defined('ABSPATH')) exit;
 
         const svgString = `
           <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="32" cy="32" r="30" fill="${fillColor}"/>
+            <rect x="4" y="4" width="56" height="56" rx="14" fill="${fillColor}" />
             <g transform="translate(14, 14) scale(1.5)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               ${innerPath}
             </g>
@@ -2038,22 +2059,20 @@ if (!defined('ABSPATH')) exit;
     const card = document.createElement("button");
     card.className = "w-full text-left p-4 rounded-xl bg-white border hover:shadow-sm transition";
     card.innerHTML = `
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="font-semibold leading-snug flex items-center gap-2">
-            <span style="color: ${meta.color}">${svgForDom(iconKey, "icon-18")}</span>
+      <div class="flex items-start gap-3">
+        <div class="shrink-0 mt-0.5 w-[35px] h-[35px] rounded-lg text-white flex items-center justify-center" style="background:${meta.color}">${svgForDom(iconKey, "icon-18")}</div>
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold leading-snug text-[16px]">
             <span>${place.name}</span>
           </div>
-          <div class="text-sm text-slate-600 flex items-center justify-between gap-2">
-            <span>${place.district ? ("เขต"+place.district) : ""}</span>
-            <span class="text-emerald-700 font-semibold">${distText}</span>
+          <div class="text-[14px] text-slate-700">
+            <span>${meta.label}${place.district ? (" : เขต" + place.district) : ""}</span>
           </div>
-          <div class="text-xs text-slate-500 mt-1 line-clamp-2">${place.address || ""}</div>
           <div class="mt-2 flex flex-wrap gap-1">
-            ${(place.tags || []).slice(0,4).map(t => `<span class="text-xs px-2 py-0.5 rounded-full border">${t}</span>`).join("")}
+            ${(place.tags || []).slice(0,4).map(t => `<span class="text-[11px] px-2 py-[1px] rounded-full border bg-white">${t}</span>`).join("")}
           </div>
+          <div class="text-[14px] font-semibold text-emerald-700 mt-2">${distText}</div>
         </div>
-        <div class="text-xs text-slate-500 whitespace-nowrap">${meta.label}</div>
       </div>
     `;
 
@@ -2165,11 +2184,11 @@ if (!defined('ABSPATH')) exit;
       alert(msg);
       return;
     }
-    if (!navigator.geolocation) { el("locStatus").textContent = "ไม่รองรับ geolocation"; return; }
-    el("locStatus").textContent = "กำลังขอตำแหน่ง...";
+    if (!navigator.geolocation) { el("locStatus").textContent = "อุปกรณ์ไม่รองรับการใช้ตำแหน่งปัจจุบัน"; return; }
+    el("locStatus").textContent = "กำลังใช้ตำแหน่งปัจจุบัน...";
     navigator.geolocation.getCurrentPosition((pos) => {
       userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      el("locStatus").textContent = `ได้ตำแหน่งแล้ว: ${userLocation.lat.toFixed(5)}, ${userLocation.lng.toFixed(5)}`;
+      el("locStatus").textContent = "ใช้ตำแหน่งปัจจุบันอยู่";
       el("nearMeWrap").classList.remove("hidden");
       if (!meMarker) {
         meMarker = new maplibregl.Marker({ element: Object.assign(document.createElement("div"), {className: "me-dot"}), anchor: "center" })
@@ -2184,7 +2203,7 @@ if (!defined('ABSPATH')) exit;
       map.flyTo({ center: [userLocation.lng, userLocation.lat], zoom: Math.max(map.getZoom(), 13) });
       saveLocationCache();
     }, () => {
-      el("locStatus").textContent = "ขอตำแหน่งไม่สำเร็จ";
+      el("locStatus").textContent = "ไม่สามารถใช้ตำแหน่งปัจจุบันได้";
     }, { enableHighAccuracy: true });
   }
 
@@ -2584,7 +2603,7 @@ if (!defined('ABSPATH')) exit;
       }
     });
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-left");
 
     const update = debounce(() => {
       resetListLimit();
@@ -2596,7 +2615,7 @@ if (!defined('ABSPATH')) exit;
       await addSvgImagesToMap();
       ensurePlacesLayers();
       if (userLocation) {
-        el("locStatus").textContent = `ได้ตำแหน่งแล้ว: ${userLocation.lat.toFixed(5)}, ${userLocation.lng.toFixed(5)}`;
+        el("locStatus").textContent = "ใช้ตำแหน่งปัจจุบันอยู่";
         el("nearMeWrap").classList.remove("hidden");
         if (!meMarker) {
           meMarker = new maplibregl.Marker({ element: Object.assign(document.createElement("div"), {className: "me-dot"}), anchor: "center" })

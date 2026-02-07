@@ -2,7 +2,7 @@
 if (!defined('ABSPATH')) exit;
 ?>
 <section id="listSectionDesktop"
-  class="hidden lg:block lg:col-span-4 border-r bg-slate-50 overflow-auto">
+  class="hidden lg:block border-r bg-slate-50 overflow-auto">
   <div class="sticky top-0 bg-slate-50/90 backdrop-blur border-b z-10">
     <div class="p-3">
       <div class="text-sm text-slate-700 font-medium">

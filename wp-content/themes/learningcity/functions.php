@@ -717,6 +717,11 @@ function nav_active($args = []) {
     return 'active';
   }
 
+  // page template
+  if (!empty($args['page_template']) && is_page_template($args['page_template'])) {
+    return 'active';
+  }
+
   return '';
 }
 

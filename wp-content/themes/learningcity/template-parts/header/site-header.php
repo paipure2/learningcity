@@ -1,3 +1,14 @@
+<?php
+$blm_pages = get_posts([
+   'post_type'      => 'page',
+   'posts_per_page' => 1,
+   'meta_key'       => '_wp_page_template',
+   'meta_value'     => 'page-blm.php',
+   'post_status'    => 'publish',
+   'fields'         => 'ids',
+]);
+$blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
+?>
  <header>
     <div class="container">
        <div class="header">
@@ -18,7 +29,12 @@
                   Next Learn
                   </a>
                </li>
-                <li><a href="#!" disabled>แหล่งเรียนรู้<span>เร็วๆนี้</span></a></li>
+                <li>
+                  <a href="<?php echo esc_url($blm_url); ?>"
+                     class="<?php echo esc_attr( nav_active(['page_template' => 'page-blm.php']) ); ?>">
+                  แหล่งเรียนรู้
+                  </a>
+               </li>
                 <li><a href="#!" disabled>การเรียนรู้นอกระบบ<span>เร็วๆนี้</span></a></li>
                 <li><a href="#!" disabled>เกี่ยวกับโครงการ<span>เร็วๆนี้</span></a></li>
              </ul>
@@ -53,7 +69,12 @@
                Next Learn
             </a>
             </li>
-             <li><a href="#!" disabled>แหล่งเรียนรู้<span>เร็วๆนี้</span></a></li>
+             <li>
+             <a href="<?php echo esc_url($blm_url); ?>"
+                class="<?php echo nav_active(['page_template' => 'page-blm.php']); ?>">
+                แหล่งเรียนรู้
+             </a>
+             </li>
              <li><a href="#!" disabled>การเรียนรู้นอกระบบ<span>เร็วๆนี้</span></a></li>
              <li><a href="#!" disabled>เกี่ยวกับโครงการ<span>เร็วๆนี้</span></a></li>
           </ul>

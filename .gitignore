@@ -27,3 +27,6 @@
 /wp-content/uploads/
 /wp-content/cache/
 /wp-content/upgrade/
+
+# Exclude file flagged by GitHub push protection
+/wp-content/plugins/acf-extended-pro/pro/includes/libraries/stripe/README.md

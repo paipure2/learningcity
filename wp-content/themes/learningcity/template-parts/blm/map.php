@@ -1,16 +1,16 @@
 <?php
 if (!defined('ABSPATH')) exit;
 ?>
-<main id="mapSection" class="lg:col-span-5 relative h-full">
+<main id="mapSection" class="relative h-full">
   <div id="map"></div>
 
   <!-- SEARCH OVERLAY (NEW) -->
   <div id="searchOverlay"
     class="absolute z-40 left-3 right-3 bottom-3
-          lg:left-auto lg:right-4 lg:bottom-auto lg:top-4 lg:w-[360px]">
+          lg:left-auto lg:right-4 lg:bottom-auto lg:top-[18px] lg:w-[297px]">
 
-    <div id="searchBox" class="bg-white/95 backdrop-blur rounded-2xl border shadow-sm p-3">
-      <div class="space-y-2 relative">
+    <div id="searchBox" class="bg-white/95 backdrop-blur rounded-[8px] border shadow-sm p-0">
+      <div class="relative">
         <label class="text-sm font-semibold">ค้นหา</label>
         <input id="q"
               class="w-full rounded-lg border px-3 py-2"
@@ -18,19 +18,19 @@ if (!defined('ABSPATH')) exit;
               autocomplete="off"/>
 
         <div id="searchStatus"
-            class="hidden rounded-xl border bg-emerald-50 p-3 text-xs text-emerald-900">
+            class="hidden rounded-[8px] border p-2 text-xs">
           กำลังค้นหา: <span id="searchText" class="font-semibold"></span>
           <button id="btnClearSearch" class="ml-2 underline font-semibold">ล้างค้นหา</button>
         </div>
 
         <div id="searchPanel"
             class="hidden absolute z-50 left-0 right-0 mt-2 bg-white border rounded-xl shadow-lg overflow-hidden">
-          <div class="px-3 py-2 text-xs text-slate-500 border-b">
-            ผลการค้นหา (คลิกเพื่อไปยังสถานที่)
+          <div class="search-panel-head px-3 py-2 text-xs text-slate-500 border-b">
+            ผลการค้นหา
           </div>
-          <div id="searchResults" class="max-h-72 overflow-auto"></div>
-          <div class="px-3 py-2 text-xs text-slate-500 border-t bg-slate-50">
-            แสดงสูงสุด 8 รายการ • กด ESC เพื่อปิด
+          <div id="searchResults" class="max-h-[252px] overflow-auto"></div>
+          <div class="search-panel-foot px-3 py-2 text-xs text-slate-500 border-t bg-slate-50">
+            แสดงสูงสุด 8 รายการ
           </div>
         </div>
       </div>
@@ -38,17 +38,26 @@ if (!defined('ABSPATH')) exit;
   </div>
 
 
-  <aside id="drawer" class="hidden fixed top-0 h-full bg-white z-[70] overflow-hidden
+  <aside id="drawer" class="hidden fixed top-0 h-full z-[70] overflow-hidden
        w-full sm:w-[560px] right-0
        lg:left-[25vw] lg:w-[33.3333vw] lg:right-auto">
-    <button id="drawerClose"
-      class="absolute top-4 right-4 h-10 w-10 rounded-full bg-black text-white flex items-center justify-center">
-      ✕
-    </button>
+    <div id="drawerPanel" class="relative h-full bg-white">
+      <div id="drawerLoading" class="hidden absolute inset-0 z-20 bg-white/65 backdrop-blur-[1px]">
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="rounded-2xl bg-white px-5 py-4 shadow-xl border flex items-center gap-3">
+            <div class="h-5 w-5 rounded-full border-2 border-slate-300 border-t-emerald-600 animate-spin"></div>
+            <div class="text-sm font-semibold text-slate-700">กำลังโหลดรายละเอียด...</div>
+          </div>
+        </div>
+      </div>
+      <button id="drawerClose"
+        class="absolute top-4 right-4 h-10 w-10 rounded-full bg-black text-white flex items-center justify-center">
+        ✕
+      </button>
 
-    <div class="h-full flex flex-col">
-      <div class="px-6 pt-8 pb-4 border-b">
-        <h2 id="dTitle" class="text-2xl font-extrabold leading-tight"></h2>
+      <div class="h-full flex flex-col">
+        <div class="px-6 pt-8 pb-4 border-b">
+          <h2 id="dTitle" class="text-2xl font-extrabold leading-tight"></h2>
 
         <div class="mt-3 flex items-center gap-3 text-sm text-slate-600">
           <div class="inline-flex items-center gap-2">
