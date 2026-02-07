@@ -1,0 +1,94 @@
+@layer components {
+  .modal {
+    @apply fixed flex items-center justify-center origin-bottom h-full w-full left-0 top-0 right-0 z-5000 pointer-events-none xl:px-8;
+
+    @media (max-width: 640px) {
+      min-height: 100dvh;
+    }
+
+    .modal-content {
+      @media (max-width: 640px) {
+        max-height: 100dvh;
+      }
+    }
+
+    .overlay-modal {
+      @apply bg-black/65;
+      z-index: 40;
+      transition: 0.4s cubic-bezier(0.8, 0, 0.1, 1);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: all;
+      cursor: pointer;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+    }
+
+    .card-modal {
+      @apply relative bg-white
+            z-50 overflow-hidden
+            translate-y-[300%] md:opacity-0 
+            transition-all duration-700 ease-in-out 
+            max-w-full max-lg:w-full lg:max-w-[1300px] rounded-t-2xl xl:rounded-3xl;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-action {
+      @apply flex justify-end;
+    }
+    .close-modal {
+      @apply transition-all duration-300 ease-in-out scale-0 rotate-0;
+
+      svg {
+        @apply transition-all duration-300 ease-in-out scale-0;
+      }
+
+      &:hover {
+        @apply transition-all duration-500 ease-in-out rotate-180! opacity-80;
+      }
+    }
+
+    &.modal-active {
+      @apply pointer-events-auto;
+
+      .overlay-modal {
+        @apply opacity-100 visible;
+      }
+      .card-modal {
+        @apply translate-y-0 scale-100 opacity-100 transition-all duration-500 ease-in-out delay-100;
+      }
+
+      .close-modal {
+        @apply delay-300 scale-100 rotate-0 transition-all duration-300 ease-in-out;
+
+        svg {
+          @apply delay-450 scale-100 transition-all duration-500 ease-in-out;
+        }
+      }
+    }
+  }
+
+  /* Scroll Button Fade Effect */
+  .btn-scroll {
+    @apply transition-all duration-300 ease-in-out;
+    transform: translateY(0) scale(1);
+
+    /* Fixed position on mobile */
+    &.fixed {
+      @apply fixed bottom-4 left-1/2 -translate-x-1/2 z-50;
+    }
+
+    /* Absolute position on desktop */
+    &.absolute {
+      @apply absolute bottom-4 left-1/2 -translate-x-1/2;
+    }
+
+    &.fade-out {
+      @apply opacity-0;
+      transform: translateY(3px) scale(0.95);
+    }
+  }
+}

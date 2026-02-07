@@ -1,0 +1,90 @@
+/* Wordpress Admin */
+/* #wpadminbar {
+  @apply bg-black/0 bg-gradient-to-b from-black/70 from-0% to-100% to-black/0;
+} */
+
+.wp-toolbar {
+  #wpadminbar {
+    @apply !bg-[#1d2327];
+  }
+}
+
+.wp-admin {
+  .misc-pub-section,
+  #select-media-language,
+  #select-add-term-language,
+  .pll-media-language-column {
+    @apply flex items-center gap-1;
+  }
+  #minor-publishing {
+    .misc-pub-section {
+      @apply flex-wrap;
+    }
+  }
+
+  .post-revisions {
+    li {
+      @apply flex gap-0.5 items-center;
+    }
+  }
+  /* Description Taxnomy */
+  &#admin-body-termphp-student-guide,
+  &.post-type-student-guide {
+    .term-description-wrap {
+      @apply hidden;
+    }
+  }
+
+  #wpadminbar .quicklinks > ul > li > a {
+    @apply flex items-center;
+  }
+
+  #term-translations .pll-language-column {
+    @apply w-fit flex items-center;
+  }
+
+  .tablenav {
+    @apply mb-5;
+  }
+
+  .health-check-accordion-trigger {
+    @apply bg-white;
+  }
+
+  table.fixed {
+    @apply static;
+  }
+
+  .notice-info,
+  .notice-warning,
+  .notice-error,
+  .updated-message {
+    @apply flex;
+
+    &.hidden {
+      @apply !hidden;
+    }
+  }
+
+  .tablenav {
+    @apply mb-5;
+  }
+
+  #select-post-language,
+  #select-edit-term-language {
+    @apply flex;
+  }
+
+  .acf-color-picker[data-display="palette"]
+    .acf-color-picker-palette
+    .color
+    > span.dashicons-saved {
+    @apply !text-primary;
+  }
+
+  #wp-admin-bar-languages-default {
+    .ab-item {
+      @apply flex items-center;
+    }
+  }
+}

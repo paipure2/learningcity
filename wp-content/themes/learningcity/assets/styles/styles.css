@@ -1,0 +1,18 @@
+@import "tailwindcss";
+@import "./admin.css";
+/* Base */
+@import "./fonts.css";
+@import "./base/variables.css";
+@import "./base/base.css";
+@import "./base/typography.css";
+@import "./base/global.css";
+
+/* Layout */
+@import "./layouts/header.css";
+@import "./layouts/footer.css";
+
+/* Components */
+@import "./components/card.css";
+@import "./components/modal.css";
+@import "./components/the-content.css";
+@import "./components/chart.css";

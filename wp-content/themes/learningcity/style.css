@@ -1,0 +1,310 @@
+@charset "UTF-8";
+/*!
+Theme Name: Bangkok Learning City 
+Author: 1DD.CO
+Author URI: https://1dd.co/
+Description: 
+Version: 1.0.0
+Tested up to: 6.2
+Requires PHP: 7.4
+License: GNU General Public License v2 or later
+License URI: LICENSE
+Text Domain:  
+Tags:
+*/
+/* =========================
+   WPC Filters -> Pill style like screenshot
+   ========================= */
+/* scope ให้กระทบเฉพาะ widget นี้ */
+.widget.widget_wpc_filters_widget {
+  /* ปรับค่ากลางได้จากตัวแปรนี้ */
+  --wpc-pill-bg: #fff;
+  --wpc-pill-border: rgba(0, 0, 0, 0.12);
+  --wpc-pill-border-hover: rgba(0, 0, 0, 0.22);
+  --wpc-pill-text: #111;
+  --wpc-pill-muted: rgba(0, 0, 0, 0.55);
+  --wpc-pill-radius: 9999px;
+  --wpc-pill-h: 44px;
+  --wpc-pill-pad-x: 16px;
+  --wpc-pill-gap: 12px;
+  /* ---------- layout รวม ---------- */
+  /* แถว filter ให้เรียงแนวนอนเหมือนในภาพ */
+  /* แต่ละ section (dropdown) */
+  /* หัวข้อ (Course Category / Audience / Course Provider)
+     ถ้าอยากให้โชว์เหมือน “ประเภทสถานที่ / เขต ...” ให้แก้ text จาก backend
+     แต่ถ้าไม่อยากเห็นหัวข้อซ้ำ ๆ แบบใน widget เดิม ให้ซ่อนไว้ */
+  /* ---------- ปรับ select ให้เป็น pill ---------- */
+  /* ลูกศร dropdown (chevron) */
+  /* ---------- ปรับ chips (selected terms) ให้เป็น pill พร้อม X ---------- */
+}
+.widget.widget_wpc_filters_widget .wpc-filters-widget-content {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+.widget.widget_wpc_filters_widget .wpc-filters-widget-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wpc-pill-gap);
+  align-items: center;
+}
+.widget.widget_wpc_filters_widget .wpc-filters-section {
+  margin: 0 !important; /* กัน margin เดิมของปลั๊กอิน */
+  padding: 0 !important;
+  flex: 0 0 auto;
+}
+.widget.widget_wpc_filters_widget .wpc-filter-header {
+  display: none;
+}
+.widget.widget_wpc_filters_widget .wpc-filter-content {
+  position: relative;
+}
+.widget.widget_wpc_filters_widget .wpc-filters-widget-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  height: var(--wpc-pill-h);
+  min-width: 120px;
+  padding: 0 calc(var(--wpc-pill-pad-x) + 22px) 0 var(--wpc-pill-pad-x);
+  border: 1px solid var(--wpc-pill-border);
+  border-radius: var(--wpc-pill-radius);
+  background: var(--wpc-pill-bg);
+  color: var(--wpc-pill-text);
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+.widget.widget_wpc_filters_widget .wpc-filters-widget-select:hover {
+  border-color: var(--wpc-pill-border-hover);
+}
+.widget.widget_wpc_filters_widget .wpc-filters-widget-select:focus {
+  border-color: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+.widget.widget_wpc_filters_widget .wpc-filter-content::after {
+  content: "";
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 16px 16px;
+  /* SVG chevron down (ไม่ผูกโดเมน) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  opacity: 0.55;
+}
+.widget.widget_wpc_filters_widget .wpc-custom-selected-terms,
+.widget.widget_wpc_filters_widget .wpc-inner-widget-chips-wrapper {
+  margin-top: 14px;
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chip {
+  margin: 0 !important;
+  /* ถ้าไม่อยากให้มี Reset all เป็น chip แรก ให้ซ่อน */
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chip a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: var(--wpc-pill-radius);
+  border: 1px solid var(--wpc-pill-border);
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--wpc-pill-text);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chip a:hover {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: var(--wpc-pill-border-hover);
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chip a:active {
+  transform: translateY(1px);
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chip .wpc-chip-remove-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--wpc-pill-text);
+  font-size: 16px;
+  line-height: 1;
+}
+.widget.widget_wpc_filters_widget .wpc-filter-chip.wpc-chip-reset-all {
+  display: none;
+}
+.widget.widget_wpc_filters_widget .widget.widget_wpc_filters_widget {
+  /* wrapper ของแต่ละ dropdown */
+  /* ตัว select */
+  /* ลูกศร dropdown อย่าดันความกว้าง */
+}
+.widget.widget_wpc_filters_widget .widget.widget_wpc_filters_widget .wpc-filters-section {
+  flex: 0 0 auto;
+}
+.widget.widget_wpc_filters_widget .widget.widget_wpc_filters_widget .wpc-filter-content {
+  display: inline-flex;
+}
+.widget.widget_wpc_filters_widget .widget.widget_wpc_filters_widget .wpc-filters-widget-select {
+  width: auto !important;
+  min-width: unset;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.widget.widget_wpc_filters_widget .widget.widget_wpc_filters_widget .wpc-filter-content::after {
+  right: 14px;
+}
+
+.widget.widget_wpc_filters_widget select {
+  width: 16ch !important;
+}
+
+.wpc-instead-of-posts-found {
+  display: none !important;
+}
+
+.wpc-filter-content select {
+  margin-bottom: 0 !important;
+}
+
+.wpc-filter-chip-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Responsive: จอเล็กให้เต็มแถว ---------- */
+@media (max-width: 520px) {
+  .widget.widget_wpc_filters_widget select {
+    width: 10ch !important;
+  }
+}
+.widget.widget_wpc_filters_widget {
+  /* Desktop ปกติให้ wrap ตามเดิม/ที่คุณจัด */
+}
+.widget.widget_wpc_filters_widget .wpc-filters-scroll-container {
+  overflow: visible;
+}
+@media (max-width: 768px) {
+  .widget.widget_wpc_filters_widget {
+    /* ให้แถบ filter เลื่อนได้แนวนอนในมือถือ */
+    /* ทำให้ wrapper กว้างตามจำนวน dropdown และไม่ wrap */
+    /* แต่ละ pill ไม่ให้หด */
+    /* สวยขึ้น: ซ่อน scrollbar (ยัง scroll ได้) */
+  }
+  .widget.widget_wpc_filters_widget .wpc-filters-scroll-container {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    padding-bottom: 6px;
+  }
+  .widget.widget_wpc_filters_widget .wpc-filters-widget-wrapper {
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    width: -moz-max-content !important;
+    width: max-content !important;
+    gap: 6px;
+  }
+  .widget.widget_wpc_filters_widget .wpc-filters-section {
+    flex: 0 0 auto !important;
+    scroll-snap-align: start;
+  }
+  .widget.widget_wpc_filters_widget .wpc-filters-scroll-container {
+    scrollbar-width: none;
+  }
+  .widget.widget_wpc_filters_widget .wpc-filters-scroll-container::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.widget.widget_wpc_filters_widget {
+  /* ซ่อน filter ที่ไม่มี term เลย */
+}
+.widget.widget_wpc_filters_widget .wpc-filters-section:has(.wpc-no-filter-terms) {
+  display: none !important;
+}
+
+#ajaxsearchlite1 .probox .proinput input,
+div.asl_w .probox .proinput input {
+  font-family: "Anuphan" !important;
+  font-size: 20px !important;
+}
+
+#ajaxsearchlite1 .probox .proinput input,
+div.asl_w .probox .proinput input {
+  font-family: "Anuphan" !important;
+  font-size: 20px !important;
+}
+
+div.asl_r .results .item .asl_content h3,
+div.asl_r .results .item .asl_content h3 a {
+  font-family: "Anuphan" !important;
+  color: #000000 !important;
+  font-size: 18px !important;
+}
+
+div#ajaxsearchliteres1 {
+  border-radius: 14px;
+  box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.1607843137);
+}
+
+body .wpc-filter-chips-list li.wpc-filter-chip:not(.wpc-chip-reset-all) a {
+  border-color: #00744a !important;
+}
+
+.wpc-custom-selected-terms:not(.wpc-show-on-mobile),
+.wpc-edit-filter-set,
+.wpc_show_bottom_widget .widget_wpc_selected_filters_widget,
+.wpc_show_bottom_widget .wpc-filters-widget-content .wpc-filter-set-widget-title,
+.wpc_show_bottom_widget .wpc-filters-main-wrap .widget-title,
+.wpc_show_bottom_widget .wpc-filters-widget-wrapper .wpc-filter-layout-submit-button,
+.wpc_show_bottom_widget .wpc-posts-found,
+body.wpc_show_bottom_widget .wpc-open-close-filters-button,
+body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
+  display: block !important;
+}
+
+.wpc-filter-chips-list {
+  display: flex !important;
+}
+
+.wpc-edit-filter-set {
+  display: none !important;
+}
+
+.modal {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.modal.modal-active {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}/*# sourceMappingURL=style.css.map */

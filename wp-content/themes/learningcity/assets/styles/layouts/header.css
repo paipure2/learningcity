@@ -1,0 +1,84 @@
+@layer layouts {
+  header {
+    @apply relative;
+
+    .header {
+      @apply flex justify-between items-center gap-4 sm:py-6 py-5 xl:h-[114px];
+    }
+
+    .logo-site {
+      @apply w-fit block;
+
+      svg {
+        @apply xl:w-[155px] lg:w-[110px] md:w-[155px] w-[135px];
+      }
+    }
+
+    .navbar {
+      @apply hidden lg:block;
+      ul {
+        @apply list-none! flex gap-1 m-0!;
+
+        a {
+          @apply block text-center text-fs14 xl:text-fs18 font-semibold text-black bg-white py-1 px-4 rounded-full transition-colors duration-300;
+
+          &:hover {
+            @apply bg-black/5;
+          }
+          &.active {
+            @apply text-white bg-black;
+          }
+
+          &[disabled] {
+            @apply opacity-25 pointer-events-none;
+          }
+
+          span {
+            @apply block text-fs10 font-normal;
+          }
+        }
+      }
+    }
+
+    .box-right {
+      @apply flex lg:items-center items-end justify-end xl:gap-8 gap-4 flex-1 lg:flex-row flex-col;
+    }
+
+    .hamburger-menu {
+      @apply h-5.5 flex flex-col items-center justify-between lg:hidden;
+      span {
+        @apply h-[3px] w-8 bg-black block;
+      }
+    }
+  }
+
+  .expand-menu {
+    @apply min-h-svh h-full bg-white  w-full fixed z-10 right-0 top-0 transition-opacity pointer-events-none opacity-0;
+
+    &.is-active {
+      @apply lg:opacity-0 opacity-100  lg:pointer-events-none pointer-events-auto;
+    }
+
+    .btn-close {
+      @apply w-10 bg-black rounded-full p-3 absolute right-4 top-4;
+    }
+
+    .list-menu {
+      @apply pb-6;
+      li {
+        a {
+          @apply text-fs28 font-bkk sm:py-1.5 py-1 inline-block transition-colors;
+          &:hover {
+            @apply text-primary;
+          }
+          &[disabled] {
+            @apply opacity-25 pointer-events-none;
+          }
+          span {
+            @apply text-fs16 font-anuphan inline-block ml-2;
+          }
+        }
+      }
+    }
+  }
+}

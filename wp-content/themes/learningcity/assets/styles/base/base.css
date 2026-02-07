@@ -1,0 +1,39 @@
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  .main {
+    @apply opacity-0;
+  }
+
+  .container {
+    @apply mx-auto xl:px-12 sm:px-8 px-4 max-w-384!;
+  }
+
+  .gs-dev-tools {
+    z-index: 9999999999;
+  }
+}
+
+.layout-sidebar {
+  @apply grid gap-0 xl:-ml-12 ml-0 xl:grid-cols-[300px_minmax(auto,1fr)] grid-cols-none;
+}
+
+.app-layout {
+  @apply min-h-lvh flex flex-col xl:overflow-visible overflow-hidden;
+}
+
+.aside {
+  @apply px-6 xl:block hidden;
+
+  .logo-site {
+    svg {
+      @apply w-[155px];
+    }
+  }
+
+  .btn-search-bar {
+    @apply w-full h-8 bg-[#EDEDED] rounded-full mb-5 flex items-center gap-2 px-3 text-fs16 cursor-pointer;
+  }
+}

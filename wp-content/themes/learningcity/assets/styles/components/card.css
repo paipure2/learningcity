@@ -1,0 +1,383 @@
+/* Card */
+@layer components {
+  .card-category {
+    max-width: 300px;
+    border-radius: 20px;
+    overflow: hidden;
+    padding-top: 16px;
+    position: relative;
+    display: block;
+    transition: all 0.15s ease-out;
+    &:hover {
+      scale: 1.025;
+      box-shadow: 0 4px 12px -1px rgba(0 0 0 / 10%);
+    }
+    .bg {
+      width: 100%;
+      height: 65%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    p {
+      padding: 8px 4px 16px;
+      text-align: center;
+      font-size: var(--text-fs14);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-white);
+      line-height: 1.2;
+    }
+  }
+
+  .card-category-other {
+    display: block;
+    max-width: 400px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0px 0px 15px -1px rgba(0 0 0 / 8%);
+    transition: all 0.15s ease-out;
+
+    &:hover {
+      scale: 1.025;
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      aspect-ratio: 1/1;
+    }
+
+    .txt {
+      background: #fff;
+      padding: 16px 16px;
+
+      p {
+        font-size: var(--text-fs16);
+        font-weight: var(--font-weight-semibold);
+      }
+    }
+  }
+
+  .card-course {
+    display: block;
+    width: 100%;
+    max-width: 800px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0px 0px 15px -1px rgba(0 0 0 / 8%);
+    background: #fff;
+    transition: all 0.15s ease-out;
+
+    &:hover {
+      scale: 1.025;
+    }
+
+    .card-content {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      text-align: left;
+      padding: 20px 24px;
+
+      h2 {
+        @apply font-semibold font-anuphan mt-1;
+      }
+
+      h3 {
+        @apply font-normal font-anuphan;
+      }
+
+      .img {
+        width: 66px;
+        aspect-ratio: 1/1;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #ddd;
+      }
+    }
+
+    .card-footer {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      white-space: nowrap;
+      border-top: 1px solid rgba(0 0 0 / 7%);
+    }
+  }
+
+  .card-highlight {
+    background: #ccc;
+    overflow: hidden;
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 1/1.025;
+
+    .img-bg {
+      position: absolute;
+
+      &:before {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 50%;
+        bottom: 0;
+        left: 0;
+        background: linear-gradient(
+          0deg,
+          rgba(0 0 0 / 75%) 0%,
+          rgba(0 0 0 / 0%) 100%
+        );
+      }
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+
+    .txt {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      padding: 6%;
+      color: #fff;
+    }
+
+    .box-event-countdown {
+      border-radius: 16px;
+      border: 1px solid rgba(255 255 255 / 35%);
+      padding: 3% 3% 3% 6%;
+      backdrop-filter: blur(8px);
+      background: rgba(255 255 255 / 12%);
+    }
+
+    h2 {
+      font-weight: var(--font-weight-bold);
+      font-family: var(--font-bkk);
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-weight: var(--font-weight-semibold);
+      font-family: var(--font-anuphan);
+      line-height: 1.25;
+    }
+
+    h4 {
+      font-weight: var(--font-weight-semibold);
+      font-family: var(--font-anuphan);
+      line-height: 1.25;
+    }
+
+    p {
+      font-weight: var(--font-weight-normal);
+      font-family: var(--font-anuphan);
+      line-height: 1.25;
+    }
+
+    .num {
+      display: block;
+      font-size: 220%;
+      font-family: var(--font-bkk);
+    }
+
+    &[size="medium"] {
+      border-radius: 20px;
+      max-width: 400px;
+
+      h2 {
+        font-size: var(--text-fs38);
+      }
+
+      h3 {
+        font-size: var(--text-fs24);
+      }
+
+      h4 {
+        font-size: var(--text-fs14);
+      }
+
+      p {
+        font-size: var(--text-fs12);
+      }
+    }
+
+    &[size="large"] {
+      border-radius: 30px;
+      max-width: 600px;
+
+      h2 {
+        font-size: var(--text-fs50);
+      }
+
+      h3 {
+        font-size: var(--text-fs32);
+      }
+
+      h4 {
+        font-size: var(--text-fs20);
+      }
+
+      p {
+        font-size: var(--text-fs14);
+      }
+    }
+  }
+
+  @media (max-width: 1535px) {
+    .card-highlight[size="large"] {
+      h2 {
+        font-size: 3.26vw;
+      }
+      h3 {
+        font-size: 2.1vw;
+      }
+      h4 {
+        font-size: 1.3vw;
+      }
+      p {
+        font-size: 0.92vw;
+      }
+    }
+  }
+
+  @media (max-width: 1439px) {
+    .card-highlight[size="medium"] {
+      max-width: 27.8vw;
+
+      .box-event-countdown {
+        border-radius: 12px;
+      }
+
+      h2 {
+        font-size: 2.64vw;
+      }
+      h3 {
+        font-size: 1.67vw;
+      }
+      h4 {
+        font-size: 0.97vw;
+      }
+      p {
+        font-size: 0.83vw;
+      }
+    }
+  }
+
+  @media (max-width: 1023px) {
+    .card-highlight[size="medium"] {
+      max-width: 100%;
+      width: 100%;
+
+      h2 {
+        font-size: 3.91vw;
+      }
+      h3 {
+        font-size: 2.5vw;
+      }
+      h4 {
+        font-size: 1.45vw;
+      }
+      p {
+        font-size: 1.25vw;
+      }
+    }
+
+    .card-highlight[size="large"] {
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+
+      h2 {
+        font-size: 6.5vw;
+      }
+      h3 {
+        font-size: 4.3vw;
+      }
+      h4 {
+        font-size: 2.7vw;
+      }
+      p {
+        font-size: 1.9vw;
+      }
+    }
+  }
+
+  @media (max-width: 767px) {
+    .card-course {
+      .card-content {
+        padding: 16px;
+      }
+      .card-footer {
+        padding: 12px 16px;
+      }
+    }
+  }
+
+  @media (max-width: 639px) {
+    .card-highlight[size="medium"] {
+      border-radius: 16px;
+      h2 {
+        font-size: 6.58vw;
+      }
+      h3 {
+        font-size: 4.26vw;
+      }
+      h4 {
+        font-size: 2.62vw;
+      }
+      p {
+        font-size: 1.85vw;
+      }
+      .num {
+        font-size: 250%;
+      }
+    }
+
+    .card-highlight[size="large"] {
+      border-radius: 20px;
+      h2 {
+        font-size: 8.7vw;
+      }
+      h3 {
+        font-size: 5.8vw;
+      }
+      h4 {
+        font-size: 3.5vw;
+      }
+      p {
+        font-size: 2.5vw;
+      }
+    }
+
+    .card-category {
+      border-radius: 12px;
+      p {
+        font-size: var(--text-fs12);
+      }
+    }
+
+    .card-category-other {
+      border-radius: 12px;
+      .txt p {
+        font-size: var(--text-fs14);
+      }
+    }
+
+    .card-course {
+      border-radius: 12px;
+      .card-content {
+        .img {
+          width: 60px;
+        }
+      }
+    }
+  }
+}

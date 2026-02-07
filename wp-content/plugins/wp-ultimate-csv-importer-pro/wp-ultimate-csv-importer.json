@@ -1,0 +1,1085 @@
+{
+  "Plugin Name": "WP Ultimate CSV Importer Pro",
+  "version": [
+    "8.11",
+    "8.10.7",
+    "8.10.6",
+    "8.10.5",
+    "8.10.4",
+    "8.10.3",
+    "8.10.2",
+    "8.10.1",
+    "8.10",
+    "8.9.11",
+    "8.9.10",
+    "8.9.9",
+    "8.9.8",
+    "8.9.7",
+    "8.9.6",
+    "8.9.5",
+    "8.9.4",
+    "8.9.3",
+    "8.9.2",
+    "8.9.1",
+    "8.9",
+    "8.8",
+    "8.7.1.7",
+    "8.7.1.6",
+    "8.7.1.5",
+    "8.7.1.4",
+    "8.7.1.3",
+    "8.7.1.2",
+    "8.7.1.1",
+    "8.7.1",
+    "8.7",
+    "8.6",
+    "8.5",
+    "8.4.1",
+    "8.4",
+    "8.3",
+    "8.2",
+    "8.1",
+    "8.0.1",
+    "8.0",
+    "7.9",
+    "7.8.11",
+    "7.8.10",
+    "7.8.9",
+    "7.8.8",
+    "7.8.7",
+    "7.8.6",
+    "7.8.4",
+    "7.8.1",
+    "7.8",
+    "7.7",
+    "7.6",
+    "7.5",
+    "7.3",
+    "7.0",
+    "6.5",
+    "6.4",
+    "6.3.4",
+    "6.3.3",
+    "6.3.2",
+    "6.3.1",
+    "6.3",
+    "6.2",
+    "6.1",
+    "6.0.5",
+    "6.0.4",
+    "6.0.3",
+    "6.0.2",
+    "6.0.1",
+    "6.0",
+    "5.5",
+    "5.4",
+    "5.3",
+    "5.2",
+    "5.1",
+    "5.0.3",
+    "5.0.2",
+    "5.0.1",
+    "5.0"
+  ],
+  "changelogs": {
+    "5.0": {
+      "0": "Added: Compatibility for WordPress 4.7 and PHP 7.",
+      "1": "Added: Option to replace imported CSV file value with static and dynamic value.",
+      "2": "Added: Image image import from external URL",
+      "3": "Added: Send email to newly imported User with Password Information.",
+      "4": "Added: Any Custom Post Type import.",
+      "5": "Added: Post Type import with terms & taxonomies with any depth of parent-child hierarchy.",
+      "6": "Added: Migration for the following versions 4.0.0, 4.1.0, 4.4.0 and 4.5.",
+      "7": "Improved: High speed import with enhanced UI.",
+      "8": "Improved: User role import with capability value or role name in CSV."
+    },
+    "5.0.1": {
+      "0": "Fixed: WP Customer Reviews import feature."
+    },
+    "5.0.2": {
+      "0": "Added: Compatibility from PHP 5.3.",
+      "1": "Todo Added: For handling the log file whether exists or not."
+    },
+    "5.0.3": {
+      "0": "Added: Support for traditional Chinese characters.",
+      "1": "Fixed: Canonical URL support on All in One SEO data import.",
+      "2": "Fixed: Author/Editor menu visibility issue.",
+      "3": "Fixed: [Assigning categories to post issue](https://wordpress.org/support/topic/ultimate-csv-importer-v5-adds-all-posts-to-uncategorized/)",
+      "4": "Fixed: [Import with Chinese character](https://wordpress.org/support/topic/unable-to-import-posts-with-chinese-characters/)",
+      "5": "Fixed: [Custom taxonomies are mixed up while assign a single term to the posts](https://wordpress.org/support/topic/version-5-03-issues/)",
+      "6": "Fixed: All of a sudden all the custom fields present in the WP installation are added to each single post, even if they are empty;",
+      "7": "Fixed: Inline image support. ( Supports all external URL )",
+      "8": "Fixed: All of the posts are now being added the following without need, before post content",
+      "9": "Removed: Custom capabilities from the roles to access the plugins. ( Administrator, Author, Editor )",
+      "10": "Applied: iCheck style to allow author / editor option.",
+      "11": "Added: Validation on Enquiry & Newsletter Subscription forms.",
+      "12": "Note Added: In Support form.",
+      "13": "Modified: Plugin action links instead of plugin row meta.",
+      "14": "Removed: Unwanted warnings in migration."
+    },
+    "5.1": {
+      "0": "Improvements: Performance tuneup.",
+      "1": "Moved: All helper class files under helpers directory.",
+      "2": "Added: WebService for all the available features.",
+      "3": "Fixed: PODS fields registration issue using API.",
+      "4": "Fixed: Export user fields issue for Toolset types plugin.",
+      "5": "Fixed: wp_page_template field import issue on import Pages.",
+      "6": "Removed: Warnings in plugin row meta information.",
+      "7": "Fixed: Widget not appeared for ACF Repeater fields while using ACF Pro add-on.",
+      "8": "Added: Inline image support.",
+      "9": "Removed: Unwanted DOCTYPE wrapper while import the inline images for post content.",
+      "10": "Removed: Unwanted capabilities on activation.",
+      "11": "Removed: Unwanted queries on deactivation.",
+      "12": "Fixed: Thumbnail generation issue on import featured images.",
+      "13": "Fixed: Featured image support for WooCommerce & MarketPress Variations.",
+      "14": "Fixed: Yoast SEO import support for Terms & Taxonomies.",
+      "15": "Fixed: Issue on exporting Yoast SEO data for Post types & Taxonomies.",
+      "16": "Fixed: External URL support ( If having space in the path ).",
+      "17": "Fixed: WooCommerce product type import ( Simple, Grouped, External, Variation, Simple Subscription & Variable Subscription ).",
+      "18": "Fixed: WooCommerce product meta information import.",
+      "19": "Fixed: post_category and post_tag export issue.",
+      "20": "Fixed: Users custom fields not shown in Mapping Section which is created by ACF Pro.",
+      "21": "Fixed: Broken when SCRIPT_DEBUG is true. [Solved](https://wordpress.org/support/topic/broken-when-script_debug-is-true/).",
+      "22": "Fixed: Warnings in prepare statements (when SCRIPT_DEBUG is true).",
+      "23": "Fixed: Issue in File manager, When switching the revisions.",
+      "24": "Fixed: Issues in import multiple images & multiple files on ACF Pro Repeater field.",
+      "25": "Fixed: ACF free image field & file field import.",
+      "26": "Added: Missing font file.",
+      "27": "Removed: Unwanted widget fields for WPeCommerce Coupons.",
+      "28": "Added: Notice for enable the wp-cron to populate the featured images.",
+      "29": "Added: Warning for Exceeded file size csv.",
+      "30": "Fixed: Issue on exporting Categories and Tags.",
+      "31": "Fixed: Issue while import post type with post ID's.",
+      "32": "Added: Restriction for WP dashboard charts to the user who have the role Author & Editor.",
+      "33": "Fixed: Export Issue for Events,Event recurring and locations in Events Manager plugin.",
+      "34": "Added: Notice for Database Optimization.",
+      "35": "Removed: Console warnings on Mapping section."
+    },
+    "5.2": {
+      "0": "Added: Advanced mapping section with easy drag ’n’ drop.",
+      "1": "Fixed: WooCommerce Latest version Support(2.6.14).",
+      "2": "Fixed: Import & Export ACF Pro repeater fields. ( Tested upto ACF Pro version - 5.5.10 ).",
+      "3": "Added: Latest version support on Yoast SEO 4.4",
+      "4": "Added: Latest version support on All In One SEO 2.3.12.1",
+      "5": "Added: Latest version support on Toolset Types 2.2.8",
+      "6": "Added: Latest version support on PODS 2.6.8",
+      "7": "Added: Latest version support on WP-Members 3.1.6.3",
+      "8": "Added: Latest version support on WPeCommerce 3.12.0",
+      "9": "Added: Latest version support on MarketPress Lite 3.2",
+      "10": "Added: WPML support for the latest version 3.6.3.",
+      "11": "Fixed: Naming issue while registering third party custom fields from mapping section."
+    },
+    "5.3": {
+      "0": "Added: CMB2 & Custom Field Suite plugin support.",
+      "1": "Added: Scheduled export.",
+      "2": "Added: Duplicate handling in ACF image import.",
+      "3": "Added: Post update with slug.",
+      "4": "Added: Maintainance mode and rollback option.",
+      "5": "Added: WooCommerce latest version support.",
+      "6": "Improved: Mapping session maintainance without data loss.",
+      "7": "Improved: CSV validation.",
+      "8": "Improved: Import serialized data in CSV.",
+      "9": "Improved: Previous mapping template search.",
+      "10": "Improved: Import Post title with special characters",
+      "11": "Improved: Export with delimeters",
+      "12": "Fixed: Comment import, duplicate handling, advanced mapping, ACF repeater field and reference tag in content."
+    },
+    "5.4": {
+      "0": "Added: Import, Update and Schedule XML import.",
+      "1": "Advanced mapping in XML with Table and Tree view.",
+      "2": "Added: New API to import/update with mapping template.",
+      "3": "Fixed: Export users created in specific period.",
+      "4": "Fixed: Send email on new user import.",
+      "5": "Fixed: Events Manager & Customer Review advanced mapping support.",
+      "6": "Fixed: Mapping data loss with advanced mapping in CSV Import."
+    },
+    "5.5": {
+      "0": "Added: support for Toolset Pro 3.1.1 & Free 2.3.4",
+      "1": "Added: support for ACF plugin version 5.7.7",
+      "2": "Added: support for multiple parent relationship import.",
+      "3": "Fixed: ACF Repeater custom fields not appearing under the mapping section.",
+      "4": "Fixed: ACF Pro Repeater field export.",
+      "5": "Fixed: Automatically updating  password on user import."
+    },
+    "6.0": {
+      "0": "Improved:User Interface and Performance",
+      "1": "Added: Image import from computer along with the Alt text & description",
+      "2": "Added: Schedule Import/Export based on their UTC time zone,admins will be notified on the Import or Export in emails in their local time.",
+      "3": "Added: Seperate image import option",
+      "4": "Improved:  Better handling of Images from 3rd party plugins",
+      "5": "Added: Header Manipulation fields can now hold static text content along with any CSV header content.",
+      "6": "Added media report section",
+      "7": "Modified: Import log section with progress bar and time ellapsed",
+      "8": "Added: Latest woocommerce version 3.6.2 support",
+      "9": "Added: Latest CMB2 Plugin support ",
+      "10": "Added: WPML support for the latest version 4.2.5",
+      "11": "Added: SFTP Schedule export",
+      "12": "Added: Export download section with progress bar and time ellapsed",
+      "13": "Added: Export support for toolset repeatable field group,multiple relationships,intermediate relationship.",
+      "14": "Modified: import log section with progress bar and time ellapsed",
+      "15": "Added: support for latest woocommerce(3.6.5) fields",
+      "16": "Added: complete import support for CMB2 2.3.0",
+      "17": "Added: Displays total number of records to be exported",
+      "18": "Schedule Export  based on their UTC time zone. And Admins will be notified on the Import or Export in emails in their local time",
+      "19": "Added: SFTP Schedule export",
+      "20": "Added export download section with progress bar and time ellapsed",
+      "21": "Added:Export support  for latest woocommerce fields",
+      "22": "ACF pro group fields export ",
+      "23": "Added: WPML export support for post,page,custom posts,woocommerce-product,categories,tags",
+      "24": "Added: Export support for toolset repeatable field group,multiple relationships,intermediate relationship.",
+      "25": "Fixed: issues in file from server",
+      "26": "Added: Progress bar for desktop upload",
+      "27": "Added: Separate widget for Nextgen gallery,WPML,Events manager,WooCommerce Orders, Refunds and Coupons",
+      "28": "fixed: Drag and Drop Section supports import of static text along with CSV headers.",
+      "29": "Added: Separate Media Upload Section for uploading bulk Images."
+    },
+    "6.0.2": {
+      "0": "Completely added RTL Support for Right to Left Languages css",
+      "1": "Fixed issue - display acf group and repeater field values to front-end",
+      "2": "Fixed: Download log issue with image import",
+      "3": "Fixed: Custom post with product category import",
+      "4": "Fixed: Bulk image import issue",
+      "5": "Fixed: Custom post with product-cat export",
+      "6": "Cleared warnings while enabling debug mode",
+      "7": "Added: Support for google drive images"
+    },
+    "6.0.3": {
+      "0": "Improved bulk import handling without memory update",
+      "1": "Import post_content image without downloaded into media",
+      "2": "Added: Post Content editor in drag and drop mode",
+      "3": "Added: Support for accepted delimiters(, , \t , | , ; , :)",
+      "4": "Fixed xml file handling issues"
+    },
+    "6.0.4": {
+      "0": "Cleared browser cache problem",
+      "1": "Fixed: Email validation in support form",
+      "2": "Added: Language support for spanish",
+      "3": "Fixed: Toolset sort-order webview issue",
+      "4": "Fixed: Xml file handling issues"
+    },
+    "6.0.5": {
+      "0": "Added: media upload option in drag and drop section",
+      "1": "Fixed: xml import issue with custom-posts",
+      "2": "Fixed: woocommerce chained product import issue",
+      "3": "Fixed: third party plugin widget & import problem in multisite",
+      "4": "Fixed: bulk schedule import",
+      "5": "Fixed: product-sku export issue",
+      "6": "Fixed: Event categories import from recurring events",
+      "7": "Fixed: Custom Category update issue",
+      "8": "Fixed: Default custom fields supports with , delimiter"
+    },
+    "6.1": {
+      "0": "Added: Import,update and export support for bbpress.(Forum,Topic,Reply)",
+      "1": "Added: Import,update and export support for  LearnPress(Lessons,Quizes,Courses,Orders,Questions)",
+      "2": "Added: Export support  for table field and product relationship field in pods",
+      "3": "Added: Import & export support for custom post parent & menu_order",
+      "4": "Added: Export based on specific category",
+      "5": "Added: Existing image import supports with attachment_id",
+      "6": "Added: Import and export support for comments reply.",
+      "7": "Fixed: Comments import with acf fields",
+      "8": "Fixed: Ftp and Url based schedule update",
+      "9": "Fixed: Nextgen gallery zip image import issue",
+      "10": "Fixed: Toolset all type widget issue",
+      "11": "Added: Filename import for pods and acf fields",
+      "12": "Fixed: stock_status update issue",
+      "13": "Fixed: Bulk xml data import",
+      "14": "Modified: Nested category delimiter from -> to >",
+      "15": "Fixed: Pods multiple pick list issue",
+      "16": "Fixed: repeater field post_object import and export using post_title",
+      "17": "Fixed: Added more than one header with xml and drag and drop import",
+      "18": "Fixed: Location and ticket export in Events manager",
+      "19": "Fixed: Import and export support for ACF relationship fields"
+    },
+    "6.2": {
+      "0": "Added: Export template section",
+      "1": "Added: Seperate Media Handling for post content images",
+      "2": "Added: Import support for LearnPress-LMS plugin:Courses,Lessons,Quizzes,Orders and Questions",
+      "3": "Added: Update based on ACF Pro and Free number and text field",
+      "4": "Added: Update based on toolset types number and text field",
+      "5": "Added: Menu import and export support",
+      "6": "Added: Support for Widgets import and export (Posts,Pages,Comments,Categories and Archives)",
+      "7": "Added: Comments import with pods fields",
+      "8": "Fixed: CSV headers with whitespace issue",
+      "9": "Fixed: Non extension xml url support",
+      "10": "Fixed: CMB2 prefix issue",
+      "11": "Updated existing user password based on email while import",
+      "12": "Fixed: ACF select field import issue"
+    },
+    "6.3": {
+      "0": "Added: Update based on PODS text and number fields (Posts,Pages,Custom Posts,WC-Products)",
+      "1": "Added: Support for flexible content (layout) field in ACF Pro plugin.",
+      "2": "Added: Update support for the images",
+      "3": "Added: Export support for the images",
+      "4": "Added: Added Separate widget for image meta fields (ACF,Pods,Tool-set and Product Gallery images).",
+      "5": "Fixed: Drag and drop post content with HTML attributes",
+      "6": "Added: Support for Widgets import and export (Posts,Pages,Comments,Categories and Archives)",
+      "7": "Added: post_title as mandatory field for import",
+      "8": "Added: Search option for timezone listing.(In schedule import and export)",
+      "9": "Added: Update support for values 0 and blank row "
+    },
+    "6.3.1": {
+      "0": "Added: Language Compatibility for French,Italian,German,Spanish,Japanese,Russian,Dutch,Turkish,English (Canadian),English (British),English (South African)."
+    },
+    "6.3.2": {
+      "0": "Added: Support for Toolset Latest Version"
+    },
+    "6.3.3": {
+      "0": "Added: JetEngine Custom Fields Support - Import,update and export support for posts,pages,custom posts and woocommerce products"
+    },
+    "6.3.4": {
+      "0": "Added: Compatibility for WordPress 5.7.1",
+      "1": "Added: Import support for All in One SEO latest version 4.1.0.2"
+    },
+    "6.4":{
+      "0": "Added:support for both comma and pipeline as separators for product image gallery",
+      "1": "Fixed:removed random url export  for featured image if its not present",
+      "2": "Fixed:post date changes to current date on updating posts",
+      "3": "Fixed:wpml translation for same post title",
+      "4": "Fixed:header manipulation issue",
+      "5": "Added:Add option(enable/disable button) in the settings page to delete the post that are not available in the csv file",
+      "6": "Fixed:woo variation export:parentsku, default attributes, custom attributes and attributes details export issue",
+      "7": "Fixed:events manager:rsvp date and time field data export/import issue",
+      "8": "Fixed:Jet engine Image field type custom fields issue on setitng image type as image url",
+      "9": "Fixed:user password not importing in hash format issue",
+      "10": "Fixed:import first image from csv column and skip other images in case of multi images provided for featured image import",
+      "11": "Fixed:polylang import issue",
+      "12": "Added:user update via user_login field",
+      "13": "Fixed:jet engine date field issue",
+      "14": "Fixed:acf image gallery import support via image name",
+      "15": "Fixed:yoast seo facebook, twitter image fields import issue",
+      "16": "Added:jet engine relationship import/export support",
+      "17": "Changed:featured image text to image url for media images import",
+      "18": "Fixed:media images update issue",
+      "19": "Fixed:taxonomies, custom post type view log issue",
+      "20": "Added:export template delete option",
+      "21": "Fixed:custom taxonomy export issue",
+      "22": "Removed:unnecessary headers from wocommerce product export",
+      "23": "Fixed:woocommerce product variations export issue",
+      "24": "Fixed:removed deactivated plugin custom fields from mapping",
+      "25": "Added:wpml translation support for pages",
+      "26": "Added:pods relationship import/export support for user",
+      "27": "Added:separate widget for product attributes",
+      "28": "Added:multiple xml records import",
+      "29": "Fixed:yoast seo, rankmath fields import issue"
+    },
+    "6.5":{
+      "0": "Added: Import and Export support for WP Job Manager Plugin ",
+      "1": "Checked: Compatibility from  WordPress 5.9.3"
+
+    },
+    "7.0":{
+      "0": "Added: MetaBox AIO complete support",
+      "1": "Added: MetaBox Group extension support",
+      "2": "Added: JetEngine latest version 3.0.4 - relationship support",
+      "3": "Checked: Compatibility from  WordPress 6.0.2",
+      "4": "Fixed:Product gallery image SEO fields import issue",
+      "5": "Fixed:JetEngine date field timestamp import & export",
+      "6": "Fixed:WooCommerce Product Variations Attribute Import issue",
+      "7": "Fixed:WooCommerce product wpml import issue and headers with new lines import issue for drag and drop mode",
+      "8": "Fixed:An issue occurred while importing and exporting JetEngine CCT",
+      "9": "Fixed:WooCommerce variations update issue via variation sku, variation id, and product category update issue",
+      "10": "Fixed:WooCommerce variations update issue if parent sku is not mapped",
+      "11": "Fixed:ACF taxonomy field multiple values import issue",
+      "12": "Fixed:JetEngine builtin custom fields import issue",
+      "13": "Fixed:JetEngine date, datetime, and posts field import issue",
+      "14": "Fixed:Bugs in JetEngine CCT Repeater are fixed",
+      "15": "Fixed:Fixed bug in JetEngine metabox repeater field importing",
+      "16": "Fixed:ACF Repeater import and export issues",
+      "17": "Fixed:Issues with LearnPress data export are fixed",
+      "18": "Fixed:JetEngine with user meta conflicts",
+      "19": "Fixed:Localhost mail sending issue",
+      "20": "Fixed:Pods custom taxonomy value export issue",
+      "21": "Fixed:Nested Category export and import",
+      "22": "Added: In the support form page of the plugin, added the Order id field and removed validation for the email field.",
+      "23": "Added: Vulnerability fixes",
+      "24": "Added: Alert message for php-zip extension missing",
+      "25": "Added: Error handling for 500,504,503 cases",
+      "26": "Fixed:Resolved issues with JetEngine media field import",
+      "27": "Fixed:Issues in selecting header manipulation from mapping",
+      "28": "Fixed:Custom Post update based on ACF field",
+      "29": "Fixed:Image SEO fields import issue"
+      },
+      "7.3":{
+        "0": "Added: CLI import,update support for all modules and thirdparty fields",
+        "1": "Added: Ploylang PRO support",
+        "2": "Added: Polylang for WooCommerce",
+        "3": "Checked: Compatibility from  WordPress 6.1.1",
+        "4": "Fixed: CMB2 widget issue",
+        "5": "Fixed: Date issue under clonable group with clonable field was fixed",
+        "6": "Added: duplicate handling option in Import method",
+        "7": "Fixed: PHP 8.1 - parse error",
+        "8": "Fixed: Woocommerce downloadable & virtual values are not exported while export the woocommerce products.",
+        "9": "Fixed: Jet relation widget was mixed in mapping section while import the jet relation fields under post section.",
+        "10": "Fixed: Yoast schema page type & article export.",
+        "11": "Fixed: fatal error - php 8.1 - array_key_exists error",
+        "12": "Fixed: Event widget was not appeared in mapping section.",
+        "13": "Fixed: Toolset one to one relationship under post section",
+        "14": "Fixed: Learnpress curriculum data import issue.",
+        "15": "Fixed: Warning errors are fixed under all in seo,metabox,wpml,polylang,rankmath modules.",
+        "16": "Fixed: Warning errors in customer review module was fixed.",
+        "17": "Fixed: Member plugin user export js conflict.",
+        "18": "Fixed: Learnpress requirements,key_features & target audience headers issue was fixed under export side."
+        },
+        "7.5":{
+        "0": "Fixed: PHP 7.4 Warnings, notices and dreprecated issues",
+        "1": "Added: Support for FIFU (Featured Image From Url) import and export",
+        "2": "Added: Support for MasterStudy LMS plugin:Courses,Lessons,Quizzes,Questions,Orders",
+        "3": "Checked: 6.2 version compatibility",
+        "4": "Fixed: Minor bugs",
+        "5": "Fixed: Missing language translations",
+        "6": "Fixed: XML Zip file upload",
+        "7": "Added: SEOPress import and export support",
+        "8": "Fixed: Rankmath array issues",  
+        "9": "Fixed: Metabox image_advanced field issue",
+        "10": "Fixed: schedule export frequency issue"
+        },
+        "7.6":{
+          "0": "Added: Security fix - Import options for advanced manipulation are restricted for all user roles except administrators",
+          "1": "Added: Restriction added to export folder indexing",
+          "2": "Fixed: WooCommerce bundle order",
+          "3": "Fixed: FTP txt file import issue and yoastseo export",
+          "4": "Fixed: WC Custom attribue export",
+          "5": "Fixed: YoastSEO focuskeyword import",
+          "6": "Fixed: Image filename and caption export",
+          "7": "Fixed: ACF taxonomy export and Post tag 500 error ",
+          "8": "Added: WC Billing & Shipping Fields export under Orders"
+        },
+        "7.7":{
+          "0": "Added: Bulk Import & Export Support for Elementor Templates",
+          "1": "Added: Support for ACF Bidirectional Relationship Import (User,Post Object,Relationship,Taxonomy)",
+          "2": "Added: Import & Export support for LifterLMS",
+          "3": "Added: WPComplete support added for Post,Pages,CPT & WooCommerce",
+          "4": "Added: Compatibility for WordPress 6.4.1",
+          "5": "Fixed: YoastSEO focuskeyword bug",
+          "6": "Added: CFS Loop Import",
+          "7": "Added: Exmage image import support",
+          "8": "Fixed : Minor bugs in metabox checkbox list",
+          "9": "Fixed: Duplicate issue with post_title have & symbol",
+          "10": "Added: index.php for import folder and restrict permission",
+          "11": "Fixed: Polylang issues",
+          "12": "Fixed: Jetengine date (timestamp) export issue and 500 error issue fix",
+          "13": "Fixed: Taxonomy import issue conflict with wpml import plugin"
+        },
+        "7.8":{
+          "0": "Added: ChatGPT integration for content and featured image",
+          "1": "Fixed: Rankmath 500 issue",
+          "2": "Added: Support fixes"
+        },
+        "7.8.1":{
+          "0": "Resolved: post_title mandatory bug in advanced mode",
+          "1": "Fixed: CSS conflicts with All-in-one-SEO plugin"
+        },
+        "7.8.4":{
+          "0": "Added: Polylang import and export support for media,woocommerce variation, woocommerce order",
+          "1": "Added: Change Woocommerce data export via api method",
+          "2": "Fixed: Yoast SEO title export and import issue",
+          "3": "Fixed: Subcategory import issue",
+          "4": "Fixed: Post_date issue"
+
+        },
+        "7.8.6":{
+          "0": "Fixed: Pods multiple gallery image not exported issue", 
+          "1": "Fixed: pods image export issue",
+          "2": "Fixed: Php Deprecated error(polyvalues=null)",
+          "3": "Fixed: Post Date Issues in some woocommerce Product ",
+          "4": "Fixed: custom post type 'product' total count not display issue",
+          "5": "Fixed: wordpress functions not working in schedule export",
+          "6": "Fixed: woocommerce product,order,variation count issue and Polylang translated post_title assign issue",
+          "7": "Fixed: Total count issue  in woocommerce products",
+          "8": "Fixed: Php Warning Errors Fix",
+          "9": "Ampersand update issue fixed",
+          "10": "Added php eval and math library for math function",
+          "11": "Fixed: Acf fields in Snippets CPT Export ,ACF gallery import issue",
+          "12": "Fixed: FIFU in Custom Post Type",
+          "13": "Fixed: Import Stuck Issue", 
+          "14": "Fixed Import as Lower and upper case issue in attributes",
+          "15": "Added: Support for update based on metabox fields",
+          "16": "Fixed: subscribe email issue",
+          "17": "Fixed: Acf group mapping template issue"
+        },
+        "7.8.7":{
+          "0": "Fixed: Import stuck issue", 
+          "1": "Fixed: Metabox taxonomy field import issue",
+          "2": "Fixed: Export term parent Id issue",
+          "3": "Fixed: ACF free group field import issue ",
+          "4": "Fixed: Metabox advanced image url export issue ",
+          "5": "Fixed: Jetengine relationship title export wrong value issue",
+          "6": "Fixed: Jetengine repeater media field import issue",
+          "7": "Fixed: Woocommerce product export data count issue ",
+          "8": "Fixed: Woocommerce variation Count issue",
+          "9": "Fixed: Update product title have apostrophe symbol issue",
+          "10": "Fixed: Metabox update based on number field or text field issue",
+          "11": "Fixed: Woocommerce attribute value export issue",
+          "12": "Fixed: Xml import Nan error issue fixed",
+          "13": "Fixed: Acf repeater inside Repeater export and import issue", 
+          "14": "Fixed: Jetengine cct post field import issue",
+          "15": "Added: Woocommerce attribute value export issue",
+          "16": "Fixed: jetcct savetemplate 500 error issue",
+          "17": "Fixed: jetengine postname 'event' issue",
+          "18": "Removed: flush_rewrite_rule function",
+          "19": "Fixed: Schedule end date null issue",
+          "20": "Fixed: lifter lms issue",
+          "21": "Fixed: woocommerce bundle product export 500 error issue",
+          "22": "Fixed: category hierarchical import issue",
+          "23": "Fixed: Rollback issue",
+          "24": "Fixed: Google drive file upload issue",
+          "25": "Fixed: Wordpress Custom field export issue",
+          "26": "Fixed: Woocommerce order import issue",
+          "27": "Fixed: Create wordpress customfield label name issue",
+          "28": "Fixed: Jetengine taxonomy to taxonomy relationship import and export issue",
+          "29": "Fixed: Delete row properly not working issue",
+          "30": "Fixed: Order status import issue",
+          "31": "Fixed: Woocommerce group product export 500 error issue",
+          "32": "Fixed: woocommerce product managestock,quantity 0 import issue" 
+        },
+        "7.8.8":{
+          "0": "Added: Support for importing WooCommerce Variable product orders",
+          "1": "Fixed: Resolved a 500 error occurring when the WooCommerce Bundles plugin is active"
+        },
+        "7.8.9": {
+          "0": "Fixed: conflict when the repeater field name and sub-field name are the same",
+          "1": "Fixed: Warning issue that occurs when navigating to the settings page",
+          "2": "Fixed: Undefined parent_count variable issue",
+          "3": "Fixed: When uploading issue with XML file in PHP 7.4",
+          "4": "Fixed: A fatal error occurred when uploading the URL in PHP 7.4",
+          "5": "Fixed: PHP Notice: Undefined variable: module",
+          "6": "Fixed: Undefined index: ID issue and WordPress SQL syntax error",
+          "7": "Fixed: When uploading from FTP, a non-well-formed numeric value encountered issue occurred",
+          "8": "Fixed: When importing CSV, auto_detect_line_endings is a deprecated issue",
+          "9": "Fixed: Undefined variable $plugin, $mode, $imgmeta issue",
+          "10": "Fixed: Undefined rep_field_parent_key issue",
+          "11": "Fixed: ACF group repeater field import issue",
+          "12": "Fixed: PHP notice: array_count_values issue",
+          "13": "Fixed: Undefined array key, parent_layout issue",
+          "14": "Fixed: PHP Notice: Trying to access array offset on the value of type bool issue",
+          "15": "Fixed: PHP Notice: Trying to get property term_id of non-object issue",
+          "16": "Fixed: Post_title update issue",
+          "17": "Fixed: WooCommerce core field import undefined variable issue",
+          "18": "Fixed: WooCommerce order import undefined array key issue",
+          "19": "Fixed: When updating the WooCommerce order, the ID was called incorrectly. Order properties should not be accessed directly issue",
+          "20": "Fixed: PHP Deprecated: Creation of dynamic property issue",
+          "21": "Fixed: PHP Notice: Undefined variable: Result issue",
+          "22": "Fixed: PHP Fatal error: Non-static method issue and PHP Warning: Undefined array key optionalType, offset issue",
+          "23": "Fixed: When exporting post, PHP Warning: Undefined array key ID issue",
+          "24": "Fixed: PHP Warning: array_count_values(): Can only count string and integer values, entry skipped issue",
+          "25": "Fixed: PHP Warning: Undefined array key RF occurring when selecting a saved template",
+          "26": "Fixed: The undefined array key when importing the ACF repeater of repeater import issue has been fixed",
+          "27": "Fixed: PHP warning: Undefined array key issue fixed",
+          "28": "Fixed: PHP Deprecated: DOMNodeList::item(): Passing null issue",
+          "29": "Fixed: Post-date export issue",
+          "30": "Fixed: When selecting use template blank page issue",
+          "31": "Fixed: WooCommerce order Export data with the specific status issue",
+          "32": "Fixed: WooCommerce product Export data for the specific period issue",
+          "33": "Fixed: PHP Deprecated: Automatic conversion of false to array is a deprecated issue",
+          "34": "Fixed: WooCommerce product, variation, orders advanced filters issue",
+          "35": "Fixed: PHP Warning: Undefined array key 1 issue",
+          "36": "Fixed: PHP Warning: Undefined variable $post_title issue",
+          "37": "Fixed: Undefined post_title variable issue",
+          "38": "Fixed: ACF_pro_grp_repeater_import function undefined $filekey issue",
+          "39": "Fixed: PHP Notice: Undefined variable: get_import_type issue",
+          "40": "Fixed: Update based on ACF PHP deprecated error",
+          "41": "Fixed: Update based on ACF post_title issue",
+          "42": "Fixed: WooCommerce variation export warning error issue",
+          "43": "Fixed: PHP Warning: Undefined array key issue",
+          "44": "Fixed: ACF group image, gallery, file export issue",
+          "45": "Fixed: WooCommerce unknown product_id issue",
+          "46": "Fixed: WooCommerce products, variation, orders export advance filters in Polylang issue",
+          "47": "Fixed: Export in advanced filter-specific status added in WooCommerce products",
+          "48": "Fixed: Advanced filter-specific period export issue",
+          "49": "Fixed: When exporting Lifter LMS, undefined variable issue",
+          "50": "Fixed: Lifter LMS course import: Undefined variable array key issue",
+          "51": "Fixed: When Polylang is active, WooCommerce orders total count issue",
+          "52": "Fixed: When exporting WooCommerce products, undefined variable issue",
+          "53": "Added: Selecting Export data by specific category added",
+          "54": "Added: Selecting Export data by specific post_title added",
+          "55": "Added: Tab separated file import support",
+          "56": "Fixed: translation issue for South Africa English",
+          "57": "Resolved: missing entry issue for ACF repeater fields",
+          "58": "Resolved: import issue for repeater inside repeater fields",
+          "59": "Fixed: export issue for repeater inside repeater fields",
+          "60": "Fixed: 500 error issue caused by symbols ('') in customer CSV file headers",
+          "61": "Resolved: issue with schedule export mail not sending",
+          "62": "Resolved: export issue for Pods gallery fields",
+          "63": "Fixed: duplicates issue",
+          "64": "Fixed: 500 error of feature image import"
+        },
+        "7.8.10": {
+          "Enhancements": {
+            "1": "Introducing: Elementor templates bulk export (addon) and import feature in a single CSV file format. This allows you to back up your Elementor templates as an easily portable single CSV file.",
+            "2": "Introducing: content import support for Posts, Pages, Custom Post Types (CPTs), and WooCommerce Products designed with Elementor, simplifying the content migration process for Elementor websites."
+          },
+          "Bug Fixes": {
+            "3": "Fixed: 500 error issue when exporting STM-course with an empty date field.",
+            "4": "Fixed: export file path URL issue (for customers without multi-site).",
+            "5": "Fixed: attribute value assignment issue in variation import (when the same attribute value is present under different attribute names).",
+            "6": "Fixed: NaN error issue while importing XML files (specific to MariaDB).",
+            "7": "Changed: stock_qty to stock for WooCommerce product metadata (as WooCommerce uses stock instead of stock_qty).",
+            "8": "Fixed: product export issue based on category (where the exported CSV was missing products).",
+            "9": "Fixed: PHP custom function not working in WordPress custom fields widget issue.",
+            "10": "Fixed: ACF field mapping custom function issue.",
+            "11": "Fixed: issue with the filename not properly inserted during zip image upload (replaced spaces with hyphens).",
+            "12": "Fixed: export data issues based on specific filters (to avoid exporting extra data).",
+            "13": "Fixed: schedule import last run date issue (set to empty if frequency is not chosen to avoid invalid date)."
+          }
+        },
+        "7.8.11": {
+          "Enhancements": {
+            "1": "Introducing: Media import UI feature improvements",
+            "2": "Introducing: Log summary and failed image download option",
+            "3": "CSV Export for Media Details: After importing media, users can now download a detailed CSV file. This CSV includes columns for status, media_id, media_url, file_name, title, caption, alt_text, and description.",
+            "4": "CSV Export for Post Failed Image Details: After importing media, users can now download a detailed CSV file. This CSV includes columns for media_id, post_title, post_id, actual_url.",
+            "5": "New Media Import Tab: Introduced a new tab dedicated to media import and update. This feature allows users to upload both local and external images directly.",
+            "6": "Failed images in posts and media can be updated in the media section.",
+            "7": "Added featured image metadata to the mapping section, including image_title, image_filename, image_alt_text, image_description, and image_caption.",
+            "8": "Improved logging details for more comprehensive tracking of import and media processes.",
+            "9": "Included post-import log details to display the count of images associated with the post and the count of any failed images.",
+            "10": "Improved: Log Manager: Implemented a log manager where users can access and download summary logs, media logs, and failed media logs as CSV files.",
+            "11": "Enabled the download of failed media logs and summary logs as CSV files."
+          },
+        "Bug Fixes": {
+          "12": "Fixed: WooCommerce product attribute not importing (case: attribute name has special character like Taille de la chaîne) #18753",
+          "13": "Fixed: ACF group field inside taxonomy field value save format issue solved",
+          "14": "Fixed: ACF taxonomy field and post_object field stores DB issue",
+          "15": "Fixed: JetEngine relation post not link issue",
+          "16": "Fixed: Datepicker icon issue",
+          "17": "Fixed: One column CSV file import issue",
+          "18": "Fixed: Price import issue (case: header has empty space) and UI issue drag-and-drop mode right side box sticky issue",
+          "19": "Fixed: FIFU plugin activate time metabox image_advanced field not import issue",
+          "20": "Fixed: ACF field import issue (case: CSV has empty value and same time already present post_title is empty getting that post_id)",
+          "21": "Fixed: Custom function import time 500 error issue",
+          "22": "Fixed: 500 error issue (case: using PHP custom function post_content value has symbol (single quote or double quote))",
+          "23": "Fixed: Repeater image and repeater inside repeater field image import issue",
+          "24": "Fixed: Custom function HTML format issue",
+          "25": "Fixed: JetEngine CCT WYSIWYG editor content import and export issue, fixed user export time JetEngine gallery field issue",
+          "26": "Fixed: WooCommerce product featured image assign issue (case: product image and gallery name start with similar)",
+          "27": "Fixed: Custom taxonomy term not assign in product (case: wp_set_object_terms function not working sometimes)",
+          "28": "Fixed: Pods image import issue and relationship field issue (case: relationship field has empty in CSV column that time 500 error occurs)",
+          "29": "Fixed: User export time blank issue",
+          "30": "Fixed: JetEngine CCT media image import issue",
+          "31": "Fixed: Pods relationship field two value assign front end issue",
+          "32": "Fixed: Image import issue",
+          "33": "Fixed: Adjust CSV Parsing Logic to Handle Delimiters",
+          "34": "Fixed: CSV header generate issue fixed",
+          "35": "Fixed: Status issue fixed",
+          "36": "Fixed: BBPress reply import post_parent assign issue",
+          "37": "Fixed: WooCommerce attribute import issue fixed",
+          "38": "Fixed: Header manipulation choosing problem"
+        }
+    },
+    "7.9": {
+      "Enhancements": {
+        "1": "Introducing: WooCommerce Reviews import and export.",
+        "2": "Introducing: YITH WooCommerce Barcodes support.",
+        "3": "Added: Import support for YITH Cost of Goods for WooCommerce Premium",
+        "4": "Added: Import support for WooCommerce Min Max Quantities",
+        "5": "Introducing: Import & Export for WooCommerce Variation Swatches ",
+        "6": "Improved: WooCommerce product,varaition,attribute,coupons import via API",
+        "7": "Added: Overall import and export support for WooCommerce Product Bundles"
+      },
+      "Bug Fixes": {
+        "8": "Fixed: Media related issues.",
+        "9": "Fixed: Summary section known issues.",
+        "10": "Fixed: WC stock update",
+        "11": "Fixed: Schedule import fatal error #932.",
+        "12": "Fixed: toolset update issue fixed #18935 ",
+        "13": "Fixed: Hide Action Button When Import Status is 100% Completed #934",
+        "14": "Fixed: FTP xml file type export .",
+        "15": "Fixed: Jet Engine relationship xml file export issue fixed #31",
+        "16": "Fixed: Template edit tab issue fixed#938",
+        "17": "Fixed: Post values whitspace issue fixed#19847",
+        "18": "Fixed: Toolset date export issue fixed#19780",
+        "19": "Fixed: Fatal Error in ACFProExtension: TypeError in count() Due to Incorrect Variable Type iisue fixed#19880",
+        "20": "Fixed: Fatal Error: Handling Non-Array Values in JSON Decoding for Yoast SEO Focus Keywords issue fixed#19780",
+        "21": "Fixed:: Yoast plugin is active, the total image count is displayed incorrectly issue has been resolved#935",
+        "22": "Fixed: Implode null value passing issue has been fixed#941",
+        "23": "Fixed: Metabox image_upload field export issue fixed#945",
+        "24": "Fixed: Issue with the Log Manager delete functionality has been fixed and php warning issue fixed#947",
+        "25": "Fixed: WooC ommerce product price update and export bundle type issue has been resolved#19925",
+        "26": "Fixed: fixed image import issue,while using php custom function with dynamic image url #19356",
+        "27": "Fixed: WC Product price update and duplicate entry issues has been resolve#19925",
+        "28": "Fixed: Jetengine CCT export issue #19950",
+        "29": "Fixed: WC product import issue while using xml file with post_content have html data #19909",
+        "30": "Fixed: Default attribute assign issue #19845 and fixed bundle product price not display in product page issue #19925",
+        "31": "Fixed: JE cct to cct releation import & export issue fixed (change relationship cct import only based on id)#20032",
+        "32": "Fixed: allow_url_fopen on not display issue #19993",
+        "33": "Fixed: Variation update not working issue #20072(case product_id and variation_id mapped)",
+        "34": "Fixed: post_content image_url issue #20087"
+      }
+    },
+   "8.0": {
+   "Enhancements": {
+        "0": "Introducing: Single CSV Import/Export/Update for Woo Product Variations",
+        "1": "Introducing: MemberPress Dynamic roles import and export",
+        "2": "Introducing: JetBookings import and export ",
+        "3": "Introducing: JetReviews support",
+        "4": "Added: Business Directory Plugin - Listings support",
+        "5": "Gravity form entries migration",
+        "6": "Added: YITH order tracking plugin support",
+        "7": "Introducing: PPOM WC product addon support",
+        "8": "Metabox - Icon & Open Street Map field",
+        "9": "Added: ACF - Icon Picker support",
+        "10": "JetEngine - Advanced Date Field support added",
+        "11": "Support for Rankmath Datasets schema type",
+        "12": "Add support for WooCommerce reviews",
+        "13": "Introducing: ACF Dashicons Field Support Added in Import and Export",
+        "14": "Introducing: Export to Google Sheet", 
+        "15": "Added:Export advanced filters (based on languages & titles)", 
+        "16": "Added:Export and Import the template from File Manager", 
+        "17": "Added: Export Based on Language Code (WPML)",
+        "18": "Help implementation ",
+        "19": "Introducing: duplicate handling(update) support based on JetEngine fields",
+        "20": "Feature Addition: Download Template Option & Import Template",
+        "22": "GeoDirectory - Places import and export",
+        "23": "Advanced Classifieds & Directory Pro Listings - Listings import"
+        },
+        "Bug Fixes": {
+        "24": "Fixed: JetEngine CCT relationships & Product CCT Export 500 error issue", 
+        "25": "Fixed: Jet cct related support fixes",
+        "26": "Support fixes - #20322,#20492,#20498,#20535,#20676"
+        }
+       
+  },
+  "8.0.1": {
+    "Enhancements": {
+        "0": "Introducing: global unique id support added#1017",
+        "1": "Added: REAL_HOMES_property_images support added#21216",
+        "2": "Added: Header manipulation for product attributes"
+      },
+         "Bug Fixes": {
+         "3": "Fixed: Security issue related to Arbitrary File Download Vulnerability.",
+         "4": "Support fixes - #20322,#20492,#20498,#20535,#20676",
+         "5": "Export based on jet booking status work completed#1014",
+         "6": "Resolved Widget Issue with Jet Booking Plugin Active#1015",
+         "7": "Jet review widget issue resolve when import woocommerce#1016",
+         "8": "Jet releation cct to users export support added#20498",
+         "9": "Categories feature image meta support added#21009",
+         "10": "Validate meta_value type before calling json_decode() to prevent errors#21031",
+         "11": "Override image issue fixed#21009",
+         "12": "Fixed: WC export,update and 500 issues", 
+         "13": "Fixed: Jet cct related support fixes"         
+     }
+        
+   },
+   "8.1": {
+    "Enhancements": {
+        "0": "Introducing: Single Record CSV export and import via the post/page/custom posts create/edit view -covering core, meta, and term fields information.",
+        "1": "Introducing: Added Import/Export Support for JetBooking WooCommerce Integration",
+        "2": "Added: JetReviews Import & Export",
+        "3": "Added: Tiered Price Table for WooCommerce support",
+        "4": "Added:Import and export support for orders along with Product Addons for Woocommerce – Product Options with Custom Fields plugin",
+        "5": "Import and Export support for WooCommerce orders, including personalized product details from Woo Extra Product Options fields."
+  
+      },
+         "Bug Fixes": {
+         "6": "Fixed: Image upload suffix -1 added issue #21359.",
+         "7": "Jet cpt gallery export changing the URL from the gallery ID#21359",
+         "8": "Image file name duplicate create issue resolved#21359",
+         "9": "Featured image duplicate create issue fixed#21359",
+         "10": "variation product count issue fixed#21304",
+         "11": "Google drive image upload failed issue resolved#21366",
+         "12": "JE CCT repeater field empty values import issue fixed#21346",
+         "13": "Export struck issue has been resolved#21110",
+         "14": "Product stock and stock status issue fixed#21418",
+         "15": "Fixed : WooCommerce Product Import Adding Unnecessary Uncategorized Category",
+         "16": "Hide the WordPress Custom Fields Widget #869",
+         "17": "Term & Taxonomies Hierarchy import issue fixed#1046 ",         
+         "18": "ACF api via to Export#21594",
+         "19": "Hide the WordPress Custom Fields Widget #869"   
+     }
+  },
+ "8.2": {
+    "Enhancements": {
+        "0": "Introducing: Import & Export support for XLSX file type.",
+        "1": "Introducing: Import/Update based on category filter.",
+        "2": "Added: JetEngine custom meta storage support.",
+        "3": "Added: Support for WC customer import and export."
+    },
+    "Bug Fixes": {
+        "4": "Fixed: Enqueue script error #21828.",
+        "5": "Fixed: SQL error caused by unescaped single quotes in term names. Used esc_sql() and prepared statements to prevent syntax errors and improve security.",
+        "6": "Fixed: Correctly count valid CSV data rows #21862.",
+        "7": "Fixed: Ensure $product_ids remains an array to prevent count() error #21862.",
+        "8": "Fixed: Prevent empty term name in wp_insert_term #21767.",
+        "9": "Fixed: Issues in Classic Editor view - Single CSV Import.",
+        "10": "Fixed: Product downloadable file import issue #21747.",
+        "11": "Fixed: Product description encoding issue #21892.",
+        "12": "Fixed: Product URL import issue #1066.",
+        "13": "Fixed: Coupons status #21862.",
+        "14": "Fixed: JetEngine repeater media field import issue #21629.",
+        "15": "Fixed: Metabox advanced_taxonomy_field added #21767.",
+        "16": "Fixed: Metabox date and group taxonomy import issue #21721.",
+        "17": "Fixed: CPT taxonomy export issue #21797.",
+        "18": "Fixed: Toolset users custom fields export issue #21728.",
+        "19": "Fixed: Custom WooCommerce extensions PDF URL field support added #21747.",
+        "20": "Fixed: Variation swatches import/export issue #21959.",
+        "21": "Fixed: File Manager - Delete all records issue resolved #21995.",
+        "22": "Fixed: Support form issue #1064.",
+        "23": "Fixed: Bulk WooCommerce order export issue #1066.",
+        "24": "Fixed: SCF active time ACF widget missing issue #22004.",
+        "25": "Fixed: ACF flexible_content widget hide issue #1066."
+    }
+},
+"8.3": {
+    "Enhancements": {
+        "0": "Added: Advanced import filtering options with support for multiple conditions.",
+        "1": "Added: TSV (Tab-Separated Values) file format support.",
+        "2": "Added: Compatibility with the latest MetaBox update (MetaBox AIO now includes MetaBox).",
+        "3": "Added: Iteration-based import processing.",
+        "4": "Added: Prefix for missing tables to avoid site migration."
+    },
+    "Bug Fixes": {
+        "5": "Fixed: WooCommerce order export issue.",
+        "6": "Fixed: Toolset checkbox fields export issue #22137.",
+        "7": "Fixed: Timezone dropdown not working issue.",
+        "8": "Fixed: WooCommerce coupons export time 500 error #1069.",
+        "9": "Fixed: Language-based export issue in WooCommerce products.",
+        "10": "Fixed: ACF fields affected by single CSV export/import #1070.",
+        "11": "Fixed: WooCommerce order import issue with WordPress custom fields #1078.",
+        "12": "Fixed: WooCommerce stock status issue #1078.",
+        "13": "Fixed: WooCommerce coupons private data export issue #1078.",
+        "14": "Fixed: Bundle-type product import issue #1078.",
+        "15": "Fixed: Update based on ACF, JetEngine, MetaBox, Pods, Toolset #1078.",
+        "16": "Fixed: Export WooCommerce product total record issue #1078.",
+        "17": "Fixed: Export WooCommerce orders total record issue #1078.",
+        "18": "Fixed: Import/Export issue with chained products #1078.",
+        "19": "Fixed: Default attribute not exporting issue #22192.",
+        "20": "Fixed: Prevent trim() fatal error by handling array values in CSV export.",
+        "21": "Fixed: Prevent fatal error when setting cross-sell IDs for variable products."
+    }
+},
+"8.4": {
+    "Enhancements": {
+        "0": "Added: Introducing migrate and one-click import feature for seamless data transfer."
+    },
+    "Bug Fixes": {
+        "1": "Fixed: Exclusion time some data missing issue #22480.",
+        "2": "Fixed: Toolset checkbox issue on customer site due to different format handling #22137.",
+        "3": "Fixed: MetaBox Lite plugin active time not showing MetaBox widget issue #22414.",
+        "4": "Fixed: WooCommerce order import issue where item_name was not importing #22530.",
+        "5": "Fixed: Gravity Forms entries import issue where logs were not displaying #22446.",
+        "6": "Fixed: Polylang category import issue #22273.",
+        "7": "Fixed: Security issue related to arbitrary file upload reported by Wordfence."
+    }
+},
+"8.4.1": {
+   
+    "Bug Fixes": {
+        "1": "Fixed: Toolset relationships",
+        "2": "Fixed: All woocommerce modules imported as products",
+        "3": "Fixed: Migration and oneclick import issues ",
+        "4": "Fixed: Minor bugs"
+      }
+  },
+  "8.5": {
+    "Enhancements": {
+        "0": "Added: WP_Query results export – Export dynamic content using WP_Query for posts, users, and comments.",
+        "1": "Added: Preview option – View the first 10 records before full export.",
+        "2": "Added: Support for BMP image format – Import and export BMP images to the WordPress media library.",
+        "3": "Added: Font faces and font families – Import/export complete font groups including styles and weights.",
+        "4": "Added: Global styles support – Transfer design presets like color schemes and typography across sites.",
+        "5": "Added: Full templates import/export – Migrate complete page layouts or full templates in block themes."
+    },
+    "Bug Fixes": {
+        "0": "Fixed: elementor_data support for custom posts #22748."
+    }
+},
+"8.6": {
+  "Enhancements": {
+    "0": "Added: Rental themes support by Real Homes.",
+    "1": "Added: Import and export support for Properties along with related taxonomies.",
+    "2": "Added: Import and export functionality for Rental Agents / Owners.",
+    "3": "Added: Media-related improvements.",
+    "4": "Added: Iteration-based export process for handling large datasets.",
+    "5": "Added: Import support for .json and .gz file formats.",
+    "6": "Added: Support for importing serialized data into default WordPress custom fields."
+  },
+  "Bug Fixes": {
+    "0": "Fixed: Relationship import issue for post types when dealing with parent-child relationships.",
+    "1": "Fixed: post_content display issue where '\\n' (newline characters) were not replaced correctly.",
+    "2": "Fixed: Issue with updating posts based on product_sku."
+  }
+},
+"8.7": {
+  "Enhancements": {
+    "0": "Added: Post content and featured image – Preview and test before export.",
+    "1": "Added: Client mode export – Export features specific to client-configured settings.",
+    "2": "Added: Export orders based on the product purchased.",
+    "3": "Added: Export orders based on payment options.",
+    "4": "Added: Export orders based on status – Completed, Processing, On Hold, Canceled.",
+    "5": "Added: Export customers based on the product purchased.",
+    "6": "Added: Export customers based on user role.",
+    "7": "Added: ACPT & ACPT Lite – Import/export support for basic fields, specialized fields, unit of measure, and media.",
+    "8": "Enhanced: Metabox compatibility – Post reference/object field now supports 'Add New' option."
+  },
+  "Bug Fixes": {
+    "0": "Fixed: Minor bugs – Improvements based on support feedback."
+  }
+},
+"8.7.1": {
+
+  "Bug Fixes": {
+    "0": "Fixed: Section  restriction removed #24275"
+  }
+},
+"8.7.1.1": {
+  "Bug Fixes": {
+    "0": "Fixed: Issue with Exporting SCF fields #24284",
+    "2": "Fixed: Minor issue while exporting custom CPT #24335",
+    "3": "Fixed: Language detection issue fixed"
+
+  },
+  "Enhancements": {
+    "1": "Added: Polylang Import SKU linking enabled — link by SKU, fallback to title. #24348"
+  }
+},
+"8.7.1.2": {
+  "Bug Fixes": {
+    "0": "Fixed: Issue with duplicate terms in other languages when using Polylang #24217"
+  }
+},
+"8.7.1.3": {
+  "Bug Fixes": {
+    "0": "Fixed: wp_block restriction was removed in the import section #24408"
+  }
+},
+"8.7.1.4": {
+  "Bug Fixes": {
+    "0": "Fixed: Import and export issues in BD plugin form fields #24389"
+  }
+},
+"8.7.1.5": {
+  "Bug Fixes": {
+    "0": "Fixed: URL upload issue without extension #24421"
+  }
+},
+"8.7.1.6": {
+  "Bug Fixes": {
+    "0": "Fixed: Added Japanese translation for UI labels in Advanced Filters. #24447"
+  }
+},
+"8.7.1.7": {
+  "Bug Fixes": {
+    "0": "Fixed: Export filters for product & role in the user module” #24435"
+  }
+},
+"8.8": {
+    "0": "UI Modification: Advanced Mapping - merged Formula, Static, and AI into a single section",
+    "1": "Added: Ability to analyze uploaded CSV files and display the first 3 sample rows in field selection during advanced drop-down mapping",
+    "2": "Improved: Enhanced server-side and file validation error handling to reduce server-related import failures",
+    "3": "AI Integration: OpenAI, Claude, Gemini (for content generation)",
+    "4": "Added: HTML-safe rendering support for post content to ensure clean and secure output"
+},
+"8.8.1": {
+  "Bug Fixes": {
+    "0": "Fixed: Language filter code issue #24320"
+  }
+},
+"8.8.2": {
+  "Bug Fixes": {
+    "0": "Fixed: Featured image import issue #24616"
+  }
+},
+"8.8.3": {
+  "Bug Fixes": {
+    "0": "Fixed: WPML language export issue in category #24320"
+  }
+},
+"8.9": {
+            "0": "Security: Use wp_verify_nonce for nonce validation",
+            "1": "Security fix: Add capability checks to FTP credential access",
+            "2": "Feat: Single-page import & export for Elementor Page Builder",
+            "3": "Feat: Auto-detect field separator (comma, semicolon, tab)",
+            "4": "Feedback: Implement feedback collection after one week of usage",
+            "5": "Minor bug fixes"
+},
+"8.9.1": {
+  "Bug Fixes": {
+    "0": "Fixed: Minor ACF count issue #24711"
+  }
+},
+"8.9.2": {
+  "Bug Fixes": {
+    "0": "Fixed: PHP Deprecated preg_match() warning #24726"
+  }
+},
+"8.9.3": {
+  "Bug Fixes": {
+    "0": "Fixed: Variation product attribute update issue #24665"
+  }
+},
+"8.9.4": {
+  "Bug Fixes": {
+    "0": "Fixed: Issue with exporting WC orders,customers and users #24738"
+  }
+},
+"8.9.5": {
+  "Bug Fixes": {
+    "0": "Fixed: Url upload issue #24819"
+  }
+},
+"8.9.6": {
+  "Bug Fixes": {
+    "0": "Fixed: Update based on jetengine fields issue #24767"
+  }
+},
+"8.9.7": {
+  "Bug Fixes": {
+    "0": "Fixed: WC product attribute update override issue #24865"
+  }
+},
+"8.9.8": {
+  "Bug Fixes": {
+    "0": "Fixed: User module export filter issue #24864"
+  }
+},
+"8.9.9": {
+  "Bug Fixes": {
+    "0": "Fixed: WC custom attribute toggle button issue #24865"
+  }
+},
+"8.9.10": {
+  "Bug Fixes": {
+    "0": "Fixed: WC product attribute duplicating on update issue #24865"
+  }
+},
+"8.9.11": {
+  "Bug Fixes": {
+    "0": "Fixed: User export module role and product filter issue #24864"
+  }
+},
+"8.10": {
+    "0": "Added: Support for quizzes in the LifterLMS plugin #24898"
+},
+"8.10.1": {
+    "0": "Fixed: Changed wc_get_orders to query #25086"
+},
+"8.10.2": {
+    "0": "Fixed: WC order date import issue #25086"
+},
+"8.10.3": {
+    "0": "Fixed: Post content image import issue #25069"
+},
+"8.10.4": {
+    "0": "Fixed: LifterLMS quiz choice field import issue #24898"
+},
+"8.10.5": {
+    "0": "Fixed: FTP upload issue #25179"
+},
+"8.10.6": {
+    "0": "Fixed: AI API UI issue #25278"
+},
+"8.10.7": {
+    "0": "Fixed: WPML slug import issue #25293"
+},
+"8.11": {
+    "0": "Added: Events Calendar Plugin – Import & Export support for events, schedules, venues, and organizers",
+    "1": "Added: Slim SEO integration with support for importing/exporting SEO meta fields",
+    "2": "Added: Dropbox-style upload interface for improved file selection and usability",
+    "3": "Enhanced: WooCommerce export filters for more precise data export",
+    "4": "Improved: WPML import/export compatibility for multilingual content and translation mappings",
+    "5": "Fixed: Polylang variation issues related to product syncing and language handling",
+    "6": "Fixed: Multiple support-reported bugs for improved stability and performance"
+}
+
+}
+}

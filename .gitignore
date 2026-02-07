@@ -1,0 +1,29 @@
+# Keep repository focused on WordPress theme + plugins only
+/*
+
+# Keep git settings file
+!/.gitignore
+
+# Keep wp-content root
+!/wp-content/
+/wp-content/*
+
+# Keep all plugins
+!/wp-content/plugins/
+!/wp-content/plugins/**
+
+# Keep only this theme
+!/wp-content/themes/
+/wp-content/themes/*
+!/wp-content/themes/learningcity/
+!/wp-content/themes/learningcity/**
+
+# Ignore generated/deploy artifacts and machine files
+**/node_modules/
+**/.DS_Store
+*.zip
+
+# Ignore media/cache/upgrade
+/wp-content/uploads/
+/wp-content/cache/
+/wp-content/upgrade/

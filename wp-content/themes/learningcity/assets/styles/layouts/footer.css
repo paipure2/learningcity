@@ -1,0 +1,27 @@
+@layer layouts {
+  footer {
+    @apply mt-auto;
+
+    .menu-footer {
+      @apply -mt-3.5;
+      li {
+        a {
+          @apply lg:text-fs30 text-fs24 font-bkk py-0.5 inline-block transition-colors;
+          &:hover {
+            @apply text-primary;
+          }
+          &[disabled] {
+            @apply opacity-25 pointer-events-none;
+          }
+          span {
+            @apply text-fs12 font-anuphan inline-block ml-2;
+          }
+        }
+      }
+    }
+
+    .swiper-logo-loop .swiper-wrapper {
+      @apply ease-linear!;
+    }
+  }
+}

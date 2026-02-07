@@ -1,0 +1,32 @@
+/* Typography Base Styles */
+@layer base {
+  body {
+    @apply antialiased;
+    font-family: var(--font-anuphan);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    line-height: 1.2;
+    font-family: var(--font-bkk);
+  }
+
+  b,
+  strong {
+    @apply font-bold;
+  }
+
+  a,
+  button {
+    @apply cursor-pointer;
+  }
+
+  p {
+    @apply leading-relaxed;
+    font-family: var(--font-anuphan);
+  }
+}

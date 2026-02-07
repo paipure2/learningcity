@@ -1,0 +1,26 @@
+@font-face {
+    font-family: 'Anuphan';
+    src: url('Anuphan-SemiBold.eot');
+    src: url('Anuphan-SemiBold.eot?#iefix') format('embedded-opentype'),
+        url('Anuphan-SemiBold.woff2') format('woff2'),
+        url('Anuphan-SemiBold.woff') format('woff'),
+        url('Anuphan-SemiBold.ttf') format('truetype'),
+        url('Anuphan-SemiBold.svg#Anuphan-SemiBold') format('svg');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Anuphan';
+    src: url('Anuphan-Medium.eot');
+    src: url('Anuphan-Medium.eot?#iefix') format('embedded-opentype'),
+        url('Anuphan-Medium.woff2') format('woff2'),
+        url('Anuphan-Medium.woff') format('woff'),
+        url('Anuphan-Medium.ttf') format('truetype'),
+        url('Anuphan-Medium.svg#Anuphan-Medium') format('svg');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+

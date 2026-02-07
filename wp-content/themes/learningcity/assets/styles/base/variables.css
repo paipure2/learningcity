@@ -1,0 +1,60 @@
+/* CSS Custom Properties / Variables */
+@theme {
+  --font-bkk: "BKKDraft", system-ui, sans-serif;
+  --font-anuphan: "Anuphan", system-ui, sans-serif;
+
+  --color-primary: #00744b;
+  --color-primary-hover: #005d3c;
+  --color-surface: #f6f6f6;
+  --color-grayBorder: #d8d8d8;
+
+  /* Custom Font Size */
+  --text-fs10: 0.625rem; /*10px*/
+  --text-fs12: 0.75rem; /*12px*/
+  --text-fs14: 0.875rem; /*14px*/
+  --text-fs16: 1rem; /*16px*/
+  --text-fs18: 1.125rem; /*18px*/
+  --text-fs20: 1.25rem; /*20px*/
+  --text-fs22: 1.375rem; /*22px*/
+  --text-fs24: 1.5rem; /*24px*/
+  --text-fs26: 1.625rem; /*26px*/
+  --text-fs28: 1.75rem; /*28px*/
+  --text-fs30: 1.875rem; /*30px*/
+  --text-fs32: 2rem; /*32px*/
+  --text-fs34: 2.125rem; /*34px*/
+  --text-fs36: 2.25rem; /*36px*/
+  --text-fs38: 2.375rem; /*38px*/
+  --text-fs40: 2.5rem; /*40px*/
+  --text-fs42: 2.625rem; /*42px*/
+  --text-fs44: 2.75rem; /*44px*/
+  --text-fs46: 2.875rem; /*46px*/
+  --text-fs48: 3rem; /*48px*/
+  --text-fs50: 3.125rem; /*50px*/
+  --text-fs52: 3.25rem; /*52px*/
+  --text-fs60: 3.75rem; /*60px*/
+  --text-fs64: 4rem; /*64px*/
+  --text-fs70: 4.375rem; /*70px*/
+  --text-fs80: 5rem; /*80px*/
+  --text-fs90: 5.625rem; /*90px*/
+  --text-fs100: 6.25rem; /*100px*/
+  --text-fs124: 7.75rem; /*124px*/
+  --text-fs140: 8.75rem; /*140px*/
+
+  /* Custom Shadows */
+  --shadow-card: 0 4px 32.5px 0 rgba(0, 0, 0, 0.05);
+  --shadow-icon: 0 2px 4px 0 rgba(0, 0, 0, 0.25);
+
+  /* Custom Border Radius */
+  --radius-20: 20px;
+
+  --animate-bounce: bounce 1s ease-in-out infinite;
+  @keyframes bounce {
+    0%,
+    100% {
+      transform: translateY(-3px);
+    }
+    50% {
+      transform: translateY(3px);
+    }
+  }
+}
