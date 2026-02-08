@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) exit;
     --blm-bg-soft: #ffffff;
     --blm-border: #dfdfdf;
     --blm-card: #f6f6f6;
-    --blm-col-filter: clamp(280px, 24.5vw, 353px);
+    --blm-col-filter: clamp(320px, 27vw, 390px);
     --blm-col-list: clamp(340px, 28.75vw, 414px);
   }
 
