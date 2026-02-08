@@ -756,6 +756,32 @@ if (!defined('ABSPATH')) exit;
     return `<span class="${sizeClass}">${getSvgByKey(iconKey)}</span>`;
   }
 
+  const DRAWER_META_ICONS = {
+    address: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/></svg>`,
+    gmaps: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4"/><path d="M16 6V4"/><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 14h8"/></svg>`,
+    phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.7.7 2.5a2 2 0 0 1-.4 2.1L8.1 9.6a16 16 0 0 0 6.3 6.3l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.6 2.5.7a2 2 0 0 1 1.7 2z"/></svg>`,
+    hours: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+    admission: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V9z"/><path d="M12 7v12"/></svg>`,
+    tags: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 19a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M14 19a4.5 4.5 0 0 1 7 0"/></svg>`,
+    facebook: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 8.5 3.5L22 13"/><path d="M14 11a5 5 0 0 0-8.5-3.5L2 11"/><path d="M8 16l8-8"/></svg>`
+  };
+
+  function renderDrawerMetaIcons() {
+    const map = [
+      ["iconAddress", "address"],
+      ["iconGmaps", "gmaps"],
+      ["iconPhone", "phone"],
+      ["iconHours", "hours"],
+      ["iconAdmission", "admission"],
+      ["iconTags", "tags"],
+      ["iconFacebook", "facebook"]
+    ];
+    map.forEach(([id, key]) => {
+      const holder = el(id);
+      if (holder) holder.innerHTML = `<span class="icon-24">${DRAWER_META_ICONS[key]}</span>`;
+    });
+  }
+
   function computeDistances() {
     if (!userLocation) {
       allPlaces.forEach(p => { delete p._distanceKm; });
@@ -1476,14 +1502,124 @@ if (!defined('ABSPATH')) exit;
   }
 
   // ================= DRAWER =================
+  function renderDistanceBadge(distanceKm) {
+    const distanceEl = el("dDistance");
+    if (!distanceEl) return;
+    if (userLocation && Number.isFinite(distanceKm)) {
+      distanceEl.innerHTML = `<span class="lbl">ห่างจากคุณ</span><span class="val">${formatKm(distanceKm)}</span>`;
+      return;
+    }
+    distanceEl.innerHTML = `<span class="lbl">ห่างจากคุณ</span><span class="val">-</span>`;
+  }
+
+  function setDrawerTabsVisibility(hasCourses) {
+    const tabsWrap = document.querySelector("#drawer .blm-drawer-tabs");
+    const tabBtnCourses = el("tabBtnCourses");
+    if (tabBtnCourses) tabBtnCourses.classList.toggle("hidden", !hasCourses);
+    if (tabsWrap) {
+      tabsWrap.classList.toggle("hidden", !hasCourses);
+      tabsWrap.style.display = hasCourses ? "flex" : "none";
+    }
+  }
+
+  function updateDescReadMoreVisibility() {
+    const desc = el("dDesc");
+    const btn = el("dDescMore");
+    if (!desc || !btn) return;
+
+    const text = (desc.textContent || "").trim();
+    if (!text) {
+      btn.classList.add("hidden");
+      return;
+    }
+
+    const wasExpanded = desc.classList.contains("is-expanded");
+    if (wasExpanded) desc.classList.remove("is-expanded");
+
+    requestAnimationFrame(() => {
+      const over3Lines = desc.scrollHeight > (desc.clientHeight + 1);
+      btn.classList.toggle("hidden", !over3Lines);
+      if (!over3Lines) {
+        btn.textContent = "อ่านทั้งหมด ▼";
+        desc.classList.remove("is-expanded");
+      } else if (wasExpanded) {
+        desc.classList.add("is-expanded");
+      }
+    });
+  }
+
   function setActiveTab(tab) {
     document.querySelectorAll(".tabPanel").forEach(p => p.classList.add("hidden"));
     el(`tab-${tab}`).classList.remove("hidden");
     document.querySelectorAll(".tabBtn").forEach(btn => {
       const isActive = btn.dataset.tab === tab;
-      btn.className = "tabBtn flex-1 py-2 rounded-full text-sm font-semibold " +
-        (isActive ? "bg-emerald-600 text-white" : "text-slate-600 hover:bg-white/70");
+      btn.classList.toggle("is-active", isActive);
     });
+  }
+
+  function updateDetailsRowsVisibility() {
+    const details = el("tab-details");
+    if (!details) return;
+
+    const hasMeaningfulText = (raw) => {
+      const v = (raw || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (!v) return false;
+      const emptyTokens = new Set(["-", "—", "–", "n/a", "na", "null", "undefined", "ไม่ระบุ", "ไม่มีข้อมูล"]);
+      return !emptyTokens.has(v);
+    };
+
+    const hasValidExternalUrl = (raw) => {
+      const href = (raw || "").trim();
+      if (!href || href === "#") return false;
+      return /^https?:\/\//i.test(href);
+    };
+
+    const hasValidPhone = (raw) => {
+      const v = (raw || "").trim();
+      if (!hasMeaningfulText(v)) return false;
+      const digits = v.replace(/\D/g, "");
+      return digits.length >= 6;
+    };
+
+    const hasValidHours = (raw) => hasMeaningfulText(raw);
+    const hasValidAdmission = (raw) => hasMeaningfulText(raw);
+
+    const checks = [
+      ["rowAddress", () => hasMeaningfulText(el("dAddress")?.textContent || "")],
+      ["rowGmaps", () => {
+        const href = (el("dGmaps")?.getAttribute("href") || "").trim();
+        return !!href && href !== "#";
+      }],
+      ["rowPhone", () => hasValidPhone(el("dPhone")?.textContent || "")],
+      ["rowHours", () => hasValidHours(el("dHours")?.textContent || "")],
+      ["rowAdmission", () => hasValidAdmission(el("dAdmission")?.textContent || "")],
+      ["rowTags", () => (el("dTags")?.children.length || 0) > 0],
+      ["rowAmenities", () => (el("dAmenities")?.children.length || 0) > 0],
+      ["rowFacebook", () => hasValidExternalUrl(el("dFacebook")?.getAttribute("href") || "") && !el("dFacebook")?.classList.contains("hidden")],
+    ];
+
+    checks.forEach(([rowId, hasData]) => {
+      const row = el(rowId);
+      if (!row) return;
+      const visible = !!hasData();
+      row.classList.toggle("hidden", !visible);
+      row.style.display = visible ? "" : "none";
+    });
+
+    const visibleRows = checks
+      .map(([rowId]) => el(rowId))
+      .filter((row) => row && !row.classList.contains("hidden")).length;
+
+    const detailsBtn = el("tabBtnDetails");
+    if (detailsBtn) detailsBtn.classList.toggle("hidden", visibleRows === 0);
+    details.classList.toggle("hidden", visibleRows === 0);
+
+    if (visibleRows === 0) {
+      const coursesBtn = el("tabBtnCourses");
+      if (coursesBtn && !coursesBtn.classList.contains("hidden")) {
+        setActiveTab("courses");
+      }
+    }
   }
 
   function openDrawer(place, options = {}) {
@@ -1515,13 +1651,14 @@ if (!defined('ABSPATH')) exit;
       const row = el(id);
       if (!row) return;
       row.classList.toggle("hidden", !visible);
+      row.style.display = visible ? "" : "none";
     };
 
     el("dTitle").textContent = place.name || "";
-    el("dDistrict").textContent = place.district ? `เขต${place.district}` : "ไม่ระบุเขต";
+    el("dDistrict").textContent = place.district ? `เขต${place.district}` : "";
     el("dCategory").textContent = meta.label;
-    el("dIcon").innerHTML = `<span style="color: ${meta.color}">${svgForDom(iconKey, "icon-24")}</span>`;
-    el("dDistance").textContent = userLocation ? `ห่างจากคุณ ${formatKm(place._distanceKm)}` : "-";
+    el("dIcon").innerHTML = `<span style="color: #ffffff">${svgForDom(iconKey, "icon-20")}</span>`;
+    renderDistanceBadge(place._distanceKm);
     el("dAddress").textContent = place.address || "";
     setRowVisible("rowAddress", !!place.address);
 
@@ -1540,9 +1677,20 @@ if (!defined('ABSPATH')) exit;
     el("dHours").textContent = "";
     el("dAdmission").textContent = "";
     el("dDesc").textContent = "";
+    el("dDesc").classList.remove("is-expanded");
+    el("dDescMore")?.classList.add("hidden");
+    if (el("dDescMore")) el("dDescMore").textContent = "อ่านทั้งหมด ▼";
 
-    el("dGmaps").href = `https://maps.google.com/?q=${place.lat},${place.lng}`;
-    setRowVisible("rowGmaps", true);
+    const fallbackGmaps = (typeof place.lat === "number" && typeof place.lng === "number")
+      ? `https://maps.google.com/?q=${place.lat},${place.lng}`
+      : "";
+    if (fallbackGmaps) {
+      el("dGmaps").href = fallbackGmaps;
+      setRowVisible("rowGmaps", true);
+    } else {
+      el("dGmaps").href = "#";
+      setRowVisible("rowGmaps", false);
+    }
     const fbEl = el("dFacebook");
     fbEl.classList.add("hidden");
     fbEl.href = "#";
@@ -1585,14 +1733,14 @@ if (!defined('ABSPATH')) exit;
     coursesWrap.innerHTML = `<div class="text-sm text-slate-400">กำลังโหลดคอร์ส...</div>`;
     const coursesCountEl = el("coursesCount");
     if (coursesCountEl) coursesCountEl.textContent = "0";
-    const tabBtnCourses = el("tabBtnCourses");
-    if (tabBtnCourses) tabBtnCourses.classList.add("hidden");
+    setDrawerTabsVisibility(false);
     const coursesSearchWrap = el("coursesSearchWrap");
     const coursesSearch = el("coursesSearch");
     if (coursesSearch) coursesSearch.value = "";
     if (coursesSearchWrap) coursesSearchWrap.classList.add("hidden");
 
     setActiveTab("details");
+    updateDetailsRowsVisibility();
     if (isMobile() && forceMapOnMobile) setMobileView("map");
 
     loadFullForId(place.id).then((full) => {
@@ -1610,7 +1758,8 @@ if (!defined('ABSPATH')) exit;
         setRowVisible("rowGmaps", true);
         coursesWrap.innerHTML = `<div class="text-sm text-slate-400">ยังไม่มีคอร์ส</div>`;
         if (coursesCountEl) coursesCountEl.textContent = "0";
-        if (tabBtnCourses) tabBtnCourses.classList.add("hidden");
+        setDrawerTabsVisibility(false);
+        updateDetailsRowsVisibility();
         return;
       }
 
@@ -1630,10 +1779,20 @@ if (!defined('ABSPATH')) exit;
         setRowVisible("rowAdmission", labels.length > 0);
       }
       el("dDesc").textContent = full.description || "";
+      el("dDesc").classList.remove("is-expanded");
+      if (el("dDescMore")) el("dDescMore").textContent = "อ่านทั้งหมด ▼";
+      updateDescReadMoreVisibility();
       setRowVisible("rowDesc", !!full.description);
 
-      el("dGmaps").href = full.links?.googleMaps || `https://maps.google.com/?q=${place.lat},${place.lng}`;
-      setRowVisible("rowGmaps", true);
+      const gmapsLink = (full.links?.googleMaps || "").trim();
+      const finalGmapsLink = gmapsLink || fallbackGmaps;
+      if (finalGmapsLink) {
+        el("dGmaps").href = finalGmapsLink;
+        setRowVisible("rowGmaps", true);
+      } else {
+        el("dGmaps").href = "#";
+        setRowVisible("rowGmaps", false);
+      }
       if (full.links?.facebook) {
         fbEl.href = full.links.facebook;
         fbEl.classList.remove("hidden");
@@ -1642,6 +1801,7 @@ if (!defined('ABSPATH')) exit;
         fbEl.classList.add("hidden");
         setRowVisible("rowFacebook", false);
       }
+      updateDetailsRowsVisibility();
 
       const normalizeImage = (img) => {
         if (!img) return null;
@@ -1705,10 +1865,10 @@ if (!defined('ABSPATH')) exit;
       if (coursesCountEl) coursesCountEl.textContent = String(courses.length);
       if (!courses.length) {
         coursesWrap.innerHTML = `<div class="text-sm text-slate-400">ยังไม่มีคอร์ส</div>`;
-        if (tabBtnCourses) tabBtnCourses.classList.add("hidden");
+        setDrawerTabsVisibility(false);
         setActiveTab("details");
       } else {
-        if (tabBtnCourses) tabBtnCourses.classList.remove("hidden");
+        setDrawerTabsVisibility(true);
         const renderCourses = (list) => {
           coursesWrap.innerHTML = "";
           if (!list.length) {
@@ -2171,7 +2331,7 @@ if (!defined('ABSPATH')) exit;
 
     if (selectedId) {
       const p = allPlaces.find(x => x.id === selectedId);
-      if (p) el("dDistance").textContent = userLocation ? `ห่างจากคุณ ${formatKm(p._distanceKm)}` : "-";
+      if (p) renderDistanceBadge(p._distanceKm);
     }
   }
 
@@ -2271,6 +2431,8 @@ if (!defined('ABSPATH')) exit;
 
   // ================= UI BINDINGS =================
   function bindUI() {
+    renderDrawerMetaIcons();
+
     el("tabMap")?.addEventListener("click", () => setMobileView("map"));
     el("tabList")?.addEventListener("click", () => setMobileView("list"));
 
@@ -2317,6 +2479,14 @@ if (!defined('ABSPATH')) exit;
       closeSearchPanel();
       updateSearchStatusUI();
       writeUrlFromState("replace");
+    });
+
+    el("dDescMore")?.addEventListener("click", () => {
+      const desc = el("dDesc");
+      const btn = el("dDescMore");
+      if (!desc || !btn) return;
+      const expanded = desc.classList.toggle("is-expanded");
+      btn.textContent = expanded ? "ย่อ ▲" : "อ่านทั้งหมด ▼";
     });
 
     document.addEventListener("click", (e) => {

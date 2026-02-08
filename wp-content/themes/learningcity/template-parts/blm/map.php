@@ -41,7 +41,7 @@ if (!defined('ABSPATH')) exit;
   <aside id="drawer" class="hidden fixed top-0 h-full z-[70] overflow-hidden
        w-full sm:w-[560px] right-0
        lg:left-[25vw] lg:w-[33.3333vw] lg:right-auto">
-    <div id="drawerPanel" class="relative h-full bg-white">
+    <div id="drawerPanel" class="relative h-full bg-[#f2f2f2]">
       <div id="drawerLoading" class="hidden absolute inset-0 z-20 bg-white/65 backdrop-blur-[1px]">
         <div class="absolute inset-0 flex items-center justify-center">
           <div class="rounded-2xl bg-white px-5 py-4 shadow-xl border flex items-center gap-3">
@@ -50,123 +50,123 @@ if (!defined('ABSPATH')) exit;
           </div>
         </div>
       </div>
-      <button id="drawerClose"
-        class="absolute top-4 right-4 h-10 w-10 rounded-full bg-black text-white flex items-center justify-center">
-        ✕
-      </button>
 
       <div class="h-full flex flex-col">
-        <div class="px-6 pt-8 pb-4 border-b">
-          <h2 id="dTitle" class="text-2xl font-extrabold leading-tight"></h2>
+        <div id="drawerHero" class="relative bg-[linear-gradient(180deg,#D1F9EB_0%,#E1FFD8_91.42%)]">
+          <div class="relative z-10 flex flex-col gap-[11px] px-[24px] pt-[15px] pb-[15px]">
+            <button id="drawerClose"
+              class="inline-flex h-[30px] w-fit items-center gap-px rounded-full bg-white px-[9px] shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
+              <span class="text-[18px] leading-none">←</span>
+              <span class="text-[14px] font-semibold">ย้อนกลับ</span>
+            </button>
 
-        <div class="mt-3 flex items-center gap-3 text-sm text-slate-600">
-          <div class="inline-flex items-center gap-2">
-            <span id="dIcon"
-              class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 icon-24">
-            </span>
-            <div>
-              <div id="dDistrict" class="text-slate-700 font-medium"></div>
-              <div id="dCategory" class="text-slate-500 text-xs"></div>
+            <div class="flex flex-col gap-[10px]">
+              <h2 id="dTitle" class="blm-drawer-title text-[24px] leading-[1.4] text-black"></h2>
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-[10px]">
+                  <span id="dIcon"
+                    class="inline-flex h-[35px] w-[35px] items-center justify-center rounded-[8px] bg-[#00744B] text-white icon-20">
+                  </span>
+                  <div>
+                    <div id="dCategory" class="text-[14px] font-normal leading-[1.2] text-black"></div>
+                    <div id="dDistrict" class="text-[14px] font-normal leading-[1.2] text-black"></div>
+                  </div>
+                </div>
+                <div id="dDistance" class="blm-distance-box">
+                  <span class="lbl">ห่างจากคุณ</span>
+                  <span class="val">-</span>
+                </div>
+              </div>
             </div>
           </div>
-
-          <div class="ml-auto text-emerald-700 font-semibold" id="dDistance">-</div>
-        </div>
-      </div>
-
-      <div class="flex-1 overflow-auto">
-        <div id="rowImages" class="px-6 pt-5">
-          <div id="imgGrid" class="grid grid-cols-3 gap-2"></div>
         </div>
 
-        <div class="px-6 pt-5">
-          <div class="flex bg-slate-100 rounded-full p-1">
-            <button id="tabBtnDetails" class="tabBtn flex-1 py-2 rounded-full text-sm font-semibold" data-tab="details">รายละเอียด</button>
-            <button id="tabBtnCourses" class="tabBtn flex-1 py-2 rounded-full text-sm font-semibold" data-tab="courses">คอร์สเรียน (<span id="coursesCount">0</span>)</button>
-          </div>
-        </div>
+        <div id="drawerBody" class="flex-1 overflow-auto bg-white px-[23px] py-[17px]">
+          <div class="flex flex-col gap-[18px]">
+            <div id="rowImages">
+              <div id="imgGrid" class="grid grid-cols-3 gap-[7px]"></div>
+            </div>
 
-        <div class="px-6 py-5">
-          <div id="tab-details" class="tabPanel space-y-4">
-            <div id="rowAddress" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">📍</div>
-              <div class="flex-1">
-                <div id="dAddress" class="text-sm text-slate-800"></div>
+            <div id="rowDesc">
+              <div id="dDesc" class="blm-desc-text"></div>
+              <button id="dDescMore" type="button" class="blm-readmore">อ่านทั้งหมด ▼</button>
+            </div>
+
+            <div class="blm-drawer-tabs">
+              <button id="tabBtnDetails" class="tabBtn is-active" data-tab="details">รายละเอียด</button>
+              <button id="tabBtnCourses" class="tabBtn" data-tab="courses">คอร์สเรียน (<span id="coursesCount">0</span>)</button>
+            </div>
+
+            <div id="tab-details" class="tabPanel space-y-4">
+              <div id="rowAddress" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconAddress"></span></div>
+                <div class="flex-1">
+                  <div id="dAddress" class="text-[14px] leading-[1.45] text-black"></div>
+                </div>
+              </div>
+
+              <div id="rowGmaps" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconGmaps"></span></div>
+                <div class="flex-1">
+                  <a id="dGmaps" class="blm-gmaps-btn" target="_blank" rel="noreferrer">เปิด Google Maps ↗</a>
+                </div>
+              </div>
+
+              <div id="rowPhone" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconPhone"></span></div>
+                <div class="flex-1">
+                  <div id="dPhone" class="text-[14px] text-black"></div>
+                </div>
+              </div>
+
+              <div id="rowHours" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconHours"></span></div>
+                <div class="flex-1">
+                  <div id="dHours" class="text-[14px] whitespace-pre-line text-black"></div>
+                </div>
+              </div>
+
+              <div id="rowAdmission" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconAdmission"></span></div>
+                <div class="flex-1">
+                  <div id="dAdmission" class="text-[14px] text-black"></div>
+                </div>
+              </div>
+
+              <div id="rowTags" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconTags"></span></div>
+                <div class="flex-1">
+                  <div id="dTags" class="flex flex-wrap gap-2"></div>
+                </div>
+              </div>
+
+              <div id="rowAmenities" class="rounded-[12px] border border-black/10 bg-transparent p-4">
+                <div class="text-[14px] font-semibold text-black/90">สิ่งอำนวยความสะดวก</div>
+                <div id="dAmenities" class="mt-2 flex flex-wrap gap-2"></div>
+              </div>
+
+              <div id="rowFacebook" class="blm-meta-row">
+                <div class="blm-meta-icon blm-meta-icon-svg" aria-hidden="true"><span id="iconFacebook"></span></div>
+                <div class="flex-1">
+                  <a id="dFacebook" class="text-[14px] text-[#00744b] underline" target="_blank" rel="noreferrer">Facebook ↗</a>
+                </div>
+              </div>
+
+              <div id="rowReportIssue" class="hidden pt-1">
+                <button id="btnReportIssue"
+                        class="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+                  แจ้งแก้ไขข้อมูล
+                </button>
               </div>
             </div>
-            <div id="rowGmaps" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">🗺️</div>
-              <div class="flex-1">
-                <a id="dGmaps" class="text-sm text-emerald-700 underline" target="_blank" rel="noreferrer">เปิด Google Maps ↗</a>
+
+            <div id="tab-courses" class="tabPanel hidden space-y-3">
+              <div class="text-sm text-slate-600">คอร์สเรียน</div>
+              <div id="coursesSearchWrap" class="hidden">
+                <input id="coursesSearch"
+                       class="w-full rounded-xl border px-3 py-2 text-sm"
+                       placeholder="ค้นหาชื่อคอร์ส..." />
               </div>
-            </div>
-
-            <div id="rowPhone" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">📞</div>
-              <div class="flex-1">
-                <div id="dPhone" class="text-sm text-slate-800"></div>
-              </div>
-            </div>
-
-            <div id="rowHours" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">🕒</div>
-              <div class="flex-1">
-                <div id="dHours" class="text-sm text-slate-800 whitespace-pre-line"></div>
-              </div>
-            </div>
-
-            <div id="rowAdmission" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">💰</div>
-              <div class="flex-1">
-                <div id="dAdmission" class="text-sm text-slate-800"></div>
-              </div>
-            </div>
-
-            <div id="rowTags" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">🏷️</div>
-              <div class="flex-1">
-                <div id="dTags" class="flex flex-wrap gap-2"></div>
-              </div>
-            </div>
-
-            <div id="rowDesc" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">ℹ️</div>
-              <div class="flex-1">
-                <div id="dDesc" class="text-sm text-slate-600"></div>
-              </div>
-            </div>
-
-            <div id="rowFacebook" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">🔗</div>
-              <div class="flex-1">
-                <a id="dFacebook" class="text-sm text-emerald-700 underline" target="_blank" rel="noreferrer">Facebook ↗</a>
-              </div>
-            </div>
-
-            <div id="rowAmenities" class="flex gap-3">
-              <div class="mt-1 text-emerald-700">✨</div>
-              <div class="flex-1">
-                <div class="text-sm text-slate-600">สิ่งอำนวยความสะดวก</div>
-                <div id="dAmenities" class="flex flex-wrap gap-2 mt-2"></div>
-              </div>
-            </div>
-
-            <div class="pt-2">
-              <button id="btnReportIssue"
-                      class="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border bg-white hover:bg-slate-50">
-                แจ้งแก้ไขข้อมูล
-              </button>
-              <div class="text-xs text-slate-500 mt-1">พบข้อมูลไม่ถูกต้อง? ช่วยเราปรับให้ถูกต้องได้เลย</div>
-            </div>
-          </div>
-
-          <div id="tab-courses" class="tabPanel hidden space-y-3">
-            <div class="text-sm text-slate-600">คอร์สเรียน</div>
-            <div id="coursesSearchWrap" class="hidden">
-              <input id="coursesSearch"
-                     class="w-full rounded-xl border px-3 py-2 text-sm"
-                     placeholder="ค้นหาชื่อคอร์ส..." />
-            </div>
               <div id="dCourses" class="space-y-2"></div>
             </div>
           </div>

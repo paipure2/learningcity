@@ -241,15 +241,170 @@ if (!defined('ABSPATH')) exit;
     height: calc(100svh - var(--lc-header-h)) !important;
     background: transparent !important;
     overflow: hidden;
+    pointer-events: none;
   }
   #drawerPanel {
     height: 100%;
+    font-family: var(--font-anuphan), system-ui, sans-serif;
+    touch-action: pan-y;
     transform: translateX(100%);
     transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
     will-change: transform;
   }
+  #drawer .overflow-auto {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  #drawer.is-open {
+    pointer-events: auto;
+  }
   #drawer.is-open #drawerPanel {
     transform: translateX(0);
+  }
+  .blm-drawer-title {
+    font-family: var(--font-bkk), var(--font-anuphan), sans-serif;
+    letter-spacing: 0;
+    line-height: 1.4;
+  }
+  #dDistance.blm-distance-box {
+    width: 78px;
+    min-height: 47px;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 0 17.3px rgba(0, 0, 0, 0.1);
+    padding: 5px 8px 4px;
+    text-align: right;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 1px;
+  }
+  #dDistance .lbl {
+    color: #000;
+    font-size: 12px;
+    line-height: 1.1;
+    font-weight: 600;
+  }
+  #dDistance .val {
+    color: #00744b;
+    font-size: 18px;
+    line-height: 1.1;
+    font-weight: 700;
+  }
+  .blm-desc-text {
+    font-size: 15px;
+    line-height: 1.5;
+    color: #000;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .blm-desc-text.is-expanded {
+    display: block;
+  }
+  #rowDesc {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .blm-readmore {
+    margin-top: 0;
+    color: #00744b;
+    font-size: 12px;
+    line-height: 1.5;
+    font-weight: 600;
+    width: fit-content;
+  }
+  .blm-drawer-tabs {
+    height: 46px;
+    width: 100%;
+    border-radius: 999px;
+    padding: 5px;
+    background: #f2f2f2;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    display: flex;
+    gap: 0;
+  }
+  .blm-drawer-tabs .tabBtn {
+    height: 36px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.73);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+  #tabBtnDetails.tabBtn {
+    flex: 0 0 46%;
+  }
+  #tabBtnCourses.tabBtn {
+    flex: 1;
+  }
+  .blm-drawer-tabs .tabBtn.is-active {
+    background: linear-gradient(180deg, #00da8d 0%, #00744b 100%);
+    color: #fff;
+  }
+  .blm-meta-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .blm-meta-icon {
+    width: 24px;
+    min-width: 24px;
+    text-align: center;
+    line-height: 1;
+    margin-top: 0;
+    color: #1f1f1f;
+  }
+  .blm-meta-icon-svg > span {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+  }
+  #dGmaps.blm-gmaps-btn {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #000;
+    border-radius: 999px;
+    min-height: 33px;
+    padding: 8px 13px;
+    font-size: 14px;
+    color: #000;
+    line-height: 1;
+  }
+  #dTags > span {
+    background: #fff !important;
+    border: 1px solid #d4d4d4 !important;
+    border-radius: 999px !important;
+    min-height: 27px;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+    color: #000 !important;
+    display: inline-flex;
+    align-items: center;
+  }
+  #dAmenities > span {
+    background: #d1f9eb !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    min-height: 27px;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+    color: #000 !important;
+    display: inline-flex;
+    align-items: center;
+  }
+  #imgGrid a img {
+    height: 116px !important;
+    border-radius: 12px !important;
+    border: 0 !important;
   }
 
   @media (min-width: 1024px) {
@@ -401,6 +556,20 @@ if (!defined('ABSPATH')) exit;
     .blm-heading h1 {
       font-size: 28px;
       line-height: 1.4;
+    }
+    #drawer {
+      top: 0 !important;
+      height: 100vh !important;
+      height: 100svh !important;
+      width: 100% !important;
+      left: 0 !important;
+      right: 0 !important;
+    }
+    #drawerPanel {
+      background: #fff;
+    }
+    #drawer .overflow-auto {
+      padding: 17px 23px 24px !important;
     }
     #sidebar { background: #fff !important; }
     #searchPanel {

@@ -13,6 +13,19 @@ function blm_float_or_null($v) {
   return is_numeric($v) ? floatval($v) : null;
 }
 
+function blm_location_full_cache_key($location_id) {
+  return 'blm_location_full_v2_' . intval($location_id);
+}
+
+function blm_get_location_description_from_content($post_id) {
+  $post = get_post($post_id);
+  if (!$post || empty($post->post_content)) return '';
+  $content = apply_filters('the_content', $post->post_content);
+  $content = wp_strip_all_tags($content, true);
+  $content = preg_replace('/\s+/u', ' ', (string) $content);
+  return trim((string) $content);
+}
+
 // Replace local home_url origin with the current request origin (useful for dev on mobile)
 
 function blm_id_from_acf_post_object($value) {
@@ -433,12 +446,12 @@ function blm_clear_light_cache() {
 
 /** ล้าง full cache ของ location รายตัว */
 function blm_clear_full_cache_for_post($post_id) {
-  delete_transient('blm_location_full_' . intval($post_id));
+  delete_transient(blm_location_full_cache_key($post_id));
 }
 
 function blm_clear_full_cache_for_location_id($location_id) {
   $location_id = (int) $location_id;
-  if ($location_id) delete_transient('blm_location_full_' . $location_id);
+  if ($location_id) delete_transient(blm_location_full_cache_key($location_id));
 }
 
 /** ---------- auto rebuild caches on content update (NEW) ---------- */
@@ -478,7 +491,8 @@ add_action('blm_rebuild_caches_event', function ($post_id = 0) {
     // ---- ปรับคีย์ให้ตรง ACF ของคุณ ----
     $phone = $meta['phone'][0] ?? '';
     $hours = $meta['opening_hours'][0] ?? ($meta['hours'][0] ?? '');
-    $description = $meta['description'][0] ?? '';
+    $description = blm_get_location_description_from_content($post_id);
+    if ($description === '') $description = $meta['description'][0] ?? '';
 
     // links
     $googleMaps = $meta['google_maps'][0] ?? '';
@@ -511,7 +525,7 @@ add_action('blm_rebuild_caches_event', function ($post_id = 0) {
       ],
     ];
 
-    set_transient('blm_location_full_' . $post_id, $resp, 15 * MINUTE_IN_SECONDS);
+    set_transient(blm_location_full_cache_key($post_id), $resp, 15 * MINUTE_IN_SECONDS);
   }
 }, 10, 1);
 
@@ -750,7 +764,7 @@ add_action('rest_api_init', function () {
         return new WP_REST_Response(['error' => 'not_found'], 404);
       }
 
-      $cache_key = 'blm_location_full_' . $id;
+      $cache_key = blm_location_full_cache_key($id);
       $cached = get_transient($cache_key);
       if ($cached) return new WP_REST_Response($cached, 200);
 
@@ -759,7 +773,8 @@ add_action('rest_api_init', function () {
       // ---- ปรับคีย์ให้ตรง ACF ของคุณ ----
       $phone = $meta['phone'][0] ?? '';
       $hours = $meta['opening_hours'][0] ?? ($meta['hours'][0] ?? '');
-      $description = $meta['description'][0] ?? '';
+      $description = blm_get_location_description_from_content($id);
+      if ($description === '') $description = $meta['description'][0] ?? '';
 
       // links
       $googleMaps = $meta['google_maps'][0] ?? '';
