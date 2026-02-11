@@ -102,6 +102,14 @@ if (!defined('ABSPATH')) exit;
     font-size: 16px !important;
     font-weight: 600 !important;
   }
+  /* Keep heading-to-content spacing consistent across filter groups */
+  #sidebar .space-y-2 > #district,
+  #sidebar .space-y-2 > #ageRangeWrap,
+  #sidebar .space-y-2 > #facilityWrap,
+  #sidebar .space-y-2 > #admissionWrap,
+  #sidebar .space-y-2 > #courseCatWrap {
+    margin-top: 10px !important;
+  }
   .blm-view-all {
     font-size: 12px;
     font-weight: 600;
@@ -112,6 +120,41 @@ if (!defined('ABSPATH')) exit;
   .blm-view-all:hover {
     text-decoration: none !important;
     opacity: 0.9;
+  }
+  .blm-share-btn {
+    color: #0f172a;
+    transition: background-color .2s ease, color .2s ease;
+  }
+  .blm-share-btn:hover {
+    background: #f8fafc;
+  }
+  .blm-share-btn.is-copied {
+    background: var(--blm-primary) !important;
+    color: #ffffff !important;
+  }
+  .blm-copy-toast {
+    opacity: 0;
+    transform: translateX(6px);
+    pointer-events: none;
+    background: #0f172a;
+    color: #fff;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    padding: 6px 10px;
+    transition: opacity .2s ease, transform .2s ease;
+    white-space: nowrap;
+  }
+  .blm-copy-toast.is-show {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .blm-modal-panel {
+    width: min(800px, calc(100% - 2rem)) !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%);
   }
   #sidebar select,
   #sidebar input[type="number"] {
@@ -163,10 +206,33 @@ if (!defined('ABSPATH')) exit;
   #ageRangeWrap .bg-emerald-600,
   #facilityWrap .bg-emerald-600,
   #admissionWrap .bg-emerald-600,
-  #courseCatWrap .bg-emerald-600 {
+  #courseCatWrap .bg-emerald-600,
+  #facilityModalGrid .bg-emerald-600,
+  #courseCatModalGrid .bg-emerald-600 {
     background: var(--blm-primary) !important;
     border-color: var(--blm-primary) !important;
     color: #fff !important;
+  }
+  .blm-skeleton {
+    position: relative;
+    overflow: hidden;
+    background: #ececec;
+    border-radius: 999px;
+    display: inline-block;
+  }
+  .blm-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.75) 45%, transparent 100%);
+    animation: blm-skeleton-shimmer 1.1s infinite;
+  }
+  .blm-skeleton-pill {
+    height: 32px;
+  }
+  @keyframes blm-skeleton-shimmer {
+    100% { transform: translateX(100%); }
   }
   #reset {
     width: auto !important;
@@ -349,7 +415,7 @@ if (!defined('ABSPATH')) exit;
   .blm-meta-row {
     display: flex;
     gap: 12px;
-    align-items: center;
+    align-items: flex-start;
   }
   .blm-meta-icon {
     width: 24px;

@@ -54,18 +54,32 @@ if (!defined('ABSPATH')) exit;
       <div class="h-full flex flex-col">
         <div id="drawerHero" class="relative bg-[linear-gradient(180deg,#D1F9EB_0%,#E1FFD8_91.42%)]">
           <div class="relative z-10 flex flex-col gap-[11px] px-[24px] pt-[15px] pb-[15px]">
-            <button id="drawerClose"
-              class="inline-flex h-[30px] w-fit items-center gap-px rounded-full bg-white px-[9px] shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
-              <span class="text-[18px] leading-none">←</span>
-              <span class="text-[14px] font-semibold">ย้อนกลับ</span>
-            </button>
+            <div class="flex items-center justify-between gap-2">
+              <button id="drawerClose"
+                class="inline-flex h-[30px] w-fit items-center gap-px rounded-full bg-white px-[9px] shadow-[0_2px_4px_rgba(0,0,0,0.25)]">
+                <span class="text-[18px] leading-none">←</span>
+                <span class="text-[14px] font-semibold">ย้อนกลับ</span>
+              </button>
+              <div class="flex items-center gap-2">
+                <span id="copyLinkToast" class="blm-copy-toast" aria-live="polite">Copy link แล้ว</span>
+                <button id="btnSharePlace" type="button"
+                  class="blm-share-btn inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.25)]"
+                  aria-label="คัดลอกลิงก์สถานที่นี้"
+                  title="คัดลอกลิงก์">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-[16px] w-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.12 1.12"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.12-1.12"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
 
             <div class="flex flex-col gap-[10px]">
               <h2 id="dTitle" class="blm-drawer-title text-[24px] leading-[1.4] text-black"></h2>
               <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-[10px]">
                   <span id="dIcon"
-                    class="inline-flex h-[35px] w-[35px] items-center justify-center rounded-[8px] bg-[#00744B] text-white icon-20">
+                    class="inline-flex h-[35px] w-[35px] items-center justify-center rounded-[8px] text-white icon-20">
                   </span>
                   <div>
                     <div id="dCategory" class="text-[14px] font-normal leading-[1.2] text-black"></div>

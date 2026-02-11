@@ -2,9 +2,9 @@
 if (!defined('ABSPATH')) exit;
 ?>
 <div id="catModal" class="hidden fixed inset-0 z-999999">
-  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 
-  <div class="absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+  <div class="blm-modal-panel absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
     <div class="p-4 border-b flex items-center justify-between">
       <div class="font-bold">เลือกประเภทสถานที่</div>
       <button id="closeCatModal" class="text-lg">✕</button>
@@ -29,9 +29,9 @@ if (!defined('ABSPATH')) exit;
 
 
 <div id="facilityModal" class="hidden fixed inset-0 z-999999">
-  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 
-  <div class="absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+  <div class="blm-modal-panel absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
     <div class="p-4 border-b flex items-center justify-between">
       <div class="font-bold">เลือกสิ่งอำนวยความสะดวก</div>
       <button id="closeFacilityModal" class="text-lg">✕</button>
@@ -56,9 +56,9 @@ if (!defined('ABSPATH')) exit;
 
 
 <div id="courseCatModal" class="hidden fixed inset-0 z-999999">
-  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 
-  <div class="absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+  <div class="blm-modal-panel absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
     <div class="p-4 border-b flex items-center justify-between">
       <div class="font-bold">เลือกหมวดคอร์ส</div>
       <button id="closeCourseCatModal" class="text-lg">✕</button>
@@ -83,9 +83,9 @@ if (!defined('ABSPATH')) exit;
 
 
 <div id="reportModal" class="hidden fixed inset-0 z-999999">
-  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 
-  <div class="absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+  <div class="blm-modal-panel absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
     <div class="p-4 border-b flex items-center justify-between">
       <div class="font-bold">แจ้งแก้ไขข้อมูลสถานที่</div>
       <button id="closeReportModal" class="text-lg">✕</button>

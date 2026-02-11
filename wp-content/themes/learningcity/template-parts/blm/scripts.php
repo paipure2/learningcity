@@ -399,9 +399,12 @@ if (!defined('ABSPATH')) exit;
   let map;
 
   let selectedId = null;
+  let copyToastTimer = null;
 
   let hoverAnimRaf = null;
   let hoverAnimT0 = 0;
+  let activeAnimRaf = null;
+  let activeAnimT0 = 0;
 
   let userLocation = null; // {lat, lng}
   let meMarker = null;
@@ -446,6 +449,8 @@ if (!defined('ABSPATH')) exit;
   const LAYER_CLUSTER_CIRCLE = "places-cluster-circle";
   const LAYER_CLUSTER_COUNT  = "places-cluster-count";
   const LAYER_UNCLUSTERED    = "places-unclustered";
+  const LAYER_UNCLUSTERED_ACTIVE_RING = "places-unclustered-active-ring";
+  const LAYER_UNCLUSTERED_ACTIVE = "places-unclustered-active";
   const LAYER_UNCLUSTERED_LABEL = "places-unclustered-label";
 
   // ================= HELPERS =================
@@ -459,6 +464,20 @@ if (!defined('ABSPATH')) exit;
 
   const el = (id) => document.getElementById(id);
   const norm = (s) => (s || "").toString().trim().toLowerCase();
+  const decodeHtmlEntities = (raw) => {
+    const src = (raw || "").toString();
+    if (!src) return "";
+    const t = document.createElement("textarea");
+    let out = src;
+    // Decode twice to handle values like &amp;#8211;
+    for (let i = 0; i < 2; i += 1) {
+      t.innerHTML = out;
+      const next = t.value;
+      if (next === out) break;
+      out = next;
+    }
+    return out;
+  };
 
   function isMobile() {
     return window.matchMedia("(max-width: 1023px)").matches;
@@ -1107,6 +1126,38 @@ if (!defined('ABSPATH')) exit;
     el("searchPanel").classList.add("hidden");
   }
 
+  function skeletonPills(count = 6) {
+    return Array.from({ length: count }, (_, i) => {
+      const widths = [84, 98, 74, 112, 88, 126];
+      return `<span class="blm-skeleton blm-skeleton-pill" style="width:${widths[i % widths.length]}px"></span>`;
+    }).join("");
+  }
+
+  function renderFilterSkeletons() {
+    const district = el("district");
+    if (district) {
+      district.disabled = true;
+      district.innerHTML = `<option value="">กำลังโหลด...</option>`;
+    }
+
+    const wraps = [
+      ["ageRangeWrap", 5],
+      ["facilityWrap", 8],
+      ["admissionWrap", 3],
+      ["courseCatWrap", 5]
+    ];
+    wraps.forEach(([id, count]) => {
+      const wrap = el(id);
+      if (!wrap) return;
+      wrap.innerHTML = skeletonPills(count);
+    });
+  }
+
+  function clearFilterSkeletons() {
+    const district = el("district");
+    if (district) district.disabled = false;
+  }
+
   // ================= DYNAMIC FILTER UIs (NEW) =================
   function renderAgeRangeButtons() {
     const wrap = el("ageRangeWrap");
@@ -1634,6 +1685,7 @@ if (!defined('ABSPATH')) exit;
     }
 
     selectedId = place.id;
+    syncActiveMarkerState();
     writeUrlFromState("push");
 
     drawer.classList.remove("hidden");
@@ -1657,12 +1709,15 @@ if (!defined('ABSPATH')) exit;
     el("dTitle").textContent = place.name || "";
     el("dDistrict").textContent = place.district ? `เขต${place.district}` : "";
     el("dCategory").textContent = meta.label;
-    el("dIcon").innerHTML = `<span style="color: #ffffff">${svgForDom(iconKey, "icon-20")}</span>`;
+    const dIconEl = el("dIcon");
+    dIconEl.innerHTML = `<span style="color: #ffffff">${svgForDom(iconKey, "icon-20")}</span>`;
+    dIconEl.style.background = meta.color || DEFAULT_CATEGORY_COLOR;
     renderDistanceBadge(place._distanceKm);
     el("dAddress").textContent = place.address || "";
     setRowVisible("rowAddress", !!place.address);
 
     // default: hide optional rows until data is loaded
+    setRowVisible("rowReportIssue", true);
     setRowVisible("rowPhone", false);
     setRowVisible("rowHours", false);
     setRowVisible("rowAdmission", false);
@@ -1778,11 +1833,12 @@ if (!defined('ABSPATH')) exit;
         el("dAdmission").textContent = labels.length ? labels.join(", ") : "";
         setRowVisible("rowAdmission", labels.length > 0);
       }
-      el("dDesc").textContent = full.description || "";
+      const cleanDesc = decodeHtmlEntities(full.description || "");
+      el("dDesc").textContent = cleanDesc;
       el("dDesc").classList.remove("is-expanded");
       if (el("dDescMore")) el("dDescMore").textContent = "อ่านทั้งหมด ▼";
       updateDescReadMoreVisibility();
-      setRowVisible("rowDesc", !!full.description);
+      setRowVisible("rowDesc", !!cleanDesc.trim());
 
       const gmapsLink = (full.links?.googleMaps || "").trim();
       const finalGmapsLink = gmapsLink || fallbackGmaps;
@@ -1914,6 +1970,7 @@ if (!defined('ABSPATH')) exit;
     if (!drawer) return;
 
     selectedId = null;
+    syncActiveMarkerState();
     drawer.classList.remove("is-open");
     if (drawerHideTimer) clearTimeout(drawerHideTimer);
     drawerHideTimer = setTimeout(() => {
@@ -1921,6 +1978,56 @@ if (!defined('ABSPATH')) exit;
       drawerHideTimer = null;
     }, DRAWER_ANIM_MS);
     writeUrlFromState("replace");
+  }
+
+  function buildPlaceShareUrl(place) {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("place", String(place.id));
+    if (typeof place.lat === "number" && typeof place.lng === "number") {
+      url.searchParams.set("lat", String(Number(place.lat).toFixed(6)));
+      url.searchParams.set("lng", String(Number(place.lng).toFixed(6)));
+      url.searchParams.set("zoom", "16");
+    }
+    return url.toString();
+  }
+
+  async function copyCurrentPlaceLink() {
+    if (!selectedId) return;
+    const place = allPlaces.find(x => String(x.id) === String(selectedId));
+    if (!place) return;
+
+    const btn = el("btnSharePlace");
+    const url = buildPlaceShareUrl(place);
+
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (err) {
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+
+    if (btn) {
+      const oldTitle = btn.getAttribute("title") || "คัดลอกลิงก์";
+      const toast = el("copyLinkToast");
+      btn.setAttribute("title", "คัดลอกแล้ว");
+      btn.classList.add("is-copied");
+      if (copyToastTimer) clearTimeout(copyToastTimer);
+      toast?.classList.add("is-show");
+      setTimeout(() => {
+        btn.setAttribute("title", oldTitle);
+        btn.classList.remove("is-copied");
+      }, 950);
+      copyToastTimer = setTimeout(() => {
+        toast?.classList.remove("is-show");
+      }, 1200);
+    }
   }
 
   // ================= REPORT MODAL =================
@@ -1965,6 +2072,7 @@ if (!defined('ABSPATH')) exit;
   }
 
   (function bindReportModal() {
+    const modal = el("reportModal");
     const openBtn = el("btnReportIssue");
     const closeBtn = el("closeReportModal");
     const cancelBtn = el("cancelReport");
@@ -1978,6 +2086,11 @@ if (!defined('ABSPATH')) exit;
     });
     closeBtn?.addEventListener("click", closeReportModal);
     cancelBtn?.addEventListener("click", closeReportModal);
+    modal?.addEventListener("click", (e) => {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (target.dataset.modalBackdrop === "1") closeReportModal();
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -2147,10 +2260,39 @@ if (!defined('ABSPATH')) exit;
     });
 
     map.addLayer({
+      id: LAYER_UNCLUSTERED_ACTIVE_RING,
+      type: "circle",
+      source: PLACES_SOURCE_ID,
+      filter: ["all", ["!", ["has", "point_count"]], ["==", ["to-string", ["get", "id"]], ""]],
+      paint: {
+        "circle-radius": 20,
+        "circle-color": "#00da8d",
+        "circle-opacity": 0,
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#00da8d",
+        "circle-stroke-opacity": 0.85
+      }
+    });
+
+    map.addLayer({
+      id: LAYER_UNCLUSTERED_ACTIVE,
+      type: "symbol",
+      source: PLACES_SOURCE_ID,
+      filter: ["all", ["!", ["has", "point_count"]], ["==", ["to-string", ["get", "id"]], ""]],
+      layout: {
+        "icon-image": ["get", "iconKey"],
+        "icon-size": 1.55,
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "icon-anchor": "center"
+      }
+    });
+
+    map.addLayer({
       id: "places-unclustered-hover",
       type: "symbol",
       source: PLACES_SOURCE_ID,
-      filter: ["==", ["get", "id"], ""],
+      filter: ["all", ["!", ["has", "point_count"]], ["==", ["to-string", ["get", "id"]], ""]],
       layout: {
         "icon-image": ["get", "iconKey"],
         "icon-size": 1.6,
@@ -2192,17 +2334,44 @@ if (!defined('ABSPATH')) exit;
       });
     });
 
-    map.on("click", LAYER_UNCLUSTERED, (e) => {
-      const f = map.queryRenderedFeatures(e.point, { layers: [LAYER_UNCLUSTERED] })[0];
-      const place = allPlaces.find(p => p.id === f.properties.id);
+    const openPlaceFromPoint = (e, layers) => {
+      const f = map.queryRenderedFeatures(e.point, { layers })[0];
+      if (!f) return;
+      const fid = String(f.properties?.id ?? "");
+      const place = allPlaces.find(p => String(p.id) === fid);
       if (place) openDrawer(place, { forceMapOnMobile: true });
-    });
+    };
+
+    map.on("click", LAYER_UNCLUSTERED, (e) => openPlaceFromPoint(e, [LAYER_UNCLUSTERED]));
+    map.on("click", LAYER_UNCLUSTERED_ACTIVE, (e) => openPlaceFromPoint(e, [LAYER_UNCLUSTERED_ACTIVE]));
+    map.on("click", LAYER_UNCLUSTERED_LABEL, (e) => openPlaceFromPoint(e, [LAYER_UNCLUSTERED_LABEL]));
 
     const setCursor = (c) => map.getCanvas().style.cursor = c;
     map.on("mouseenter", LAYER_CLUSTER_CIRCLE, () => setCursor("pointer"));
     map.on("mouseleave", LAYER_CLUSTER_CIRCLE, () => setCursor(""));
     map.on("mouseenter", LAYER_UNCLUSTERED, () => setCursor("pointer"));
     map.on("mouseleave", LAYER_UNCLUSTERED, () => setCursor(""));
+    map.on("mouseenter", LAYER_UNCLUSTERED_ACTIVE, () => setCursor("pointer"));
+    map.on("mouseleave", LAYER_UNCLUSTERED_ACTIVE, () => setCursor(""));
+    map.on("mouseenter", LAYER_UNCLUSTERED_LABEL, () => setCursor("pointer"));
+    map.on("mouseleave", LAYER_UNCLUSTERED_LABEL, () => setCursor(""));
+    syncActiveMarkerState();
+  }
+
+  function syncActiveMarkerState() {
+    if (!map) return;
+    const activeId = selectedId == null ? "" : String(selectedId);
+    const activeFilter = ["all", ["!", ["has", "point_count"]], ["==", ["to-string", ["get", "id"]], activeId]];
+
+    if (map.getLayer(LAYER_UNCLUSTERED_ACTIVE_RING)) {
+      map.setFilter(LAYER_UNCLUSTERED_ACTIVE_RING, activeFilter);
+    }
+    if (map.getLayer(LAYER_UNCLUSTERED_ACTIVE)) {
+      map.setFilter(LAYER_UNCLUSTERED_ACTIVE, activeFilter);
+    }
+
+    if (activeId) startActivePulse();
+    else stopActivePulse();
   }
 
   function syncPlacesSource(placesToShow) {
@@ -2238,13 +2407,13 @@ if (!defined('ABSPATH')) exit;
 
     card.addEventListener("mouseenter", () => {
       if (!map) return;
-      map.setFilter("places-unclustered-hover", ["==", ["get", "id"], String(place.id)]);
+      map.setFilter("places-unclustered-hover", ["==", ["to-string", ["get", "id"]], String(place.id)]);
       startHoverShake();
     });
 
     card.addEventListener("mouseleave", () => {
       if (!map) return;
-      map.setFilter("places-unclustered-hover", ["==", ["get", "id"], ""]);
+      map.setFilter("places-unclustered-hover", ["==", ["to-string", ["get", "id"]], ""]);
       stopHoverShake();
     });
 
@@ -2432,6 +2601,15 @@ if (!defined('ABSPATH')) exit;
   // ================= UI BINDINGS =================
   function bindUI() {
     renderDrawerMetaIcons();
+    const bindBackdropClose = (modalId, onClose) => {
+      const modal = el(modalId);
+      if (!modal || typeof onClose !== "function") return;
+      modal.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!(target instanceof Element)) return;
+        if (target.dataset.modalBackdrop === "1") onClose();
+      });
+    };
 
     el("tabMap")?.addEventListener("click", () => setMobileView("map"));
     el("tabList")?.addEventListener("click", () => setMobileView("list"));
@@ -2547,6 +2725,7 @@ if (!defined('ABSPATH')) exit;
     el("closeFacilityModal")?.addEventListener("click", () => {
       el("facilityModal").classList.add("hidden");
     });
+    bindBackdropClose("facilityModal", () => el("facilityModal")?.classList.add("hidden"));
 
     el("btnApplyFacilities")?.addEventListener("click", () => {
       el("facilityModal").classList.add("hidden");
@@ -2630,6 +2809,7 @@ if (!defined('ABSPATH')) exit;
 
     el("btnAllCourseCats")?.addEventListener("click", () => el("courseCatModal").classList.remove("hidden"));
     el("closeCourseCatModal")?.addEventListener("click", () => el("courseCatModal").classList.add("hidden"));
+    bindBackdropClose("courseCatModal", () => el("courseCatModal")?.classList.add("hidden"));
     el("btnApplyCourseCats")?.addEventListener("click", () => {
       el("courseCatModal").classList.add("hidden");
       resetListLimit();
@@ -2691,6 +2871,7 @@ if (!defined('ABSPATH')) exit;
     });
 
     el("drawerClose")?.addEventListener("click", closeDrawer);
+    el("btnSharePlace")?.addEventListener("click", copyCurrentPlaceLink);
 
     document.querySelectorAll(".tabBtn").forEach((btn) =>
       btn.addEventListener("click", () => setActiveTab(btn.dataset.tab))
@@ -2698,6 +2879,7 @@ if (!defined('ABSPATH')) exit;
 
     el("btnAllCats")?.addEventListener("click", () => el("catModal").classList.remove("hidden"));
     el("closeCatModal")?.addEventListener("click", () => el("catModal").classList.add("hidden"));
+    bindBackdropClose("catModal", () => el("catModal")?.classList.add("hidden"));
     el("btnApplyCats")?.addEventListener("click", () => {
       el("catModal").classList.add("hidden");
       resetListLimit();
@@ -2834,11 +3016,55 @@ if (!defined('ABSPATH')) exit;
     map.setLayoutProperty("places-unclustered-hover", "icon-size", 1.6);
   }
 
+  function startActivePulse() {
+    if (!map) return;
+    if (activeAnimRaf) cancelAnimationFrame(activeAnimRaf);
+    activeAnimT0 = performance.now();
+
+    const tick = (t) => {
+      if (!map.getLayer(LAYER_UNCLUSTERED_ACTIVE) || !map.getLayer(LAYER_UNCLUSTERED_ACTIVE_RING)) {
+        activeAnimRaf = null;
+        return;
+      }
+      if (selectedId == null) {
+        stopActivePulse();
+        return;
+      }
+
+      const dt = (t - activeAnimT0) / 1000;
+      const rippleDuration = 1.15;
+      const phase = (dt % rippleDuration) / rippleDuration;
+      const ringRadius = 20 + (phase * 13);
+      const ringStrokeOpacity = 0.9 * (1 - phase);
+
+      map.setPaintProperty(LAYER_UNCLUSTERED_ACTIVE_RING, "circle-radius", ringRadius);
+      map.setPaintProperty(LAYER_UNCLUSTERED_ACTIVE_RING, "circle-stroke-opacity", ringStrokeOpacity);
+
+      activeAnimRaf = requestAnimationFrame(tick);
+    };
+
+    activeAnimRaf = requestAnimationFrame(tick);
+  }
+
+  function stopActivePulse() {
+    if (activeAnimRaf) cancelAnimationFrame(activeAnimRaf);
+    activeAnimRaf = null;
+    if (!map) return;
+    if (map.getLayer(LAYER_UNCLUSTERED_ACTIVE)) {
+      map.setLayoutProperty(LAYER_UNCLUSTERED_ACTIVE, "icon-size", 1.55);
+    }
+    if (map.getLayer(LAYER_UNCLUSTERED_ACTIVE_RING)) {
+      map.setPaintProperty(LAYER_UNCLUSTERED_ACTIVE_RING, "circle-radius", 20);
+      map.setPaintProperty(LAYER_UNCLUSTERED_ACTIVE_RING, "circle-stroke-opacity", 0.85);
+    }
+  }
+
   // ================= BOOT =================
   async function boot() {
     syncHeaderHeight();
     window.addEventListener("resize", syncHeaderHeight);
 
+    renderFilterSkeletons();
     loadCachedLocation();
     await Promise.all([loadPlaces(), loadFilters()]);
     rebuildCategoryMetaIndex();
@@ -2857,6 +3083,7 @@ if (!defined('ABSPATH')) exit;
     renderFacilityPillsTop();
     renderAdmissionPills();
     renderCourseCategoryPillsTop();
+    clearFilterSkeletons();
     renderCourseCategoryModalGrid("");
     renderFacilityModalGrid("");
 
