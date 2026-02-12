@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) exit;
   <div class="p-3 space-y-3">
     <div id="list" class="space-y-3"></div>
 
-    <button id="btnLoadMoreDesktop"
+    <button id="btnLoadMoreDesktop" type="button"
       class="hidden w-full px-4 py-3 rounded-xl border bg-white hover:bg-slate-50 font-semibold text-sm">
       โหลดเพิ่มอีก 10 รายการ
     </button>
@@ -27,18 +27,23 @@ if (!defined('ABSPATH')) exit;
 <section id="listSectionMobile"
   class="lg:hidden hidden bg-slate-50 overflow-auto h-full">
   <div class="sticky top-0 bg-slate-50/90 backdrop-blur border-b z-10">
+    <div class="blm-sheet-grabber-wrap">
+      <button id="btnSheetToggle" type="button" class="blm-sheet-grabber" aria-label="สลับขนาดแผงรายการ"></button>
+    </div>
     <div class="p-3">
-      <div class="text-sm text-slate-700 font-medium">
-        แสดงแหล่งเรียนรู้ <span id="listCountMobile" class="font-bold text-emerald-700">0</span> สถานที่
+      <div class="flex items-center justify-between gap-3">
+        <div class="text-sm text-slate-700 font-medium">
+          แสดงแหล่งเรียนรู้ <span id="listCountMobile" class="font-bold text-emerald-700">0</span> สถานที่
+        </div>
       </div>
       <div id="activeFiltersMobile" class="mt-2 flex flex-wrap gap-2"></div>
     </div>
   </div>
 
-  <div class="p-3 space-y-3">
+  <div id="listMobileBody" class="p-3 space-y-3">
     <div id="listMobile" class="space-y-3"></div>
 
-    <button id="btnLoadMoreMobile"
+    <button id="btnLoadMoreMobile" type="button"
       class="hidden w-full px-4 py-3 rounded-xl border bg-white hover:bg-slate-50 font-semibold text-sm">
       โหลดเพิ่มอีก 10 รายการ
     </button>

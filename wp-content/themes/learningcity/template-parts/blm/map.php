@@ -42,6 +42,10 @@ if (!defined('ABSPATH')) exit;
        w-full sm:w-[560px] right-0
        lg:left-[25vw] lg:w-[33.3333vw] lg:right-auto">
     <div id="drawerPanel" class="relative h-full bg-[#f2f2f2]">
+      <div id="drawerGrabberWrap" class="blm-drawer-grabber-wrap">
+        <button id="drawerGrabber" class="blm-drawer-grabber" aria-label="ลากเพื่อย่อหรือปิดรายละเอียด"></button>
+      </div>
+
       <div id="drawerLoading" class="hidden absolute inset-0 z-20 bg-white/65 backdrop-blur-[1px]">
         <div class="absolute inset-0 flex items-center justify-center">
           <div class="rounded-2xl bg-white px-5 py-4 shadow-xl border flex items-center gap-3">

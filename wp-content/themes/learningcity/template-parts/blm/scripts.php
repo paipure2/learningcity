@@ -441,7 +441,11 @@ if (!defined('ABSPATH')) exit;
 
   let searchQuery = "";
   let mobileView = "map";
+  let mobileSheetExpanded = false;
   let isSearching = false;
+  let suppressMapClicksUntil = 0;
+  let suppressSheetHandleClickUntil = 0;
+  let suppressSheetCardClickUntil = 0;
   const DRAWER_ANIM_MS = 280;
   let drawerHideTimer = null;
 
@@ -891,17 +895,43 @@ if (!defined('ABSPATH')) exit;
     const listMobile = el("listSectionMobile");
     const mapSection = el("mapSection");
 
+    if (!listMobile || !mapSection) return;
+
+    if (isMobile()) {
+      mapSection.classList.remove("hidden");
+      listMobile.classList.remove("hidden");
+      listMobile.classList.toggle("is-expanded", view === "list");
+      listMobile.classList.toggle("is-collapsed", view !== "list");
+      mobileSheetExpanded = view === "list";
+
+      if (mapTab && listTab) {
+        if (view === "list") {
+          mapTab.className = "px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white";
+          listTab.className = "px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white";
+        } else {
+          mapTab.className = "px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white";
+          listTab.className = "px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white";
+        }
+      }
+      setTimeout(() => map && map.resize(), 60);
+      return;
+    }
+
     if (view === "map") {
-      mapTab.className = "px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white";
-      listTab.className = "px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white";
+      if (mapTab && listTab) {
+        mapTab.className = "px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white";
+        listTab.className = "px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white";
+      }
 
       listMobile.classList.add("hidden");
       mapSection.classList.remove("hidden");
 
       setTimeout(() => map && map.resize(), 60);
     } else {
-      mapTab.className = "px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white";
-      listTab.className = "px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white";
+      if (mapTab && listTab) {
+        mapTab.className = "px-4 py-2 rounded-xl text-sm font-semibold text-slate-700 hover:bg-white";
+        listTab.className = "px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-600 text-white";
+      }
 
       listMobile.classList.remove("hidden");
       mapSection.classList.remove("hidden");
@@ -1677,7 +1707,7 @@ if (!defined('ABSPATH')) exit;
   }
 
   function openDrawer(place, options = {}) {
-    const { forceMapOnMobile = false } = options;
+    const { forceMapOnMobile = false, expandOnOpen = false } = options;
 
     const drawer = el("drawer");
     if (!drawer) return;
@@ -1692,9 +1722,15 @@ if (!defined('ABSPATH')) exit;
     writeUrlFromState("push");
 
     drawer.classList.remove("hidden");
+    drawer.classList.remove("is-expanded");
+    if (isMobile() && expandOnOpen) drawer.classList.add("is-expanded");
     requestAnimationFrame(() => {
       drawer.classList.add("is-open");
     });
+
+    if (isMobile()) {
+      el("listSectionMobile")?.classList.add("is-hidden");
+    }
 
     if (isMobile() && forceMapOnMobile) setMobileView("map");
 
@@ -1968,19 +2004,331 @@ if (!defined('ABSPATH')) exit;
     });
   }
 
-  function closeDrawer() {
+  function closeDrawer(options = {}) {
+    const { suppressMapClick = false } = options;
     const drawer = el("drawer");
     if (!drawer) return;
 
     selectedId = null;
     syncActiveMarkerState();
+    drawer.classList.remove("is-expanded");
     drawer.classList.remove("is-open");
     if (drawerHideTimer) clearTimeout(drawerHideTimer);
     drawerHideTimer = setTimeout(() => {
       drawer.classList.add("hidden");
       drawerHideTimer = null;
     }, DRAWER_ANIM_MS);
+    if (suppressMapClick) {
+      suppressMapClicksUntil = Date.now() + 600;
+    }
+    if (isMobile()) {
+      const listMobile = el("listSectionMobile");
+      if (listMobile) listMobile.classList.remove("is-hidden");
+      mobileSheetExpanded = false;
+      setMobileView("map"); // map mode on mobile == list in peek state
+    }
     writeUrlFromState("replace");
+  }
+
+  function bindDrawerDrag() {
+    const drawer = el("drawer");
+    const panel = el("drawerPanel");
+    const grabber = el("drawerGrabber");
+    const grabberWrap = el("drawerGrabberWrap");
+    const hero = el("drawerHero");
+    if (!drawer || !panel || !grabber) return;
+
+    let dragging = false;
+    let startY = 0;
+    let baseTranslate = 0;
+    let currentTranslate = 0;
+    let startTs = 0;
+    let wasExpanded = false;
+    let activePointerId = null;
+    const peekOffsetPx = () => window.innerHeight * 0.6; // 40svh visible
+    const canStartFromTarget = (target) => {
+      if (!(target instanceof Element)) return true;
+      return !target.closest("button, a, input, textarea, select, label, [role='button'], .tabBtn");
+    };
+
+    const startDrag = (clientY) => {
+      if (!isMobile() || !drawer.classList.contains("is-open")) return;
+      dragging = true;
+      startY = clientY;
+      startTs = Date.now();
+      wasExpanded = drawer.classList.contains("is-expanded");
+      baseTranslate = wasExpanded ? 0 : peekOffsetPx();
+      currentTranslate = baseTranslate;
+      panel.style.transition = "none";
+    };
+
+    const moveDrag = (clientY) => {
+      if (!dragging) return;
+      const raw = clientY - startY;
+      const minY = 0;
+      const maxY = peekOffsetPx();
+      currentTranslate = Math.min(maxY, Math.max(minY, baseTranslate + raw));
+      panel.style.transform = `translateY(${currentTranslate}px)`;
+    };
+
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      const elapsed = Math.max(1, Date.now() - startTs);
+      const velocity = (currentTranslate - baseTranslate) / elapsed;
+
+      panel.style.transition = "";
+      panel.style.transform = "";
+
+      const peek = peekOffsetPx();
+      const shouldExpand = currentTranslate < (peek * 0.45) || velocity < -0.18;
+      const shouldCollapse = currentTranslate > (peek * 0.55) || velocity > 0.08;
+
+      if (shouldExpand) {
+        drawer.classList.add("is-expanded");
+      } else if (shouldCollapse) {
+        drawer.classList.remove("is-expanded");
+      } else {
+        // snap back to state before drag when movement is small
+        drawer.classList.toggle("is-expanded", wasExpanded);
+      }
+    };
+
+    const bindStartZone = (zone) => {
+      if (!zone) return;
+      zone.addEventListener("touchstart", (e) => {
+        if (!canStartFromTarget(e.target)) return;
+        const t = e.touches?.[0];
+        if (!t) return;
+        startDrag(t.clientY);
+      }, { passive: false });
+      zone.addEventListener("touchend", endDrag);
+      zone.addEventListener("touchcancel", endDrag);
+
+      zone.addEventListener("pointerdown", (e) => {
+        if (!canStartFromTarget(e.target)) return;
+        if (e.pointerType !== "mouse" && e.pointerType !== "touch" && e.pointerType !== "pen") return;
+        activePointerId = e.pointerId;
+        if (zone.setPointerCapture) {
+          try { zone.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+        startDrag(e.clientY);
+      });
+      zone.addEventListener("pointerup", endDrag);
+      zone.addEventListener("pointercancel", endDrag);
+    };
+    [grabber, grabberWrap, hero].forEach(bindStartZone);
+
+    window.addEventListener("touchmove", (e) => {
+      if (!dragging) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      if (e.cancelable) e.preventDefault();
+      moveDrag(t.clientY);
+    }, { passive: false });
+    window.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      if (activePointerId != null && e.pointerId !== activePointerId) return;
+      moveDrag(e.clientY);
+    });
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("touchend", endDrag);
+    window.addEventListener("touchcancel", endDrag);
+    window.addEventListener("pointerup", () => { activePointerId = null; });
+    window.addEventListener("pointercancel", () => { activePointerId = null; });
+  }
+
+  function bindListSheetDrag() {
+    const sheet = el("listSectionMobile");
+    const handle = el("btnSheetToggle");
+    if (!sheet || !handle) return;
+
+    let dragging = false;
+    let gestureMode = ""; // "", "drag", "scroll"
+    let startY = 0;
+    let startX = 0;
+    let baseTranslate = 0;
+    let currentTranslate = 0;
+    let startTs = 0;
+    let dragMoved = false;
+    let activePointerId = null;
+    let wasExpanded = false;
+    let startScrollEl = null;
+    let gesturePrimed = false;
+    const DRAG_START_THRESHOLD_PX = 8;
+
+    const collapsedOffsetPx = () => window.innerHeight * 0.68; // 32svh visible
+    const expandedOffsetPx = () => {
+      const root = getComputedStyle(document.documentElement);
+      const headerVar = parseFloat(root.getPropertyValue("--lc-header-h")) || 0;
+      const headerEl = document.querySelector("header");
+      const headerPx = headerEl ? headerEl.offsetHeight : headerVar;
+      return Math.max(0, Math.round(headerPx));
+    };
+
+    const findScrollableParent = (target) => {
+      let node = target instanceof Element ? target : null;
+      while (node && node !== sheet) {
+        if (node instanceof HTMLElement) {
+          const style = getComputedStyle(node);
+          const overflowY = style.overflowY;
+          const canScroll = (overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight;
+          if (canScroll) return node;
+        }
+        node = node.parentElement;
+      }
+      if (sheet.scrollHeight > sheet.clientHeight) return sheet;
+      return null;
+    };
+
+    const startDrag = (clientY) => {
+      if (!isMobile()) return;
+      if (sheet.classList.contains("is-hidden")) return;
+      dragging = true;
+      startY = clientY;
+      startTs = Date.now();
+      dragMoved = false;
+      wasExpanded = sheet.classList.contains("is-expanded");
+      baseTranslate = wasExpanded ? expandedOffsetPx() : collapsedOffsetPx();
+      currentTranslate = baseTranslate;
+      sheet.style.transition = "none";
+    };
+
+    const moveDrag = (clientY) => {
+      if (!dragging) return;
+      const raw = clientY - startY;
+      const minY = expandedOffsetPx();
+      const maxY = collapsedOffsetPx();
+      currentTranslate = Math.min(maxY, Math.max(minY, baseTranslate + raw));
+      if (Math.abs(currentTranslate - baseTranslate) > 2) dragMoved = true;
+      sheet.style.transform = `translateY(${currentTranslate}px)`;
+    };
+
+    const resetGesture = () => {
+      dragging = false;
+      gestureMode = "";
+      startScrollEl = null;
+      gesturePrimed = false;
+    };
+
+    const endDrag = () => {
+      if (!dragging) {
+        resetGesture();
+        return;
+      }
+      dragging = false;
+      const elapsed = Math.max(1, Date.now() - startTs);
+      const velocity = (currentTranslate - baseTranslate) / elapsed;
+
+      sheet.style.transition = "";
+      sheet.style.transform = "";
+
+      const minY = expandedOffsetPx();
+      const maxY = collapsedOffsetPx();
+      const mid = (minY + maxY) / 2;
+      const shouldExpand = currentTranslate < mid || velocity < -0.18;
+      const shouldCollapse = currentTranslate >= mid || velocity > 0.08;
+      const nextExpanded = shouldExpand ? true : (shouldCollapse ? false : wasExpanded);
+
+      mobileSheetExpanded = nextExpanded;
+      sheet.classList.toggle("is-expanded", nextExpanded);
+      sheet.classList.toggle("is-collapsed", !nextExpanded);
+      if (dragMoved) {
+        suppressSheetHandleClickUntil = Date.now() + 350;
+        suppressSheetCardClickUntil = Date.now() + 400;
+      }
+      setTimeout(() => map && map.resize(), 80);
+      resetGesture();
+    };
+
+    const beginGesture = (clientX, clientY, target) => {
+      if (!isMobile() || sheet.classList.contains("is-hidden")) {
+        gesturePrimed = false;
+        return;
+      }
+      if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) {
+        gesturePrimed = false;
+        return;
+      }
+      startX = clientX;
+      startY = clientY;
+      gestureMode = "";
+      dragMoved = false;
+      startScrollEl = findScrollableParent(target);
+      gesturePrimed = true;
+    };
+
+    const resolveGestureMode = (clientX, clientY) => {
+      if (!gesturePrimed) return "";
+      if (gestureMode) return gestureMode;
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+      if (Math.abs(dx) < DRAG_START_THRESHOLD_PX && Math.abs(dy) < DRAG_START_THRESHOLD_PX) return "";
+      if (Math.abs(dy) <= Math.abs(dx)) {
+        gestureMode = "scroll";
+        return gestureMode;
+      }
+      const isExpandedNow = sheet.classList.contains("is-expanded");
+      const draggingDown = dy > 0;
+      const atTop = !startScrollEl || startScrollEl.scrollTop <= 0;
+      // In peek state, any vertical gesture should control the sheet.
+      // In expanded state, only drag-down at top should control the sheet (otherwise keep list scrolling).
+      const shouldDrag = !isExpandedNow ? true : (draggingDown && atTop);
+      gestureMode = shouldDrag ? "drag" : "scroll";
+      if (gestureMode === "drag") startDrag(startY);
+      return gestureMode;
+    };
+
+    sheet.addEventListener("touchstart", (e) => {
+      const t = e.touches?.[0];
+      if (!t) return;
+      beginGesture(t.clientX, t.clientY, e.target);
+    }, { passive: true });
+    sheet.addEventListener("touchend", endDrag);
+    sheet.addEventListener("touchcancel", endDrag);
+
+    sheet.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      activePointerId = e.pointerId;
+      if (sheet.setPointerCapture) {
+        try { sheet.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+      beginGesture(e.clientX, e.clientY, e.target);
+    });
+    sheet.addEventListener("pointerup", endDrag);
+    sheet.addEventListener("pointercancel", endDrag);
+
+    window.addEventListener("touchmove", (e) => {
+      const t = e.touches?.[0];
+      if (!t) return;
+      if (gesturePrimed && !gestureMode) {
+        const dy = t.clientY - startY;
+        const atTop = !startScrollEl || startScrollEl.scrollTop <= 0;
+        if (dy > 0 && atTop && e.cancelable) e.preventDefault();
+      }
+      const mode = resolveGestureMode(t.clientX, t.clientY);
+      if (mode !== "drag") return;
+      if (e.cancelable) e.preventDefault();
+      moveDrag(t.clientY);
+    }, { passive: false });
+    window.addEventListener("pointermove", (e) => {
+      if (activePointerId != null && e.pointerId !== activePointerId) return;
+      const mode = resolveGestureMode(e.clientX, e.clientY);
+      if (mode !== "drag") return;
+      moveDrag(e.clientY);
+    });
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("touchend", endDrag);
+    window.addEventListener("touchcancel", endDrag);
+    window.addEventListener("pointerup", () => { activePointerId = null; });
+    window.addEventListener("pointercancel", () => { activePointerId = null; });
+
+    sheet.addEventListener("click", (e) => {
+      if (Date.now() < suppressSheetCardClickUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
   }
 
   function shouldShowWelcomeModal() {
@@ -2355,6 +2703,7 @@ if (!defined('ABSPATH')) exit;
     });
 
     map.on("click", LAYER_CLUSTER_CIRCLE, (e) => {
+      if (Date.now() < suppressMapClicksUntil) return;
       const features = map.queryRenderedFeatures(e.point, { layers: [LAYER_CLUSTER_CIRCLE] });
       const clusterId = features[0].properties.cluster_id;
       map.getSource(PLACES_SOURCE_ID).getClusterExpansionZoom(clusterId, (err, zoom) => {
@@ -2364,6 +2713,7 @@ if (!defined('ABSPATH')) exit;
     });
 
     const openPlaceFromPoint = (e, layers) => {
+      if (Date.now() < suppressMapClicksUntil) return;
       const f = map.queryRenderedFeatures(e.point, { layers })[0];
       if (!f) return;
       const fid = String(f.properties?.id ?? "");
@@ -2415,6 +2765,7 @@ if (!defined('ABSPATH')) exit;
     const iconKey = getIconKeyFromCategory(primaryCat);
     const distText = userLocation ? `ห่างจากคุณ ${formatKm(place._distanceKm)}` : "";
     const card = document.createElement("button");
+    card.type = "button";
     card.className = "w-full text-left p-4 rounded-xl bg-white border hover:shadow-sm transition";
     card.innerHTML = `
       <div class="flex items-start gap-3">
@@ -2450,7 +2801,7 @@ if (!defined('ABSPATH')) exit;
       if (map && typeof place.lng === "number" && typeof place.lat === "number") {
         map.flyTo({ center: [place.lng, place.lat], zoom: 16 });
       }
-      openDrawer(place);
+      openDrawer(place, { expandOnOpen: false });
       closeSidebarIfMobile();
     };
     return card;
@@ -2630,6 +2981,8 @@ if (!defined('ABSPATH')) exit;
   // ================= UI BINDINGS =================
   function bindUI() {
     renderDrawerMetaIcons();
+    bindDrawerDrag();
+    bindListSheetDrag();
     const bindBackdropClose = (modalId, onClose) => {
       const modal = el(modalId);
       if (!modal || typeof onClose !== "function") return;
@@ -2664,6 +3017,11 @@ if (!defined('ABSPATH')) exit;
 
     el("btnLoadMoreDesktop")?.addEventListener("click", applyLoadMore);
     el("btnLoadMoreMobile")?.addEventListener("click", applyLoadMore);
+    el("btnSheetToggle")?.addEventListener("click", () => {
+      if (Date.now() < suppressSheetHandleClickUntil) return;
+      mobileSheetExpanded = !mobileSheetExpanded;
+      setMobileView(mobileSheetExpanded ? "list" : "map");
+    });
 
     // ===== SEARCH =====
     el("q")?.addEventListener("focus", () => {
@@ -2943,9 +3301,10 @@ if (!defined('ABSPATH')) exit;
     });
 
     const onResize = () => {
-      if (isMobile()) setMobileView(mobileView || "map");
+      if (isMobile()) setMobileView(mobileSheetExpanded ? "list" : (mobileView || "map"));
       else {
         el("listSectionMobile").classList.add("hidden");
+        el("listSectionMobile").classList.remove("is-expanded", "is-collapsed", "is-hidden");
         closeSidebarMobile();
         setTimeout(() => map && map.resize(), 80);
       }
