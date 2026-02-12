@@ -437,6 +437,7 @@ if (!defined('ABSPATH')) exit;
     amenities: new Set(),  // facility slugs
     admissionPolicies: new Set(), // admission_policy slugs
     courseCategories: new Set(), // course_category slugs
+    courseLocationIds: new Set(), // location IDs from course context
     nearMeEnabled: false,
     radiusKm: 5
   };
@@ -554,6 +555,7 @@ if (!defined('ABSPATH')) exit;
       amenities: Array.from(state.amenities || []),
       admission: Array.from(state.admissionPolicies || []),
       course_categories: Array.from(state.courseCategories || []),
+      course_locs: Array.from(state.courseLocationIds || []),
       near: state.nearMeEnabled ? 1 : 0,
       radius: Number.isFinite(state.radiusKm) ? state.radiusKm : 5,
       place: selectedId ? String(selectedId) : "",
@@ -576,6 +578,7 @@ if (!defined('ABSPATH')) exit;
     _setCsvOrDelete(sp, "amenities", s.amenities);
     _setCsvOrDelete(sp, "admission", s.admission);
     _setCsvOrDelete(sp, "course_categories", s.course_categories);
+    _setCsvOrDelete(sp, "course_locs", s.course_locs);
 
     _setOrDelete(sp, "near", s.near ? "1" : "");
     _setOrDelete(sp, "radius", s.near ? String(s.radius) : "");
@@ -663,6 +666,7 @@ if (!defined('ABSPATH')) exit;
       amenities: _parseList(sp.get("amenities")),
       admission: _parseList(sp.get("admission")),
       course_categories: _parseList(sp.get("course_categories")),
+      course_locs: _parseList(sp.get("course_locs")),
       near: hasNear ? sp.get("near") === "1" : (cachedNear ?? false),
       radius: hasRadius ? Number(sp.get("radius")) : (Number.isFinite(cachedRadius) ? cachedRadius : 5),
       place: sp.get("place") || "",
@@ -696,6 +700,11 @@ if (!defined('ABSPATH')) exit;
     u.admission.forEach(a => state.admissionPolicies.add(a));
     state.courseCategories.clear();
     u.course_categories.forEach(a => state.courseCategories.add(a));
+    state.courseLocationIds.clear();
+    u.course_locs.forEach(id => {
+      const n = Number(id);
+      if (Number.isFinite(n) && n > 0) state.courseLocationIds.add(String(Math.trunc(n)));
+    });
 
     // sync dynamic UIs
     syncTagButtonsUI();
@@ -854,6 +863,11 @@ if (!defined('ABSPATH')) exit;
   }
 
   function matchesFilters(place) {
+    if (state.courseLocationIds.size > 0) {
+      const pid = String(place.id);
+      if (!state.courseLocationIds.has(pid)) return false;
+    }
+
     if (state.district && place.district !== state.district) return false;
     if (state.categories.size > 0) {
       const cats = new Set(getPlaceCategories(place));

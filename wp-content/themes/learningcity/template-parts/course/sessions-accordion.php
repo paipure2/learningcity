@@ -31,9 +31,19 @@ if (!empty($grouped)) {
 
 $grouped = $open_grouped;
 $location_count = count($grouped);
+
+$blm_pages = get_posts([
+  'post_type'      => 'page',
+  'posts_per_page' => 1,
+  'meta_key'       => '_wp_page_template',
+  'meta_value'     => 'page-blm.php',
+  'post_status'    => 'publish',
+  'fields'         => 'ids',
+]);
+$learning_map_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
 ?>
 
-<div class="my-10">
+<div class="my-10" data-course-session-distance="1">
 
 <?php
 // ACF field ในหน้า single course (post ปัจจุบัน)
@@ -41,9 +51,14 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
 ?>
 
   <?php if ($location_count > 0): ?>
-    <h2 class="sm:text-fs24 text-fs22 font-bold">
-      <?php echo esc_html($location_count); ?> สถานที่ที่เปิดสอน
-    </h2>
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="sm:text-fs24 text-fs22 font-bold">
+        <?php echo esc_html($location_count); ?> สถานที่ที่เปิดสอน
+      </h2>
+      <button type="button" class="px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50 shrink-0" data-course-distance-use-current>
+        ใช้ตำแหน่งปัจจุบัน
+      </button>
+    </div>
 
   <?php else: ?>
 
@@ -58,7 +73,7 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
   <?php endif; ?>
 
 
-  <div class="accordion-detail mt-4">
+  <div class="accordion-detail mt-4" data-course-location-list>
 
     <?php if (!empty($grouped)) : ?>
       <?php foreach ($grouped as $location_id => $sids) : ?>
@@ -68,15 +83,26 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
         $phone         = get_field('phone', $location_id);
         $facebook_link = get_field('facebook_link', $location_id);
         $map_url       = get_field('map_url', $location_id);
+        $location_map_page_url = add_query_arg(['place' => (int) $location_id], $learning_map_url);
+        $lat_raw       = get_post_meta((int) $location_id, 'latitude', true);
+        $lng_raw       = get_post_meta((int) $location_id, 'longitude', true);
+        $lat_val       = is_numeric($lat_raw) ? (float) $lat_raw : null;
+        $lng_val       = is_numeric($lng_raw) ? (float) $lng_raw : null;
+        $district_terms = wp_get_post_terms((int) $location_id, 'district', ['fields' => 'names']);
+        $district_name  = (!is_wp_error($district_terms) && !empty($district_terms[0])) ? trim((string) $district_terms[0]) : '';
+        if ($district_name !== '' && mb_strpos($district_name, 'เขต') !== 0) {
+          $district_name = 'เขต' . $district_name;
+        }
         ?>
 
-        <div class="accordion-item">
+        <div class="accordion-item" data-location-id="<?php echo (int) $location_id; ?>" data-lat="<?php echo $lat_val !== null ? esc_attr((string) $lat_val) : ''; ?>" data-lng="<?php echo $lng_val !== null ? esc_attr((string) $lng_val) : ''; ?>" data-district-label="<?php echo esc_attr($district_name); ?>">
 
           <div class="accordion-header flex items-center justify-between cursor-pointer">
             <div>
               <span class="block sm:text-fs18 text-fs16 font-semibold">
                 <?php echo esc_html(get_the_title($location_id)); ?>
               </span>
+              <span class="block text-fs14 text-primary mt-1" data-distance-badge></span>
             </div>
 
             <?php if ($mode === 'single'): ?>
@@ -274,6 +300,11 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
                     <?php endif; ?>
 
                   </ul>
+
+                  <a href="<?php echo esc_url($location_map_page_url); ?>" target="_blank" rel="noopener"
+                     class="mt-3 inline-flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-full text-fs14 font-semibold py-2 px-4 hover:bg-primary/20 transition-colors">
+                    ดูสถานที่นี้บนแผนที่กรุงเทพฯ
+                  </a>
                 </div>
               <?php endif; ?>
 

@@ -275,6 +275,28 @@
                     get_template_part('template-parts/course/recommended-grid');
                     ?>
 
+                    <div id="nearby-home-section" class="xl:py-12 py-8 sec-course" data-aos="fade-in">
+                        <h2 class="text-heading">เรียนใกล้บ้านเลยล่ะ</h2>
+                        <div id="nearby-home-grid" class="mt-6 grid xl:grid-cols-2 grid-cols-1 xl:gap-6 gap-4">
+                          <?php for ($i = 0; $i < 6; $i++) : ?>
+                            <div class="card-course flex flex-col h-full pointer-events-none lc-skeleton" aria-hidden="true">
+                              <div class="card-content gap-10">
+                                <div class="min-w-0 w-full">
+                                  <div class="h-3 w-24 lc-sk-bar mb-3"></div>
+                                  <div class="h-5 w-4/5 lc-sk-bar mb-3"></div>
+                                  <div class="h-4 w-2/3 lc-sk-bar"></div>
+                                </div>
+                                <div class="img shrink-0 lc-sk-bar"></div>
+                              </div>
+                              <div class="card-footer mt-auto">
+                                <div class="h-4 w-2/3 lc-sk-bar"></div>
+                                <div class="h-4 w-16 lc-sk-bar"></div>
+                              </div>
+                            </div>
+                          <?php endfor; ?>
+                        </div>
+                    </div>
+
 
 
                     <div class="xl:py-12 py-8 sec-category-other" data-aos="fade-in">
@@ -448,6 +470,282 @@
 <?php get_template_part('template-parts/components/modal-category'); ?>
 <?php get_template_part('template-parts/components/modal-search'); ?>
 
+<style>
+  @keyframes lcShimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .lc-skeleton {
+    position: relative;
+    overflow: hidden;
+  }
+  .lc-skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+    background-size: 200% 100%;
+    animation: lcShimmer 1.25s linear infinite;
+    pointer-events: none;
+  }
+  .lc-sk-bar {
+    background: #e5e7eb;
+    border-radius: 8px;
+  }
+</style>
+
+<script>
+(() => {
+  const LOCATION_CACHE_KEY = 'lc_user_location_v1';
+  const sectionEl = document.getElementById('nearby-home-section');
+  const gridEl = document.getElementById('nearby-home-grid');
+  if (!sectionEl || !gridEl) return;
+
+  function showMessage(msg) {
+    sectionEl.classList.remove('hidden');
+    gridEl.innerHTML = `<div class="col-span-full py-6 text-center text-fs16 opacity-70">${esc(msg)}</div>`;
+  }
+
+  function getCachedLocation() {
+    try {
+      const raw = localStorage.getItem(LOCATION_CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      const lat = Number(data && data.lat);
+      const lng = Number(data && data.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return { lat, lng };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function distanceText(km) {
+    const n = Number(km);
+    if (!Number.isFinite(n)) return '';
+    return `${n.toFixed(n < 10 ? 1 : 0)} กม.`;
+  }
+
+  function renderSkeleton(count = 6) {
+    const cards = Array.from({ length: count }, () => `
+      <div class="card-course flex flex-col h-full pointer-events-none lc-skeleton" aria-hidden="true">
+        <div class="card-content gap-10">
+          <div class="min-w-0 w-full">
+            <div class="h-3 w-24 lc-sk-bar mb-3"></div>
+            <div class="h-5 w-4/5 lc-sk-bar mb-3"></div>
+            <div class="h-4 w-2/3 lc-sk-bar"></div>
+          </div>
+          <div class="img shrink-0 lc-sk-bar"></div>
+        </div>
+        <div class="card-footer mt-auto">
+          <div class="h-4 w-2/3 lc-sk-bar"></div>
+          <div class="h-4 w-16 lc-sk-bar"></div>
+        </div>
+      </div>
+    `).join('');
+    gridEl.innerHTML = cards;
+  }
+
+  function injectNearbyIcons() {
+    ['icon-calendar', 'icon-chartbar', 'icon-person'].forEach((iconClass) => {
+      const sourceSvg = Array.from(document.querySelectorAll('.' + iconClass + ' svg'))
+        .find((svg) => !gridEl.contains(svg));
+      if (!sourceSvg) return;
+      const svgHtml = sourceSvg.outerHTML;
+      gridEl.querySelectorAll('.' + iconClass).forEach((el) => {
+        if (el.dataset.svgInjected === '1') return;
+        el.innerHTML = svgHtml;
+        el.dataset.svgInjected = '1';
+      });
+    });
+  }
+
+  function renderCourses(courses) {
+    if (!Array.isArray(courses) || courses.length === 0) {
+      showMessage('ยังไม่พบคอร์สใกล้บ้านจากข้อมูลรอบเรียนที่เปิดอยู่');
+      return;
+    }
+
+    const placeholderImg = <?php echo wp_json_encode(THEME_URI . '/assets/images/placeholder-gray.png'); ?>;
+    const providerPlaceholder = <?php echo wp_json_encode('https://dummyimage.com/100x100/ddd/aaa'); ?>;
+
+    gridEl.innerHTML = courses.map((c) => {
+      const thumb = c.thumb || placeholderImg;
+      const providerLogo = c.provider_logo_url || providerPlaceholder;
+      const categoryName = c.primary_term_name || '';
+      const finalColor = c.final_color || '#00744B';
+      const providerName = c.provider_name || '';
+      const audienceText = c.audience_text || 'ทุกวัย';
+      return `
+        <a class="card-course flex flex-col h-full"
+           href="${esc(c.permalink || '#')}"
+           data-modal-id="modal-course"
+           data-course-id="${esc(c.id || '')}"
+           data-course-url="${esc(c.permalink || '#')}">
+          <div class="card-content gap-10">
+            <div class="min-w-0">
+              ${categoryName ? `<div class="text-fs12" style="color:${esc(finalColor)}">${esc(categoryName)}</div>` : ''}
+              <h2 class="sm:text-fs20 text-fs16">${esc(c.title || '')}</h2>
+              ${providerName ? `
+                <div class="flex items-center gap-2 mt-1.5">
+                  <img src="${esc(providerLogo)}" alt="${esc(providerName)}" class="sm:w-6 w-5 aspect-square rounded-full object-cover">
+                  <h3 class="text-fs14">${esc(providerName)}</h3>
+                </div>
+              ` : ''}
+            </div>
+            <div class="img shrink-0">
+              <img class="h-full w-full object-cover" src="${esc(thumb)}" alt="${esc(c.title || '')}" loading="lazy">
+            </div>
+          </div>
+          <div class="card-footer mt-auto">
+            <div class="flex items-center md:gap-5 sm:gap-3 gap-1.5">
+              <div class="flex items-center sm:gap-1.5 gap-1">
+                <div class="icon-calendar sm:w-5 w-4"></div>
+                <span class="text-fs14">${esc(c.duration_text || 'ตามรอบเรียน')}</span>
+              </div>
+              <div class="flex items-center sm:gap-1.5 gap-1">
+                <div class="icon-chartbar sm:w-5 w-4"></div>
+                <span class="text-fs14">${esc(c.level_text || 'ไม่ระบุ')}</span>
+              </div>
+              <div class="flex items-center sm:gap-1.5 gap-1 flex-1 min-w-0">
+                <div class="icon-person sm:w-5 w-4 shrink-0"></div>
+                <span class="text-fs14 truncate block max-w-[100px]" title="${esc(audienceText)}">${esc(audienceText)}</span>
+              </div>
+            </div>
+            <div class="text-fs16 font-semibold text-primary">${esc(distanceText(c.distance_km))}</div>
+          </div>
+        </a>
+      `;
+    }).join('');
+
+    sectionEl.classList.remove('hidden');
+    injectNearbyIcons();
+    if (window.CourseModalAjax && typeof window.CourseModalAjax.rebind === 'function') {
+      window.CourseModalAjax.rebind();
+    }
+    bindNearbyModalOpeners();
+  }
+
+  function lockBodyScroll() {
+    const body = document.body;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = 'hidden';
+    body.style.paddingRight = `${scrollbarWidth}px`;
+    body.setAttribute('data-scroll', 'hidden');
+  }
+
+  function openModalByContent(content) {
+    const modalWrap = document.querySelector(`[data-modal-content="${content}"]`);
+    if (!modalWrap) return;
+    window.history.replaceState(null, null, `${window.location.pathname}#${content}`);
+    modalWrap.classList.add('modal-active');
+    lockBodyScroll();
+  }
+
+  function bindNearbyModalOpeners() {
+    gridEl.querySelectorAll('.card-course[data-modal-id]').forEach((button) => {
+      if (button.dataset.modalBound === '1') return;
+      button.dataset.modalBound = '1';
+      button.addEventListener('click', () => {
+        const content = button.getAttribute('data-modal-id');
+        if (content) openModalByContent(content);
+      });
+    });
+  }
+
+  async function loadNearby() {
+    renderSkeleton(6);
+    const loc = getCachedLocation();
+    if (!loc) {
+      showMessage('ยังไม่พบตำแหน่งปัจจุบัน กรุณาเปิดใช้งานตำแหน่งจากหน้าแผนที่ก่อน');
+      return;
+    }
+
+    const restUrl = <?php echo wp_json_encode(rest_url('learningcity/v1/nearby-courses')); ?>;
+    const ajaxUrl = <?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>;
+    const params = new URLSearchParams({
+      lat: String(loc.lat),
+      lng: String(loc.lng),
+      limit: '6',
+    });
+
+    try {
+      async function fetchWithTimeout(url, options, ms) {
+        const fetchPromise = fetch(url, options);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('timeout')), ms);
+        });
+        return Promise.race([fetchPromise, timeoutPromise]);
+      }
+
+      let lastError = '';
+
+      try {
+        const restRes = await fetchWithTimeout(`${restUrl}?${params.toString()}`, { credentials: 'same-origin' }, 30000);
+        if (!restRes.ok) {
+          lastError = `REST HTTP ${restRes.status}`;
+        } else {
+          const restJson = await restRes.json();
+          if (restJson && Array.isArray(restJson.courses)) {
+            renderCourses(restJson.courses);
+            return;
+          }
+          lastError = 'REST invalid payload';
+        }
+      } catch (e) {
+        lastError = e && e.message ? `REST ${e.message}` : 'REST failed';
+      }
+
+      const fd = new FormData();
+      fd.append('action', 'lc_get_nearby_courses');
+      fd.append('lat', String(loc.lat));
+      fd.append('lng', String(loc.lng));
+      fd.append('limit', '6');
+
+      try {
+        const ajaxRes = await fetchWithTimeout(ajaxUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: fd,
+        }, 30000);
+
+        if (!ajaxRes.ok) {
+          showMessage(`โหลดคอร์สใกล้บ้านไม่สำเร็จ (AJAX HTTP ${ajaxRes.status} | ${lastError})`);
+          return;
+        }
+
+        const json = await ajaxRes.json();
+        if (!json || !json.success || !json.data) {
+          const msg = json && json.data && json.data.message ? String(json.data.message) : 'invalid payload';
+          showMessage(`โหลดคอร์สใกล้บ้านไม่สำเร็จ (${msg} | ${lastError})`);
+          return;
+        }
+
+        renderCourses(json.data.courses || []);
+      } catch (e) {
+        const eMsg = e && e.message ? e.message : 'request_failed';
+        showMessage(`โหลดคอร์สใกล้บ้านไม่สำเร็จ (${eMsg} | ${lastError})`);
+      }
+    } catch (_) {
+      showMessage('โหลดคอร์สใกล้บ้านไม่สำเร็จ หรือใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadNearby);
+  } else {
+    loadNearby();
+  }
+})();
+</script>
+
 <?php get_footer(); ?>
-
-

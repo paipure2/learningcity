@@ -126,7 +126,6 @@ require_once 'inc/admin/acf-tabs-name.php';
 require_once 'inc/admin/acf-preview-styles.php';
 require_once 'inc/admin/acf-flexible-keyboard.php';
 
-
 /* =========================================================
  * [FRONT] AJAX Modal Course
  * - ลดซ้ำ: ใช้ block เดียว (มีทั้ง enqueue + config)
@@ -155,6 +154,48 @@ add_action('wp_enqueue_scripts', function () {
   );
 });
 
+if (!function_exists('load_course_modal')) {
+  add_action('wp_ajax_load_course_modal', 'load_course_modal');
+  add_action('wp_ajax_nopriv_load_course_modal', 'load_course_modal');
+
+  function load_course_modal() {
+    check_ajax_referer('course_modal_nonce', 'nonce');
+
+    $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
+    if (!$course_id) {
+      wp_send_json_error(['message' => 'missing course_id'], 400);
+    }
+
+    $course_post = get_post($course_id);
+    if (!$course_post || $course_post->post_status !== 'publish') {
+      wp_send_json_error(['message' => 'course not found'], 404);
+    }
+
+    if ($course_post->post_type !== 'course') {
+      wp_send_json_error(['message' => 'invalid post type'], 400);
+    }
+
+    $tpl = locate_template('template-parts/components/modal-course-ajax.php');
+    if (!$tpl) {
+      wp_send_json_error(['message' => 'template not found'], 500);
+    }
+
+    ob_start();
+    global $post;
+    $post = $course_post;
+    setup_postdata($post);
+    include $tpl;
+    wp_reset_postdata();
+    $html = ob_get_clean();
+
+    wp_send_json_success([
+      'html'      => $html,
+      'permalink' => get_permalink($course_id),
+      'title'     => get_the_title($course_id),
+    ]);
+  }
+}
+
 // Enqueue BLM assets only on BLM page template
 add_action('wp_enqueue_scripts', function () {
   if (!is_page_template('page-blm.php')) return;
@@ -173,43 +214,6 @@ add_action('wp_enqueue_scripts', function () {
     true
   );
 }, 20);
-
-add_action('wp_ajax_load_course_modal', 'load_course_modal');
-add_action('wp_ajax_nopriv_load_course_modal', 'load_course_modal');
-
-function load_course_modal() {
-  check_ajax_referer('course_modal_nonce', 'nonce');
-
-  $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
-  if (!$course_id) {
-    wp_send_json_error(['message' => 'missing course_id'], 400);
-  }
-
-  $course_post = get_post($course_id);
-  if (!$course_post || $course_post->post_status !== 'publish') {
-    wp_send_json_error(['message' => 'course not found'], 404);
-  }
-
-  if ($course_post->post_type !== 'course') {
-    wp_send_json_error(['message' => 'invalid post type'], 400);
-  }
-
-  ob_start();
-  global $post;
-  $post = $course_post;
-  setup_postdata($post);
-
-  include locate_template('template-parts/components/modal-course-ajax.php');
-
-  wp_reset_postdata();
-  $html = ob_get_clean();
-
-  wp_send_json_success([
-    'html'      => $html,
-    'permalink' => get_permalink($course_id),
-    'title'     => get_the_title($course_id),
-  ]);
-}
 
 
 /* =========================================================
@@ -890,8 +894,11 @@ function lc_course_should_show_in_archive($course_id) {
   ]);
 
   if (empty($session_ids)) {
-    $cache[$course_id] = false;
-    return false;
+    // Support online courses that do not have sessions yet.
+    $learning_link = trim((string) get_field('learning_link', $course_id));
+    $is_online_without_sessions = ($learning_link !== '');
+    $cache[$course_id] = $is_online_without_sessions;
+    return $is_online_without_sessions;
   }
 
   $today_ts = strtotime(current_time('Y-m-d'));
@@ -1039,7 +1046,10 @@ add_action('pre_get_posts', function ($q) {
   $existing_mq = $q->get('meta_query');
   if (!is_array($existing_mq)) $existing_mq = [];
 
-  // Show courses that are open now OR sessions that do not provide reg info.
+  // Show courses that are:
+  // - open for registration, or
+  // - sessions missing reg fields, or
+  // - online courses with learning_link (no session needed).
   $open_filter = [
     'relation' => 'OR',
     [
@@ -1053,6 +1063,11 @@ add_action('pre_get_posts', function ($q) {
       'value'   => 1,
       'compare' => '=',
       'type'    => 'NUMERIC',
+    ],
+    [
+      'key'     => 'learning_link',
+      'value'   => '',
+      'compare' => '!=',
     ],
   ];
 
@@ -1287,6 +1302,220 @@ add_action('wp_ajax_scp_get_course_provider', function () {
     wp_send_json_success(['html' => $html]);
 });
 
+/* =========================================================
+ * [FRONT] Nearby courses for NextLearn (by cached user location)
+ * ========================================================= */
+if (!function_exists('lc_parse_location_id_from_session')) {
+    function lc_parse_location_id_from_session($session_id) {
+        $location = function_exists('get_field') ? get_field('location', $session_id, false) : get_post_meta($session_id, 'location', true);
+        if (is_object($location) && isset($location->ID)) return (int) $location->ID;
+        if (is_numeric($location)) return (int) $location;
+        if (is_array($location) && !empty($location[0])) {
+            $first = $location[0];
+            if (is_object($first) && isset($first->ID)) return (int) $first->ID;
+            if (is_numeric($first)) return (int) $first;
+        }
+        return 0;
+    }
+}
+
+if (!function_exists('lc_haversine_km')) {
+    function lc_haversine_km($lat1, $lon1, $lat2, $lon2) {
+        $to_rad = M_PI / 180;
+        $d_lat = ($lat2 - $lat1) * $to_rad;
+        $d_lon = ($lon2 - $lon1) * $to_rad;
+        $a = sin($d_lat / 2) * sin($d_lat / 2)
+            + cos($lat1 * $to_rad) * cos($lat2 * $to_rad)
+            * sin($d_lon / 2) * sin($d_lon / 2);
+        return 6371 * (2 * atan2(sqrt($a), sqrt(1 - $a)));
+    }
+}
+
+add_action('wp_ajax_lc_get_nearby_courses', 'lc_get_nearby_courses_ajax');
+add_action('wp_ajax_nopriv_lc_get_nearby_courses', 'lc_get_nearby_courses_ajax');
+if (!function_exists('lc_get_nearby_courses_data')) {
+    function lc_get_nearby_courses_data($lat, $lng, $limit = 6) {
+        $lat = (float) $lat;
+        $lng = (float) $lng;
+        $limit = (int) $limit;
+        if ($limit <= 0) $limit = 6;
+        if ($limit > 12) $limit = 12;
+
+        if (!is_numeric($lat) || !is_numeric($lng) || abs($lat) > 90 || abs($lng) > 180) {
+            return new WP_Error('invalid_coords', 'invalid_coords', ['status' => 400]);
+        }
+
+        // Cache nearby result by rounded user coordinate to avoid heavy recalculation.
+        $cache_key = 'lc_nearby_' . md5(sprintf('%.3f|%.3f|%d', $lat, $lng, $limit));
+        $cached = get_transient($cache_key);
+        if (is_array($cached) && isset($cached['courses'])) {
+            return $cached;
+        }
+
+        $session_ids = get_posts([
+            'post_type'      => 'session',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ]);
+        if (empty($session_ids)) {
+            return ['courses' => []];
+        }
+
+        $location_coord_cache = [];
+        $best_by_course = [];
+        $course_allowed_cache = [];
+
+        $extract_related_id = static function ($raw) {
+            if (is_object($raw) && isset($raw->ID)) return (int) $raw->ID;
+            if (is_numeric($raw)) return (int) $raw;
+            if (is_array($raw) && !empty($raw[0])) {
+                $first = $raw[0];
+                if (is_object($first) && isset($first->ID)) return (int) $first->ID;
+                if (is_numeric($first)) return (int) $first;
+            }
+            return 0;
+        };
+
+        foreach ($session_ids as $sid) {
+            // Read raw meta directly for speed (avoid ACF get_field in large loops).
+            $course_raw = get_post_meta($sid, 'course', true);
+            $course_id = $extract_related_id($course_raw);
+            if ($course_id <= 0) continue;
+
+            if (!array_key_exists($course_id, $course_allowed_cache)) {
+                $is_course = (get_post_type($course_id) === 'course');
+                $is_publish = (get_post_status($course_id) === 'publish');
+                // Lightweight visibility guard: use precomputed flags instead of runtime session scans.
+                $open_reg = (int) get_post_meta($course_id, '_lc_open_reg', true);
+                $has_session = (int) get_post_meta($course_id, '_lc_has_session', true);
+                $course_allowed_cache[$course_id] = ($is_course && $is_publish && ($open_reg === 1 || $has_session === 0));
+            }
+            if (!$course_allowed_cache[$course_id]) continue;
+
+            $location_raw = get_post_meta($sid, 'location', true);
+            $location_id = $extract_related_id($location_raw);
+            if ($location_id <= 0 || get_post_type($location_id) !== 'location' || get_post_status($location_id) !== 'publish') continue;
+
+            if (!array_key_exists($location_id, $location_coord_cache)) {
+                $raw_lat = get_post_meta($location_id, 'latitude', true);
+                $raw_lng = get_post_meta($location_id, 'longitude', true);
+                $loc_lat = is_numeric($raw_lat) ? (float) $raw_lat : null;
+                $loc_lng = is_numeric($raw_lng) ? (float) $raw_lng : null;
+                if ($loc_lat === null || $loc_lng === null || abs($loc_lat) > 90 || abs($loc_lng) > 180) {
+                    $location_coord_cache[$location_id] = null;
+                } else {
+                    $location_coord_cache[$location_id] = [$loc_lat, $loc_lng];
+                }
+            }
+
+            if ($location_coord_cache[$location_id] === null) continue;
+            [$loc_lat, $loc_lng] = $location_coord_cache[$location_id];
+            $distance_km = lc_haversine_km($lat, $lng, $loc_lat, $loc_lng);
+
+            if (!isset($best_by_course[$course_id]) || $distance_km < $best_by_course[$course_id]['distance_km']) {
+                $best_by_course[$course_id] = [
+                    'course_id' => $course_id,
+                    'distance_km' => $distance_km,
+                ];
+            }
+        }
+
+        if (empty($best_by_course)) {
+            return ['courses' => []];
+        }
+
+        $items = array_values($best_by_course);
+        usort($items, function ($a, $b) {
+            if ($a['distance_km'] === $b['distance_km']) return 0;
+            return ($a['distance_km'] < $b['distance_km']) ? -1 : 1;
+        });
+        $items = array_slice($items, 0, $limit);
+
+        $courses = [];
+        foreach ($items as $item) {
+            $course_id = (int) $item['course_id'];
+
+            $cat_ctx = function_exists('course_get_primary_category_context')
+                ? course_get_primary_category_context($course_id)
+                : ['final_color' => '#00744B', 'primary' => null];
+            $provider = function_exists('course_get_provider_context')
+                ? course_get_provider_context($course_id)
+                : ['name' => '', 'img_src' => ''];
+
+            $courses[] = [
+                'id' => $course_id,
+                'title' => get_the_title($course_id),
+                'permalink' => get_permalink($course_id),
+                'thumb' => function_exists('course_get_thumb') ? course_get_thumb($course_id) : (get_the_post_thumbnail_url($course_id, 'medium') ?: ''),
+                'primary_term_name' => isset($cat_ctx['primary']->name) ? (string) $cat_ctx['primary']->name : '',
+                'final_color' => !empty($cat_ctx['final_color']) ? (string) $cat_ctx['final_color'] : '#00744B',
+                'provider_name' => (string) ($provider['name'] ?? ''),
+                'provider_logo_url' => (string) ($provider['img_src'] ?? ''),
+                'duration_text' => function_exists('course_get_duration_text') ? (string) course_get_duration_text($course_id) : 'ตามรอบเรียน',
+                'level_text' => function_exists('course_get_level_text') ? (string) course_get_level_text($course_id) : 'ไม่ระบุ',
+                'audience_text' => function_exists('course_get_audience_text') ? (string) course_get_audience_text($course_id) : 'ทุกวัย',
+                'distance_km' => round((float) $item['distance_km'], 1),
+            ];
+        }
+
+        $result = ['courses' => $courses];
+        set_transient($cache_key, $result, 10 * MINUTE_IN_SECONDS);
+        return $result;
+    }
+}
+
+function lc_get_nearby_courses_ajax() {
+    $lat = isset($_POST['lat']) ? (float) $_POST['lat'] : null;
+    $lng = isset($_POST['lng']) ? (float) $_POST['lng'] : null;
+    $limit = isset($_POST['limit']) ? (int) $_POST['limit'] : 6;
+    if ($limit <= 0) $limit = 6;
+    if ($limit > 12) $limit = 12;
+
+    $result = lc_get_nearby_courses_data($lat, $lng, $limit);
+    if (is_wp_error($result)) {
+        $status = (int) $result->get_error_data('status');
+        if ($status <= 0) $status = 400;
+        wp_send_json_error(['message' => $result->get_error_message()], $status);
+    }
+    wp_send_json_success($result);
+}
+
+add_action('rest_api_init', function () {
+    register_rest_route('learningcity/v1', '/nearby-courses', [
+        'methods' => 'GET',
+        'callback' => function (WP_REST_Request $request) {
+            $lat = (float) $request->get_param('lat');
+            $lng = (float) $request->get_param('lng');
+            $limit = (int) $request->get_param('limit');
+            $result = lc_get_nearby_courses_data($lat, $lng, $limit);
+            if (is_wp_error($result)) return $result;
+            return rest_ensure_response($result);
+        },
+        'permission_callback' => '__return_true',
+        'args' => [
+            'lat' => ['required' => true],
+            'lng' => ['required' => true],
+            'limit' => ['required' => false],
+        ],
+    ]);
+});
+
+if (!function_exists('lc_clear_nearby_courses_cache')) {
+    function lc_clear_nearby_courses_cache() {
+        global $wpdb;
+        if (!isset($wpdb->options)) return;
+        $like = $wpdb->esc_like('_transient_lc_nearby_') . '%';
+        $like_timeout = $wpdb->esc_like('_transient_timeout_lc_nearby_') . '%';
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $like, $like_timeout));
+    }
+}
+add_action('save_post_course', 'lc_clear_nearby_courses_cache');
+add_action('save_post_session', 'lc_clear_nearby_courses_cache');
+add_action('save_post_location', 'lc_clear_nearby_courses_cache');
+add_action('deleted_post', 'lc_clear_nearby_courses_cache');
+
 
 /* =========================================================
  * [ADMIN SESSION] ตั้งชื่อจาก ACF Post Object: course - location
@@ -1460,7 +1689,6 @@ add_action('pre_get_posts', function ($query) {
     $query->set('meta_query', $meta_query);
 
 }, 99999);
-
 
 /* =========================================================
  * [ADMIN SESSION] Preview/View -> Course permalink (เร็ว)

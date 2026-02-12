@@ -55,8 +55,8 @@
 
   // แชร์แบบเปิด modal (ยังใช้กับ URL bar ได้) แต่ "ไม่" ใช้กับปุ่ม copy/open
   function buildModalUrl(courseId) {
-    const base = CFG.archive_url || window.location.pathname;
-    const u = new URL(base, window.location.origin);
+    // Use current page URL as base (archive/tax/search/etc.) so close can return correctly.
+    const u = new URL(window.location.href);
     u.searchParams.set('course_modal', String(courseId));
     u.hash = 'modal-course';
     return u.toString();
@@ -65,6 +65,24 @@
   function getCourseIdFromUrl() {
     const u = new URL(window.location.href);
     return u.searchParams.get('course_modal');
+  }
+
+  function cleanupCourseModalUrl() {
+    try {
+      const u = new URL(window.location.href);
+      let changed = false;
+      if (u.searchParams.has('course_modal')) {
+        u.searchParams.delete('course_modal');
+        changed = true;
+      }
+      if (u.hash === '#modal-course') {
+        u.hash = '';
+        changed = true;
+      }
+      if (!changed) return;
+      const nextUrl = `${u.pathname}${u.search ? `?${u.searchParams.toString()}` : ''}${u.hash || ''}`;
+      history.replaceState(null, '', nextUrl);
+    } catch (_) {}
   }
 
   async function fetchCourse(courseId) {
@@ -192,11 +210,37 @@
     });
   }
 
+  function bindModalCloseUrlCleanup() {
+    const modal = getModalEl();
+    if (!modal || modal.__urlCleanupBound) return;
+    modal.__urlCleanupBound = true;
+
+    const maybeCleanup = () => {
+      if (!modal.classList.contains('modal-active')) {
+        cleanupCourseModalUrl();
+      }
+    };
+
+    // Observe class changes from modal.js open/close flow.
+    const observer = new MutationObserver(maybeCleanup);
+    observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+
+    // Extra safety for Escape/overlay close timing.
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      setTimeout(maybeCleanup, 0);
+    });
+  }
+
   // init
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindCards);
+    document.addEventListener('DOMContentLoaded', () => {
+      bindCards();
+      bindModalCloseUrlCleanup();
+    });
   } else {
     bindCards();
+    bindModalCloseUrlCleanup();
   }
 
   window.CourseModalAjax = { rebind: bindCards };
@@ -214,6 +258,232 @@
   });
 })();
 
+// ===== Distance sort for course sessions (single + modal) =====
+(() => {
+  const LOCATION_CACHE_KEY = "lc_user_location_v1";
+  const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+
+  function toNum(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    const toRad = (d) => d * Math.PI / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+
+  function formatKm(km) {
+    if (!Number.isFinite(km)) return "";
+    if (km < 1) return `${Math.round(km * 1000)} ม.`;
+    return `${km.toFixed(1)} กม.`;
+  }
+
+  function loadCachedLocation() {
+    try {
+      const raw = localStorage.getItem(LOCATION_CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data) return null;
+      const lat = toNum(data.lat);
+      const lng = toNum(data.lng);
+      if (lat === null || lng === null) return null;
+      const ts = toNum(data.ts);
+      if (ts && Date.now() - ts > LOCATION_CACHE_TTL_MS) {
+        localStorage.removeItem(LOCATION_CACHE_KEY);
+        return null;
+      }
+      return { lat, lng, ts: toNum(data.ts) || Date.now() };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveCachedLocation(lat, lng) {
+    try {
+      const prev = loadCachedLocation() || {};
+      localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
+        lat,
+        lng,
+        ts: Date.now(),
+        near: typeof prev.near === "boolean" ? prev.near : false,
+        radius: Number.isFinite(prev.radius) ? prev.radius : 5,
+      }));
+    } catch (_) {}
+  }
+
+  function setStatus(container, text) {
+    const el = container.querySelector("[data-course-distance-status]");
+    if (el) el.textContent = text || "";
+  }
+
+  function sortAndRenderByLocation(container, userLoc) {
+    const list = container.querySelector("[data-course-location-list]");
+    if (!list) return;
+    const items = Array.from(list.querySelectorAll(".accordion-item[data-location-id]"));
+    if (!items.length) return;
+
+    items.forEach((item, idx) => {
+      if (!item.dataset.initialIndex) item.dataset.initialIndex = String(idx);
+      const lat = toNum(item.getAttribute("data-lat"));
+      const lng = toNum(item.getAttribute("data-lng"));
+      const district = (item.getAttribute("data-district-label") || "").trim();
+      const badge = item.querySelector("[data-distance-badge]");
+
+      if (!userLoc || lat === null || lng === null) {
+        item.dataset.distanceKm = "";
+        if (badge) badge.textContent = "";
+        return;
+      }
+
+      const km = haversineKm(userLoc.lat, userLoc.lng, lat, lng);
+      item.dataset.distanceKm = String(km);
+      if (badge) {
+        const distanceText = `ห่างจากคุณ ${formatKm(km)}`;
+        badge.textContent = district ? `${district} | ${distanceText}` : distanceText;
+      }
+    });
+
+    const sorted = items.slice().sort((a, b) => {
+      if (!userLoc) {
+        return Number(a.dataset.initialIndex || 0) - Number(b.dataset.initialIndex || 0);
+      }
+      const da = toNum(a.dataset.distanceKm);
+      const db = toNum(b.dataset.distanceKm);
+      if (da === null && db === null) return Number(a.dataset.initialIndex || 0) - Number(b.dataset.initialIndex || 0);
+      if (da === null) return 1;
+      if (db === null) return -1;
+      return da - db;
+    });
+
+    sorted.forEach((item) => list.appendChild(item));
+  }
+
+  function bindDistanceContainer(container) {
+    if (!container || container.dataset.distanceBound === "1") return;
+    container.dataset.distanceBound = "1";
+
+    const btnCurrent = container.querySelector("[data-course-distance-use-current]");
+    const btnManual = container.querySelector("[data-course-distance-set-manual]");
+    const btnClear = container.querySelector("[data-course-distance-clear]");
+
+    function setCurrentButtonState(mode) {
+      if (!btnCurrent) return;
+      const isActive = mode === "active";
+      const isLoading = mode === "loading";
+      btnCurrent.disabled = isActive || isLoading;
+      btnCurrent.textContent = isLoading
+        ? "กำลังระบุตำแหน่ง..."
+        : (isActive ? "ใช้ตำแหน่งปัจจุบันอยู่" : "ใช้ตำแหน่งปัจจุบัน");
+
+      if (isActive || isLoading) {
+        btnCurrent.classList.add("opacity-60", "cursor-not-allowed");
+      } else {
+        btnCurrent.classList.remove("opacity-60", "cursor-not-allowed");
+      }
+    }
+
+    const applyCached = () => {
+      const cached = loadCachedLocation();
+      if (cached) {
+        sortAndRenderByLocation(container, cached);
+        setStatus(container, "");
+        setCurrentButtonState("active");
+      } else {
+        sortAndRenderByLocation(container, null);
+        setCurrentButtonState("idle");
+      }
+    };
+
+    if (btnCurrent) {
+      btnCurrent.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          setStatus(container, "อุปกรณ์ไม่รองรับตำแหน่งปัจจุบัน");
+          setCurrentButtonState("idle");
+          return;
+        }
+        setCurrentButtonState("loading");
+        setStatus(container, "กำลังขอตำแหน่งปัจจุบัน...");
+        navigator.geolocation.getCurrentPosition((pos) => {
+          const lat = toNum(pos.coords.latitude);
+          const lng = toNum(pos.coords.longitude);
+          if (lat === null || lng === null) {
+            setStatus(container, "อ่านตำแหน่งไม่สำเร็จ");
+            setCurrentButtonState("idle");
+            return;
+          }
+          saveCachedLocation(lat, lng);
+          sortAndRenderByLocation(container, { lat, lng });
+          setStatus(container, "เรียงลำดับใกล้ -> ไกล จากตำแหน่งปัจจุบัน");
+          setCurrentButtonState("active");
+        }, () => {
+          setStatus(container, "ไม่ได้รับสิทธิ์ตำแหน่งปัจจุบัน");
+          setCurrentButtonState("idle");
+        }, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 120000,
+        });
+      });
+    }
+
+    if (btnManual) {
+      btnManual.addEventListener("click", () => {
+        const raw = window.prompt("กรอกพิกัดของคุณ: lat,lng", "");
+        if (!raw) return;
+        const parts = raw.split(",");
+        if (parts.length !== 2) {
+          setStatus(container, "รูปแบบไม่ถูกต้อง ตัวอย่าง 13.7563,100.5018");
+          return;
+        }
+        const lat = toNum(parts[0].trim());
+        const lng = toNum(parts[1].trim());
+        if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+          setStatus(container, "พิกัดไม่ถูกต้อง");
+          return;
+        }
+        saveCachedLocation(lat, lng);
+        sortAndRenderByLocation(container, { lat, lng });
+        setStatus(container, "เรียงลำดับใกล้ -> ไกล จาก location ที่เลือก");
+        setCurrentButtonState("active");
+      });
+    }
+
+    if (btnClear) {
+      btnClear.addEventListener("click", () => {
+        try {
+          localStorage.removeItem(LOCATION_CACHE_KEY);
+        } catch (_) {}
+        sortAndRenderByLocation(container, null);
+        setStatus(container, "ล้างตำแหน่งแล้ว");
+        setCurrentButtonState("idle");
+      });
+    }
+
+    applyCached();
+  }
+
+  function initCourseSessionDistance(root = document) {
+    root.querySelectorAll('[data-course-session-distance="1"]').forEach(bindDistanceContainer);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => initCourseSessionDistance(document));
+  } else {
+    initCourseSessionDistance(document);
+  }
+
+  document.addEventListener("courseModal:loaded", () => {
+    const modal = document.querySelector('[data-modal-content="modal-course"]');
+    if (modal) initCourseSessionDistance(modal);
+  });
+})();
 
 // ===== Accordion (เฉพาะใน modal-course) =====
 document.addEventListener("click", (e) => {
@@ -227,10 +497,18 @@ document.addEventListener("click", (e) => {
   const panel = item?.querySelector(".accordion-panel");
   if (!item || !panel) return;
 
-  item.classList.toggle("is-active");
-  panel.style.maxHeight = item.classList.contains("is-active")
-    ? panel.scrollHeight + "px"
-    : "";
+  const wasActive = item.classList.contains("is-active");
+  const allItems = inCourseModal.querySelectorAll(".accordion-item");
+  allItems.forEach((it) => {
+    it.classList.remove("is-active");
+    const p = it.querySelector(".accordion-panel");
+    if (p) p.style.maxHeight = "";
+  });
+
+  if (!wasActive) {
+    item.classList.add("is-active");
+    panel.style.maxHeight = panel.scrollHeight + "px";
+  }
 });
 
 // icon init
