@@ -156,6 +156,12 @@ if (!defined('ABSPATH')) exit;
     right: auto !important;
     transform: translateX(-50%);
   }
+  .blm-welcome-panel {
+    top: 50% !important;
+    bottom: auto !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: min(88vh, 640px);
+  }
   #sidebar select,
   #sidebar input[type="number"] {
     border-radius: 8px !important;
