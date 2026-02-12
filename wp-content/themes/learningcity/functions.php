@@ -856,6 +856,64 @@ function lc_is_session_open_for_reg($sid, $today_ts) {
   return ($today_ts >= $start_ts && $today_ts <= $end_ts);
 }
 
+/**
+ * Runtime guard for course cards on archive/tax pages.
+ * Show course only when:
+ * - at least one session is currently open for registration, OR
+ * - at least one session has no reg_start/reg_end (treat as always open).
+ */
+function lc_course_should_show_in_archive($course_id) {
+  $course_id = (int) $course_id;
+  if (!$course_id) return false;
+
+  static $cache = [];
+  if (array_key_exists($course_id, $cache)) return $cache[$course_id];
+
+  $session_ids = get_posts([
+    'post_type'      => 'session',
+    'post_status'    => 'publish',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+    'meta_query'     => [
+      'relation' => 'OR',
+      [
+        'key'     => 'course',
+        'value'   => (string) $course_id,
+        'compare' => '=',
+      ],
+      [
+        'key'     => 'course',
+        'value'   => '"' . (string) $course_id . '"',
+        'compare' => 'LIKE',
+      ],
+    ],
+  ]);
+
+  if (empty($session_ids)) {
+    $cache[$course_id] = false;
+    return false;
+  }
+
+  $today_ts = strtotime(current_time('Y-m-d'));
+  foreach ($session_ids as $sid) {
+    $reg_start = trim((string) get_field('reg_start', $sid, false));
+    $reg_end   = trim((string) get_field('reg_end',   $sid, false));
+
+    if ($reg_start === '' && $reg_end === '') {
+      $cache[$course_id] = true;
+      return true;
+    }
+
+    if (lc_is_session_open_for_reg($sid, $today_ts)) {
+      $cache[$course_id] = true;
+      return true;
+    }
+  }
+
+  $cache[$course_id] = false;
+  return false;
+}
+
 function lc_recalc_course_flags($course_id) {
   $course_id = (int) $course_id;
   if (!$course_id) return;
@@ -884,9 +942,20 @@ function lc_recalc_course_flags($course_id) {
   update_post_meta($course_id, '_lc_has_session', $has_session ? 1 : 0);
 
   $open_reg = 0;
+  $has_missing_reg_info = 0;
   if ($has_session) {
     $today_ts = strtotime(current_time('Y-m-d'));
     foreach ($session_ids as $sid) {
+      $reg_start_raw = get_field('reg_start', $sid, false);
+      $reg_end_raw   = get_field('reg_end',   $sid, false);
+      $reg_start_txt = trim((string) $reg_start_raw);
+      $reg_end_txt   = trim((string) $reg_end_raw);
+
+      // If registration fields are not provided, treat as always open.
+      if ($reg_start_txt === '' && $reg_end_txt === '') {
+        $has_missing_reg_info = 1;
+      }
+
       if (lc_is_session_open_for_reg($sid, $today_ts)) {
         $open_reg = 1;
         break;
@@ -894,6 +963,7 @@ function lc_recalc_course_flags($course_id) {
     }
   }
   update_post_meta($course_id, '_lc_open_reg', $open_reg);
+  update_post_meta($course_id, '_lc_reg_missing', $has_missing_reg_info);
 }
 
 // save session -> recalc its course
@@ -969,10 +1039,21 @@ add_action('pre_get_posts', function ($q) {
   $existing_mq = $q->get('meta_query');
   if (!is_array($existing_mq)) $existing_mq = [];
 
+  // Show courses that are open now OR sessions that do not provide reg info.
   $open_filter = [
     'relation' => 'OR',
-    [ 'key' => '_lc_open_reg',    'value' => 1, 'compare' => '=' ],
-    [ 'key' => '_lc_has_session', 'value' => 0, 'compare' => '=' ],
+    [
+      'key'     => '_lc_open_reg',
+      'value'   => 1,
+      'compare' => '=',
+      'type'    => 'NUMERIC',
+    ],
+    [
+      'key'     => '_lc_reg_missing',
+      'value'   => 1,
+      'compare' => '=',
+      'type'    => 'NUMERIC',
+    ],
   ];
 
   if (!empty($existing_mq)) {

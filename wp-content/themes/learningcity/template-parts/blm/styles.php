@@ -677,7 +677,7 @@ if (!defined('ABSPATH')) exit;
       position: absolute;
       top: 76px;
       left: 12px;
-      right: 12px;
+      right: 0;
       border: 0 !important;
       background: transparent !important;
       z-index: 52;
@@ -689,11 +689,91 @@ if (!defined('ABSPATH')) exit;
     #mobileTabsWrap {
       display: none !important;
     }
+    #mobileQuickCatsWrap {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+    }
+    #mobileQuickCats {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 1px 2px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    #mobileQuickCats::-webkit-scrollbar {
+      display: none;
+    }
+    .mobile-quick-cat {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 999px;
+      min-height: 42px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .mobile-quick-cat .icon-slot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      color: var(--pill-cat-color, #00744b);
+      flex: 0 0 auto;
+    }
+    .mobile-quick-cat .txt {
+      display: inline-block;
+      line-height: 1;
+    }
+    .mobile-quick-cat.is-active {
+      border-color: #00744b;
+      background: #00744b;
+      color: #ffffff;
+    }
+    .mobile-quick-cat.is-active .icon-slot {
+      color: #ffffff;
+    }
     #btnOpenFiltersMobile,
     #btnLocateMobile {
       min-height: 42px;
       border-radius: 999px !important;
       box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+    }
+    #btnOpenFiltersMobile {
+      flex: 0 0 auto;
+    }
+    .blm-mobile-locate-fab {
+      position: fixed;
+      right: calc(env(safe-area-inset-right) * -1);
+      bottom: calc(32svh + env(safe-area-inset-bottom) + 12px);
+      width: 46px;
+      height: 46px;
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(180deg, #1893ff 12%, #0045ad 100%);
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 94;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.22);
+    }
+    .blm-mobile-locate-fab svg {
+      width: 22px;
+      height: 22px;
+      display: block;
     }
 
     #searchOverlay {

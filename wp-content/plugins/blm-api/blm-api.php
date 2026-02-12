@@ -300,6 +300,28 @@ function blm_get_terms_simple_with_parent_slug($tax, $args = []) {
   }, $terms);
 }
 
+/**
+ * Guard REST callbacks so PHP notices/warnings do not leak as HTML into JSON responses.
+ */
+function blm_rest_guard(callable $fn) {
+  ob_start();
+  try {
+    $result = $fn();
+    $noise = trim((string) ob_get_clean());
+    if ($noise !== '') {
+      error_log('[BLM API] Unexpected output in REST callback: ' . wp_strip_all_tags($noise));
+    }
+    return $result;
+  } catch (Throwable $e) {
+    ob_end_clean();
+    error_log('[BLM API] REST callback failed: ' . $e->getMessage());
+    return new WP_REST_Response([
+      'error' => 'server_error',
+      'message' => 'BLM API error',
+    ], 500);
+  }
+}
+
 /** ---------- cache builders ---------- */
 
 function blm_build_locations_light_payload() {
@@ -670,10 +692,10 @@ register_deactivation_hook(__FILE__, function () {
 /** ให้ cron มาสร้าง cache ใหม่เป็นช่วง ๆ */
 add_action('blm_refresh_caches', function () {
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v7', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v9', $light, 6 * HOUR_IN_SECONDS);
 
   $filters = blm_build_filters_payload();
-  set_transient('blm_filters_v4', $filters, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_filters_v6', $filters, 6 * HOUR_IN_SECONDS);
 });
 
 /** ---------- REST ---------- */
@@ -687,33 +709,48 @@ add_action('rest_api_init', function () {
     'methods'  => 'GET',
     'permission_callback' => '__return_true',
     'callback' => function (WP_REST_Request $req) {
+      return blm_rest_guard(function () {
+        // อ่านจาก cache เป็นหลัก
+        $resp = get_transient('blm_locations_light_v9');
+        // backward fallback (old key)
+        if (!$resp) $resp = get_transient('blm_locations_light_v7');
 
-      // อ่านจาก cache เป็นหลัก
-      $resp = get_transient('blm_locations_light_v9');
+        // fallback: ถ้ายังไม่เคยมี cache (เช่นเพิ่งย้าย server/ลบ transient)
+        if (!$resp) {
+          try {
+            $resp = blm_build_locations_light_payload();
+            set_transient('blm_locations_light_v9', $resp, 6 * HOUR_IN_SECONDS);
+          } catch (Throwable $e) {
+            error_log('[BLM API] locations-light rebuild failed: ' . $e->getMessage());
+            $resp = [
+              'places' => [],
+              'meta' => [
+                'count' => 0,
+                'schema_version' => 2,
+                'generated_at' => time(),
+              ],
+            ];
+          }
+        }
 
-      // fallback: ถ้ายังไม่เคยมี cache (เช่นเพิ่งย้าย server/ลบ transient)
-      if (!$resp) {
-        $resp = blm_build_locations_light_payload();
-        set_transient('blm_locations_light_v9', $resp, 6 * HOUR_IN_SECONDS);
-      }
+        // ---- Browser cache 15 นาที (ไม่ต้องแก้ server) ----
+        $generated_at = intval($resp['meta']['generated_at'] ?? time());
+        $etag = '"' . md5((string)$generated_at) . '"';
 
-      // ---- Browser cache 15 นาที (ไม่ต้องแก้ server) ----
-      $generated_at = intval($resp['meta']['generated_at'] ?? time());
-      $etag = '"' . md5((string)$generated_at) . '"';
+        $if_none_match = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
+        if ($if_none_match === $etag) {
+          // client มีของล่าสุดแล้ว
+          $r304 = new WP_REST_Response(null, 304);
+          $r304->header('Cache-Control', 'public, max-age=900');
+          $r304->header('ETag', $etag);
+          return $r304;
+        }
 
-      $if_none_match = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
-      if ($if_none_match === $etag) {
-        // client มีของล่าสุดแล้ว
-        $r304 = new WP_REST_Response(null, 304);
-        $r304->header('Cache-Control', 'public, max-age=900');
-        $r304->header('ETag', $etag);
-        return $r304;
-      }
-
-      $response = new WP_REST_Response($resp, 200);
-      $response->header('Cache-Control', 'public, max-age=900');
-      $response->header('ETag', $etag);
-      return $response;
+        $response = new WP_REST_Response($resp, 200);
+        $response->header('Cache-Control', 'public, max-age=900');
+        $response->header('ETag', $etag);
+        return $response;
+      });
     },
   ]);
 
@@ -724,29 +761,45 @@ add_action('rest_api_init', function () {
     'methods'  => 'GET',
     'permission_callback' => '__return_true',
     'callback' => function () {
+      return blm_rest_guard(function () {
+        $resp = get_transient('blm_filters_v6');
+        // backward fallback (old key)
+        if (!$resp) $resp = get_transient('blm_filters_v4');
+        if (!$resp) {
+          try {
+            $resp = blm_build_filters_payload();
+            set_transient('blm_filters_v6', $resp, 6 * HOUR_IN_SECONDS);
+          } catch (Throwable $e) {
+            error_log('[BLM API] filters rebuild failed: ' . $e->getMessage());
+            $resp = [
+              'districts' => [],
+              'categories' => [],
+              'age_ranges' => [],
+              'facilities' => [],
+              'admission_policies' => [],
+              'course_categories' => [],
+              'meta' => ['generated_at' => time()],
+            ];
+          }
+        }
 
-      $resp = get_transient('blm_filters_v6');
-      if (!$resp) {
-        $resp = blm_build_filters_payload();
-        set_transient('blm_filters_v6', $resp, 6 * HOUR_IN_SECONDS);
-      }
+        // Browser cache 15 นาทีเช่นกัน
+        $generated_at = intval($resp['meta']['generated_at'] ?? time());
+        $etag = '"' . md5((string)$generated_at) . '"';
 
-      // Browser cache 15 นาทีเช่นกัน
-      $generated_at = intval($resp['meta']['generated_at'] ?? time());
-      $etag = '"' . md5((string)$generated_at) . '"';
+        $if_none_match = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
+        if ($if_none_match === $etag) {
+          $r304 = new WP_REST_Response(null, 304);
+          $r304->header('Cache-Control', 'public, max-age=900');
+          $r304->header('ETag', $etag);
+          return $r304;
+        }
 
-      $if_none_match = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
-      if ($if_none_match === $etag) {
-        $r304 = new WP_REST_Response(null, 304);
-        $r304->header('Cache-Control', 'public, max-age=900');
-        $r304->header('ETag', $etag);
-        return $r304;
-      }
-
-      $response = new WP_REST_Response($resp, 200);
-      $response->header('Cache-Control', 'public, max-age=900');
-      $response->header('ETag', $etag);
-      return $response;
+        $response = new WP_REST_Response($resp, 200);
+        $response->header('Cache-Control', 'public, max-age=900');
+        $response->header('ETag', $etag);
+        return $response;
+      });
     },
   ]);
 
@@ -758,17 +811,18 @@ add_action('rest_api_init', function () {
     'methods'  => 'GET',
     'permission_callback' => '__return_true',
     'callback' => function (WP_REST_Request $req) {
+      return blm_rest_guard(function () use ($req) {
 
-      $id = intval($req['id']);
-      if (!$id || get_post_type($id) !== 'location' || get_post_status($id) !== 'publish') {
-        return new WP_REST_Response(['error' => 'not_found'], 404);
-      }
+        $id = intval($req['id']);
+        if (!$id || get_post_type($id) !== 'location' || get_post_status($id) !== 'publish') {
+          return new WP_REST_Response(['error' => 'not_found'], 404);
+        }
 
-      $cache_key = blm_location_full_cache_key($id);
-      $cached = get_transient($cache_key);
-      if ($cached) return new WP_REST_Response($cached, 200);
+        $cache_key = blm_location_full_cache_key($id);
+        $cached = get_transient($cache_key);
+        if ($cached) return new WP_REST_Response($cached, 200);
 
-      $meta = get_post_meta($id);
+        $meta = get_post_meta($id);
 
       // ---- ปรับคีย์ให้ตรง ACF ของคุณ ----
       $phone = $meta['phone'][0] ?? '';
@@ -807,8 +861,9 @@ add_action('rest_api_init', function () {
         ],
       ];
 
-      set_transient($cache_key, $resp, 15 * MINUTE_IN_SECONDS);
-      return new WP_REST_Response($resp, 200);
+        set_transient($cache_key, $resp, 15 * MINUTE_IN_SECONDS);
+        return new WP_REST_Response($resp, 200);
+      });
     },
   ]);
 

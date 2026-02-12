@@ -27,7 +27,9 @@ if (!defined('ABSPATH')) exit;
   const REPORT_AJAX_URL = "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
   const REPORT_NONCE = "<?php echo esc_js(wp_create_nonce('lc_report_location')); ?>";
   const LOCATION_CACHE_KEY = "lc_user_location_v1";
+  const PLACES_CACHE_KEY = "lc_blm_places_cache_v1";
   const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+  const PLACES_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes
   const WELCOME_SEEN_KEY = "lc_blm_welcome_seen_v1";
 
   let cachedNear = null;
@@ -622,6 +624,30 @@ if (!defined('ABSPATH')) exit;
       localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(payload));
     } catch (e) {
       // ignore cache errors
+    }
+  }
+
+  function loadPlacesCache() {
+    try {
+      const raw = localStorage.getItem(PLACES_CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.places)) return null;
+      if (!data.ts || (Date.now() - data.ts > PLACES_CACHE_TTL_MS)) return null;
+      return data.places;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function savePlacesCache(places) {
+    try {
+      localStorage.setItem(PLACES_CACHE_KEY, JSON.stringify({
+        ts: Date.now(),
+        places: Array.isArray(places) ? places : []
+      }));
+    } catch (e) {
+      // ignore storage errors
     }
   }
 
@@ -1544,15 +1570,44 @@ if (!defined('ABSPATH')) exit;
       <span style="color: ${active ? "#ffffff" : meta.color}">${svgForDom(iconKey, "icon-18")}</span>
       <span class="truncate">${meta.label}</span>
     `;
-    btn.onclick = () => {
-      if (state.categories.has(key)) state.categories.delete(key);
-      else state.categories.add(key);
-      renderCategoryUIs();
-      resetListLimit();
-      refresh();
-      writeUrlFromState("push");
-    };
+    btn.type = "button";
+    btn.onclick = () => toggleCategory(key);
     return btn;
+  }
+
+  function toggleCategory(key) {
+    if (state.categories.has(key)) state.categories.delete(key);
+    else state.categories.add(key);
+    renderCategoryUIs();
+    resetListLimit();
+    refresh();
+    writeUrlFromState("push");
+  }
+
+  function renderMobileQuickCategoryPills() {
+    const wrap = el("mobileQuickCats");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+
+    const top = getTopCategoriesFromData(10);
+    if (!top.length) return;
+
+    top.forEach((key) => {
+      const meta = catMeta(key);
+      const iconKey = getIconKeyFromCategory(key);
+      const btn = document.createElement("button");
+      const active = state.categories.has(key);
+      btn.type = "button";
+      btn.className = "mobile-quick-cat" + (active ? " is-active" : "");
+      btn.innerHTML = `
+        <span class="icon-slot">${svgForDom(iconKey, "icon-18")}</span>
+        <span class="txt">${meta.label}</span>
+      `;
+      btn.style.setProperty("--pill-cat-color", meta.color || "#00744b");
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+      btn.onclick = () => toggleCategory(key);
+      wrap.appendChild(btn);
+    });
   }
 
   function renderCategoryUIs() {
@@ -1562,6 +1617,7 @@ if (!defined('ABSPATH')) exit;
     const grid = el("catGrid");
     grid.innerHTML = "";
     top.forEach(k => grid.appendChild(makeCatButton(k)));
+    renderMobileQuickCategoryPills();
     renderCategoryModalGrid(all, el("catSearch")?.value || "");
   }
 
@@ -2933,12 +2989,35 @@ if (!defined('ABSPATH')) exit;
   async function loadPlaces() {
     try {
       setApiLoading(true, "กำลังโหลดสถานที่...");
-      const res = await fetch(`${BLM_API_BASE}/locations-light?per_page=10000`);
-      const json = await res.json();
-      allPlaces = json.places || [];
+      const res = await fetch(`${BLM_API_BASE}/locations-light`, {
+        headers: { Accept: "application/json" }
+      });
+      if (!res.ok) {
+        throw new Error(`locations-light failed (${res.status})`);
+      }
+      const raw = await res.text();
+      let json = null;
+      try {
+        json = JSON.parse(raw);
+      } catch (err) {
+        const preview = raw.slice(0, 180).replace(/\s+/g, " ");
+        throw new Error(`locations-light returned non-JSON: ${preview}`);
+      }
+      if (!Array.isArray(json.places)) {
+        throw new Error("locations-light JSON missing places[]");
+      }
+      allPlaces = json.places;
+      savePlacesCache(allPlaces);
     } catch (e) {
       console.error(e);
-      alert("โหลดข้อมูลไม่สำเร็จ");
+      const cachedPlaces = loadPlacesCache();
+      if (Array.isArray(cachedPlaces) && cachedPlaces.length) {
+        allPlaces = cachedPlaces;
+        console.warn("Using cached places due to API failure");
+      } else {
+        allPlaces = [];
+        alert("โหลดข้อมูลไม่สำเร็จ (API ส่งข้อมูลไม่ถูกต้อง)");
+      }
     } finally {
       setApiLoading(false);
     }
@@ -2946,9 +3025,16 @@ if (!defined('ABSPATH')) exit;
 
   async function loadFilters() {
     try {
-      const res = await fetch(`${BLM_API_BASE}/filters`);
+      const res = await fetch(`${BLM_API_BASE}/filters`, {
+        headers: { Accept: "application/json" }
+      });
       if (!res.ok) return;
-      filtersData = await res.json();
+      const raw = await res.text();
+      try {
+        filtersData = JSON.parse(raw);
+      } catch (err) {
+        console.warn("loadFilters got non-JSON response", raw.slice(0, 180));
+      }
     } catch (e) {
       console.warn("loadFilters failed", e);
     }

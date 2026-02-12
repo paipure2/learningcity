@@ -1,6 +1,10 @@
 <?php
 $post_id = get_the_ID();
 
+if (function_exists('lc_course_should_show_in_archive') && !lc_course_should_show_in_archive($post_id)) {
+    return;
+}
+
 // 1. ดึงข้อมูลหมวดหมู่หลัก (Primary Term) และสี
 $primary_term_name = '';
 $final_color = '#00744B'; // สี Default

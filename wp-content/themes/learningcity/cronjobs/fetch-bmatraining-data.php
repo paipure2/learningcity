@@ -224,6 +224,29 @@ function update_course_meta($post_id, $course, $total_attendance_hours) {
     update_post_meta($post_id, 'price', $course['price']);
     update_post_meta($post_id, 'has_certificate', 1);
     update_post_meta($post_id, 'source', 'bmatraining.bangkok.go.th');
+
+    // Ensure imported BMA Training courses are assigned to provider: "โรงเรียนฝึกอาชีพ"
+    assign_default_course_provider_term($post_id);
+}
+
+function assign_default_course_provider_term($post_id) {
+    $taxonomy = 'course_provider';
+    $provider_name = 'โรงเรียนฝึกอาชีพ';
+
+    $term = get_term_by('name', $provider_name, $taxonomy);
+    if (!$term || is_wp_error($term)) {
+        $created = wp_insert_term($provider_name, $taxonomy);
+        if (is_wp_error($created) || empty($created['term_id'])) {
+            return;
+        }
+        $term_id = (int) $created['term_id'];
+    } else {
+        $term_id = (int) $term->term_id;
+    }
+
+    if ($term_id > 0) {
+        wp_set_object_terms((int) $post_id, [$term_id], $taxonomy, false);
+    }
 }
 
 function sync_sessions_to_posts($wpdb, $courses) {
