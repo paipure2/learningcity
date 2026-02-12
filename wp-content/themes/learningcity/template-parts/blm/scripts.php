@@ -7,6 +7,8 @@ if (!defined('ABSPATH')) exit;
   const MAPTILER_STYLE = `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`;
   const SITE_PATH = "<?php echo esc_js((string) wp_parse_url(home_url(), PHP_URL_PATH)); ?>";
   const SITE_BASE = window.location.origin + (SITE_PATH || "");
+  const SITE_ROOT = SITE_BASE.replace(/\/+$/, "");
+  const BLM_API_BASE = `${SITE_ROOT}/wp-json/blm/v1`;
   const LOCAL_GLYPHS_BASE = `${SITE_BASE}/wp-content/themes/learningcity/assets/fonts/map-font`;
   // Must match the folder name exactly (see MapLibre Font Maker output)
   const LOCAL_GLYPH_FONT = "Anuphan-SemiBold";
@@ -416,7 +418,7 @@ if (!defined('ABSPATH')) exit;
     if (fullCache.has(id)) return fullCache.get(id);
     try {
       setApiLoading(true, "กำลังโหลดรายละเอียด...", "drawer");
-      const res = await fetch(`/learningcity/wp-json/blm/v1/location/${id}`);
+      const res = await fetch(`${BLM_API_BASE}/location/${id}`);
       if (!res.ok) return null;
       const full = await res.json();
       fullCache.set(id, full);
@@ -2580,7 +2582,7 @@ if (!defined('ABSPATH')) exit;
   async function loadPlaces() {
     try {
       setApiLoading(true, "กำลังโหลดสถานที่...");
-      const res = await fetch(`/learningcity/wp-json/blm/v1/locations-light?per_page=10000`);
+      const res = await fetch(`${BLM_API_BASE}/locations-light?per_page=10000`);
       const json = await res.json();
       allPlaces = json.places || [];
     } catch (e) {
@@ -2593,7 +2595,7 @@ if (!defined('ABSPATH')) exit;
 
   async function loadFilters() {
     try {
-      const res = await fetch(`/learningcity/wp-json/blm/v1/filters`);
+      const res = await fetch(`${BLM_API_BASE}/filters`);
       if (!res.ok) return;
       filtersData = await res.json();
     } catch (e) {

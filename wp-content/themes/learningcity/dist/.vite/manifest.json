@@ -1,0 +1,36 @@
+{
+  "assets/fonts/bkkdraft/BKKDraft-Regular.woff": {
+    "file": "fonts/C6teQ8U7.woff",
+    "src": "assets/fonts/bkkdraft/BKKDraft-Regular.woff"
+  },
+  "assets/fonts/bkkdraft/BKKDraft-Regular.woff2": {
+    "file": "fonts/C4eX5d8Q.woff2",
+    "src": "assets/fonts/bkkdraft/BKKDraft-Regular.woff2"
+  },
+  "assets/images/icons/arrow-next-black.svg": {
+    "file": "images/Bk_1XaMR.svg",
+    "src": "assets/images/icons/arrow-next-black.svg"
+  },
+  "assets/images/icons/arrow-prev-black.svg": {
+    "file": "images/BfGQ3Ul7.svg",
+    "src": "assets/images/icons/arrow-prev-black.svg"
+  },
+  "assets/scripts/scripts.js": {
+    "file": "BRoJSvz-.js",
+    "name": "scripts",
+    "src": "assets/scripts/scripts.js",
+    "isEntry": true,
+    "css": [
+      "DvB2Xm2x.css"
+    ]
+  },
+  "assets/styles/styles.css": {
+    "file": "CfdDA9P_.css",
+    "src": "assets/styles/styles.css",
+    "isEntry": true,
+    "name": "styles",
+    "names": [
+      "styles.css"
+    ]
+  }
+}
