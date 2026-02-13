@@ -501,9 +501,67 @@
   const gridEl = document.getElementById('nearby-home-grid');
   if (!sectionEl || !gridEl) return;
 
-  function showMessage(msg) {
+  function showMessage(msg, options = {}) {
+    const showLocateButton = !!(options && options.showLocateButton);
+    const buttonHtml = showLocateButton
+      ? `<button type="button" id="nearby-use-current-location" class="mt-4 inline-flex items-center justify-center rounded-full bg-[#00744B] px-5 py-2 text-white text-fs14 font-semibold hover:opacity-90">ใช้ตำแหน่งปัจจุบันของคุณ</button>`
+      : '';
+
     sectionEl.classList.remove('hidden');
-    gridEl.innerHTML = `<div class="col-span-full py-6 text-center text-fs16 opacity-70">${esc(msg)}</div>`;
+    gridEl.innerHTML = `
+      <div class="col-span-full">
+        <div class="w-full rounded-2xl border border-gray-200 bg-gray-100 px-5 py-6 text-center">
+          <div class="text-fs16 opacity-80">${esc(msg)}</div>
+          ${buttonHtml}
+        </div>
+      </div>
+    `;
+
+    if (showLocateButton) {
+      const btn = document.getElementById('nearby-use-current-location');
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          if (!navigator.geolocation) {
+            showMessage('อุปกรณ์นี้ไม่รองรับการระบุตำแหน่ง');
+            return;
+          }
+
+          btn.disabled = true;
+          btn.classList.add('opacity-60', 'cursor-not-allowed');
+          btn.textContent = 'กำลังขอตำแหน่ง...';
+
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = Number(pos && pos.coords ? pos.coords.latitude : NaN);
+              const lng = Number(pos && pos.coords ? pos.coords.longitude : NaN);
+              if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                showMessage('ไม่สามารถอ่านค่าตำแหน่งได้ กรุณาลองใหม่อีกครั้ง', { showLocateButton: true });
+                return;
+              }
+
+              try {
+                localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
+                  lat,
+                  lng,
+                  ts: Date.now(),
+                  source: 'nextlearn',
+                }));
+              } catch (_) {}
+
+              loadNearby();
+            },
+            () => {
+              showMessage('ไม่สามารถเข้าถึงตำแหน่งได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง', { showLocateButton: true });
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
+            }
+          );
+        });
+      }
+    }
   }
 
   function getCachedLocation() {
@@ -527,6 +585,13 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function decodeHtmlEntities(s) {
+    const str = String(s == null ? '' : s);
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = str;
+    return textarea.value;
   }
 
   function distanceText(km) {
@@ -585,6 +650,9 @@
       const finalColor = c.final_color || '#00744B';
       const providerName = c.provider_name || '';
       const audienceText = c.audience_text || 'ทุกวัย';
+      const durationText = c.duration_text || 'ตามรอบเรียน';
+      const levelText = c.level_text || 'ไม่ระบุ';
+      const courseTitle = decodeHtmlEntities(c.title || '');
       return `
         <a class="card-course flex flex-col h-full"
            href="${esc(c.permalink || '#')}"
@@ -594,7 +662,7 @@
           <div class="card-content gap-10">
             <div class="min-w-0">
               ${categoryName ? `<div class="text-fs12" style="color:${esc(finalColor)}">${esc(categoryName)}</div>` : ''}
-              <h2 class="sm:text-fs20 text-fs16">${esc(c.title || '')}</h2>
+              <h2 class="sm:text-fs20 text-fs16">${esc(courseTitle)}</h2>
               ${providerName ? `
                 <div class="flex items-center gap-2 mt-1.5">
                   <img src="${esc(providerLogo)}" alt="${esc(providerName)}" class="sm:w-6 w-5 aspect-square rounded-full object-cover">
@@ -603,18 +671,18 @@
               ` : ''}
             </div>
             <div class="img shrink-0">
-              <img class="h-full w-full object-cover" src="${esc(thumb)}" alt="${esc(c.title || '')}" loading="lazy">
+              <img class="h-full w-full object-cover" src="${esc(thumb)}" alt="${esc(courseTitle)}" loading="lazy">
             </div>
           </div>
           <div class="card-footer mt-auto">
             <div class="flex items-center md:gap-5 sm:gap-3 gap-1.5">
               <div class="flex items-center sm:gap-1.5 gap-1">
                 <div class="icon-calendar sm:w-5 w-4"></div>
-                <span class="text-fs14">${esc(c.duration_text || 'ตามรอบเรียน')}</span>
+                <span class="text-fs14 truncate block max-w-[90px]" title="${esc(durationText)}">${esc(durationText)}</span>
               </div>
               <div class="flex items-center sm:gap-1.5 gap-1">
                 <div class="icon-chartbar sm:w-5 w-4"></div>
-                <span class="text-fs14">${esc(c.level_text || 'ไม่ระบุ')}</span>
+                <span class="text-fs14 truncate block max-w-[90px]" title="${esc(levelText)}">${esc(levelText)}</span>
               </div>
               <div class="flex items-center sm:gap-1.5 gap-1 flex-1 min-w-0">
                 <div class="icon-person sm:w-5 w-4 shrink-0"></div>
@@ -666,7 +734,7 @@
     renderSkeleton(6);
     const loc = getCachedLocation();
     if (!loc) {
-      showMessage('ยังไม่พบตำแหน่งปัจจุบัน กรุณาเปิดใช้งานตำแหน่งจากหน้าแผนที่ก่อน');
+      showMessage('ยังไม่พบตำแหน่งปัจจุบัน กรุณาเปิดใช้งานตำแหน่ง', { showLocateButton: true });
       return;
     }
 
