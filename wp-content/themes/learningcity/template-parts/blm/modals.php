@@ -110,7 +110,6 @@ if (!defined('ABSPATH')) exit;
   </div>
 </div>
 
-
 <div id="reportModal" class="hidden fixed inset-0 z-999999">
   <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 
