@@ -91,6 +91,40 @@ if (!defined('ABSPATH')) exit;
     border: 0 !important;
     background: #fff !important;
   }
+  .blm-near-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    align-items: center;
+  }
+  .blm-near-actions #btnLocate,
+  .blm-near-actions #nearMeWrap {
+    width: 100%;
+  }
+  .blm-near-actions #nearMeWrap {
+    justify-self: stretch;
+  }
+  .blm-near-switch-wrap {
+    width: 100%;
+    justify-content: space-between;
+  }
+  @media (min-width: 1380px) {
+    .blm-near-actions {
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+    }
+    .blm-near-actions #btnLocate {
+      width: auto;
+    }
+    .blm-near-actions #nearMeWrap {
+      width: auto;
+      justify-self: end;
+    }
+    .blm-near-switch-wrap {
+      width: auto;
+      justify-content: flex-start;
+    }
+  }
   #btnLocate {
     border-radius: 999px !important;
     border: 0 !important;
@@ -99,13 +133,48 @@ if (!defined('ABSPATH')) exit;
     font-weight: 600;
     min-height: 42px;
   }
-  #chipNearMe {
-    border-radius: 999px !important;
+  .blm-near-switch-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     min-height: 42px;
-    border-color: #c8c8c8 !important;
-    background: #fff !important;
-    font-size: 14px;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .blm-near-switch-label {
+    font-size: 13px;
     font-weight: 600;
+    line-height: 1;
+  }
+  .blm-ios-switch {
+    position: relative;
+    width: 46px;
+    height: 28px;
+    border-radius: 999px;
+    background: #d1d5db;
+    transition: background-color .2s ease;
+    flex-shrink: 0;
+  }
+  .blm-ios-switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+    transition: transform .2s ease;
+  }
+  #nearMeSwitch:checked + .blm-ios-switch {
+    background: #22c55e;
+  }
+  #nearMeSwitch:checked + .blm-ios-switch::after {
+    transform: translateX(18px);
   }
   #sidebar .space-y-2 > .flex > label,
   #sidebar .space-y-2 > label {
@@ -172,29 +241,33 @@ if (!defined('ABSPATH')) exit;
     transform: translate(-50%, -50%) !important;
     max-height: min(88vh, 640px);
   }
-  #sidebar select,
-  #sidebar input[type="number"] {
+  #sidebar select {
     border-radius: 8px !important;
     border-color: #111 !important;
+  }
+  #radiusKm {
+    accent-color: #00744b;
   }
   #catGrid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px 9px;
   }
-  #catGrid > button {
+  #catGrid > button,
+  #catModalGrid > button {
     border-radius: 12px !important;
     min-height: 42px;
-    border: 1px solid #e5e5e5 !important;
-    background: #fff !important;
+    border: 0 !important;
+    background: var(--cat-bg, #ffffff) !important;
+    color: var(--cat-text, #0f172a) !important;
     justify-content: flex-start;
     padding: 10px 8px !important;
     font-size: 14px;
   }
-  #catGrid > button.bg-emerald-600 {
-    background: var(--blm-primary) !important;
-    border-color: var(--blm-primary) !important;
-    color: #fff !important;
+  #catGrid > button.is-active-cat,
+  #catModalGrid > button.is-active-cat {
+    background: var(--cat-bg, rgba(15, 23, 42, 0.18)) !important;
+    color: var(--cat-text, #0f172a) !important;
   }
   #ageRangeWrap .tagBtn,
   #facilityWrap .amPill,
@@ -738,8 +811,8 @@ if (!defined('ABSPATH')) exit;
       line-height: 1;
     }
     .mobile-quick-cat.is-active {
-      border-color: #00744b;
-      background: #00744b;
+      border-color: var(--pill-cat-color, #00744b);
+      background: var(--pill-cat-color, #00744b);
       color: #ffffff;
     }
     .mobile-quick-cat.is-active .icon-slot {
@@ -808,7 +881,7 @@ if (!defined('ABSPATH')) exit;
       transform: translateY(var(--lc-header-h));
     }
     #listSectionMobile.is-collapsed {
-      transform: translateY(68svh);
+      transform: translateY(82svh);
     }
     #listSectionMobile.is-hidden {
       transform: translateY(100%);

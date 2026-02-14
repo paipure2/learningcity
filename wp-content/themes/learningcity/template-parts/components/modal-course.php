@@ -127,6 +127,11 @@
         </div>
 
         <div>
+          <div class="text-fs16 font-semibold mb-2">สถานที่ที่ต้องการแจ้งแก้ไข (เลือกได้หลายแห่ง)</div>
+          <div id="courseReportLocations" class="max-h-36 overflow-auto rounded-xl border px-3 py-2 space-y-2 text-fs14"></div>
+        </div>
+
+        <div>
           <label for="courseReportDetails" class="text-fs16 font-semibold">รายละเอียดเพิ่มเติม</label>
           <textarea id="courseReportDetails" name="report_details" rows="4" class="mt-2 w-full rounded-xl border px-3 py-2 text-fs14" placeholder="ระบุข้อมูลที่ควรแก้ไข"></textarea>
         </div>

@@ -28,293 +28,86 @@ if (!defined('ABSPATH')) exit;
   const REPORT_AJAX_URL = "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
   const REPORT_NONCE = "<?php echo esc_js(wp_create_nonce('lc_report_location')); ?>";
   const LOCATION_CACHE_KEY = "lc_user_location_v1";
-  const PLACES_CACHE_KEY = "lc_blm_places_cache_v2";
+  const PLACES_CACHE_KEY = "lc_blm_places_cache_v3";
   const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
   const PLACES_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes
   const WELCOME_SEEN_KEY = "lc_blm_welcome_seen_v1";
+  const API_CACHE_BUST = String(Date.now());
 
   let cachedNear = null;
   let cachedRadius = null;
 
   // ================= SVG ICONS =================
+  const GMSVG = (path, viewBox = "0 -960 960 960") =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" fill="currentColor" aria-hidden="true"><path d="${path}"/></svg>`;
+
   const ICON_SVGS = {
-    default: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11z"/>
-        <circle cx="12" cy="10" r="2"/>
-      </svg>
-    `,
-    library: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 19a2 2 0 0 0 2 2h12"/>
-        <path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/>
-        <path d="M8 7h6"/>
-        <path d="M8 11h6"/>
-      </svg>
-    `,
-    museum: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 10l9-6 9 6"/>
-        <path d="M5 10v10"/>
-        <path d="M9 10v10"/>
-        <path d="M15 10v10"/>
-        <path d="M19 10v10"/>
-        <path d="M3 20h18"/>
-      </svg>
-    `,
-    park: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 2l-3 7h6l-3-7z"/>
-        <path d="M12 9l-4 6h8l-4-6z"/>
-        <path d="M12 15v7"/>
-        <path d="M9 22h6"/>
-      </svg>
-    `,
-    learning_center: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M22 10L12 4 2 10l10 6 10-6z"/>
-        <path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/>
-      </svg>
-    `,
-    science: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M10 2v6l-4 8a4 4 0 0 0 4 6h4a4 4 0 0 0 4-6l-4-8V2"/>
-        <path d="M8 14h8"/>
-      </svg>
-    `,
-    art: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 22c4.4 0 8-3.6 8-8 0-6-8-12-8-12S4 8 4 14c0 4.4 3.6 8 8 8z"/>
-        <path d="M8.5 14.5h.01"/>
-        <path d="M12 11h.01"/>
-        <path d="M15.5 14.5h.01"/>
-      </svg>
-    `,
-    history: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M6 3h12v18H6z"/>
-        <path d="M8 7h8"/>
-        <path d="M8 11h8"/>
-        <path d="M8 15h6"/>
-      </svg>
-    `,
-    kids: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="7" r="3"/>
-        <path d="M5 21a7 7 0 0 1 14 0"/>
-      </svg>
-    `,
-    community: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 21V10l9-6 9 6v11"/>
-        <path d="M9 21v-6h6v6"/>
-      </svg>
-    `,
-    coworking: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="12" rx="2"/>
-        <path d="M8 20h8"/>
-        <path d="M12 16v4"/>
-      </svg>
-    `,
-    sport: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M13 5a2 2 0 1 0-2 2"/>
-        <path d="M7 22l2-6 3-3 4 2 2 7"/>
-        <path d="M10 13l-2-3 3-3 4 2"/>
-      </svg>
-    `,
-    book_house: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 11l9-7 9 7"/>
-        <path d="M5 11v9h14v-9"/>
-        <path d="M8 13h5"/>
-        <path d="M8 17h5"/>
-      </svg>
-    `,
-    museum_kids: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 10l9-6 9 6"/>
-        <path d="M5 10v10"/>
-        <path d="M9 10v10"/>
-        <path d="M15 10v10"/>
-        <path d="M19 10v10"/>
-        <path d="M3 20h18"/>
-        <circle cx="18.5" cy="5.5" r="2"/>
-        <path d="M18.5 7.5v2"/>
-      </svg>
-    `,
-    museum_local: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 10l9-6 9 6"/>
-        <path d="M5 10v10"/>
-        <path d="M9 10v10"/>
-        <path d="M15 10v10"/>
-        <path d="M19 10v10"/>
-        <path d="M3 20h18"/>
-        <path d="M12 4v6"/>
-        <path d="M12 4h4l-1 2 1 2h-4"/>
-      </svg>
-    `,
-    indie_bookstore: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 7h6a2 2 0 0 1 2 2v10a2 2 0 0 0-2-2H4z"/>
-        <path d="M20 7h-6a2 2 0 0 0-2 2v10a2 2 0 0 1 2-2h6z"/>
-        <path d="M16.5 11.5s1.5-1.5 2.5 0c1 1.5-2.5 3.5-2.5 3.5s-3.5-2-2.5-3.5c1-1.5 2.5 0 2.5 0z"/>
-      </svg>
-    `,
-    vocational_school: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 7h8l4 4v8H4z"/>
-        <path d="M12 7v4h4"/>
-        <path d="M7 15l4 4"/>
-        <path d="M13 13l-2 2"/>
-      </svg>
-    `,
-    bma_school: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 10l9-6 9 6"/>
-        <path d="M5 10v9h14v-9"/>
-        <path d="M10 19v-5h4v5"/>
-        <path d="M12 4v6"/>
-        <path d="M12 4h4l-1 2 1 2h-4"/>
-      </svg>
-    `,
-    sports_field: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="5" width="18" height="14" rx="2"/>
-        <path d="M12 5v14"/>
-        <circle cx="12" cy="12" r="2"/>
-      </svg>
-    `,
-    sports_center: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 10v4"/>
-        <path d="M7 9v6"/>
-        <path d="M10 12h4"/>
-        <path d="M14 12h4"/>
-        <path d="M17 9v6"/>
-        <path d="M20 10v4"/>
-      </svg>
-    `,
-    recreation_center: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="5" r="2"/>
-        <path d="M4 11l4-3"/>
-        <path d="M20 11l-4-3"/>
-        <path d="M8 8l4 3 4-3"/>
-        <path d="M12 11v8"/>
-        <path d="M8 19h8"/>
-      </svg>
-    `,
-    senior_center: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="9" cy="6" r="2"/>
-        <path d="M9 8v6"/>
-        <path d="M9 14l-3 6"/>
-        <path d="M9 14l3 4"/>
-        <path d="M15 11v8"/>
-        <path d="M15 19h2"/>
-      </svg>
-    `,
-    child_dev_center: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="8" r="4"/>
-        <path d="M10 14h4"/>
-        <path d="M12 14v2"/>
-        <path d="M10 16h4"/>
-      </svg>
-    `,
-    public_park: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 3l-3 6h6l-3-6z"/>
-        <path d="M7 11h10"/>
-        <path d="M6 11v7"/>
-        <path d="M18 11v7"/>
-        <path d="M9 18h6"/>
-      </svg>
-    `,
-    art_gallery: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="4" y="5" width="16" height="14" rx="2"/>
-        <path d="M8 9h8"/>
-        <path d="M8 13h5"/>
-      </svg>
-    `,
-    online: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3" y="5" width="18" height="12" rx="2"/>
-        <path d="M8 21h8"/>
-        <path d="M12 17v4"/>
-        <path d="M8 9c1.5-1.5 4.5-1.5 6 0"/>
-        <path d="M6.5 7.5c2.5-2.5 8.5-2.5 11 0"/>
-      </svg>
-    `
+    default: GMSVG("M480-80q-61 0-116-23.5T267-169q-42-42-65.5-97T178-382q0-67 25.5-127.5T273-615q44-44 103-68.5T504-708q67 0 127.5 25.5T735-613q44 44 68.5 103T829-382q0 61-23.5 116T740-169q-42 42-97 65.5T527-80h-47Zm23-323q33 0 56.5-23.5T583-483q0-33-23.5-56.5T503-563q-33 0-56.5 23.5T423-483q0 33 23.5 56.5T503-403Z"),
+    library: GMSVG("M480-60q-72-68-165-104t-195-36v-440q101 0 194 36.5T480-498q73-69 166-105.5T840-640v440q-103 0-195.5 36T480-60Zm0-104q63-47 134-75t146-37v-276q-73 13-143.5 52.5T480-394q-66-66-136.5-105.5T200-552v276q75 9 146 37t134 75ZM367-647q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47Zm169.5-56.5Q560-727 560-760t-23.5-56.5Q513-840 480-840t-56.5 23.5Q400-793 400-760t23.5 56.5Q447-680 480-680t56.5-23.5ZM480-760Zm0 366Z"),
+    museum: GMSVG("M120-120v-80h720v80H120Zm80-120v-280h-80v-80l360-240 360 240v80h-80v280h80v80H120v-80h80Zm80 0h120v-280H280v280Zm200 0h120v-280H480v280Z"),
+    park: GMSVG("M440-120v-240H300l180-260-90-140h170v-120h80v120h170l-90 140 180 260H520v240h-80Z"),
+    learning_center: GMSVG("M480-140 240-280v-240l-120-70 360-210 360 210v240L480-140Zm0-92 280-160v-252L480-804 200-644v252l280 160Zm0-228Z"),
+    science: GMSVG("M280-80q-33 0-56.5-23.5T200-160q0-14 4.5-27t13.5-24l202-279v-230h-80v-80h280v80h-80v230l202 279q9 11 13.5 24t4.5 27q0 33-23.5 56.5T680-80H280Zm54-80h292L500-336 374-160Z"),
+    art: GMSVG("M480-80q-83 0-156-31.5t-127-86Q143-252 111.5-325T80-480q0-83 31.5-156t86-127Q252-817 325-848.5T480-880q83 0 156 31.5t127 86Q817-708 848.5-635T880-480q0 74-35.5 126T756-272H620q-20 0-35 14.5T570-222q0 10 5 22t10 20q6 8 11 18.5t5 23.5q0 26-18.5 42T540-80h-60Zm-160-400q17 0 28.5-11.5T360-520q0-17-11.5-28.5T320-560q-17 0-28.5 11.5T280-520q0 17 11.5 28.5T320-480Zm160-80q17 0 28.5-11.5T520-600q0-17-11.5-28.5T480-640q-17 0-28.5 11.5T440-600q0 17 11.5 28.5T480-560Zm160 80q17 0 28.5-11.5T680-520q0-17-11.5-28.5T640-560q-17 0-28.5 11.5T600-520q0 17 11.5 28.5T640-480Zm80 160q17 0 28.5-11.5T760-360q0-17-11.5-28.5T720-400q-17 0-28.5 11.5T680-360q0 17 11.5 28.5T720-320Z"),
+    history: GMSVG("M480-200q-117 0-198.5-81.5T200-480q0-117 81.5-198.5T480-760q68 0 128 31.5T710-642v-118h80v280H510v-80h167q-26-57-79.5-88.5T480-680q-83 0-141.5 58.5T280-480q0 83 58.5 141.5T480-280q58 0 107-31t73-82h84q-28 86-99.5 139.5T480-200Zm40-140-200-120v-160h80v114l160 96-40 70Z"),
+    kids: GMSVG("M400-560q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35Zm-240 400v-112q0-34 17.5-62.5T224-378q62-31 117-46.5T400-440q59 0 114.5 15.5T624-378q30 15 47 43.5t17 62.5v112H160Z"),
+    community: GMSVG("M40-160v-112q0-34 17-62.5T104-378q62-31 126-46.5T360-440q66 0 130 15.5T616-378q30 15 47 43.5t17 62.5v112H40Zm720 0v-112q0-34-17-62.5T696-378q-20-10-41-18t-43-15q49 34 78.5 83T720-240v80h40Zm0-360q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35Zm-400 0q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35Z"),
+    coworking: GMSVG("M160-120v-480q0-33 23.5-56.5T240-680h160v-80q0-33 23.5-56.5T480-840h160q33 0 56.5 23.5T720-760v80h160q33 0 56.5 23.5T960-600v480H160Zm320-560h160v-80H480v80ZM240-200h640v-400H240v400Z"),
+    sport: GMSVG("M120-120v-200h80v-200q0-33 23.5-56.5T280-600h160v-80H320v-80h320v80H520v80h160q33 0 56.5 23.5T760-520v200h80v200h-80v-120H200v120h-80Z"),
+    book_house: GMSVG("M120-120v-440l360-280 360 280v440H560v-240H400v240H120Z"),
+    museum_kids: GMSVG("M120-120v-80h720v80H120Zm80-120v-280h-80v-80l360-240 360 240v80h-80v280h80v80H120v-80h80Zm280-80q33 0 56.5-23.5T560-400q0-33-23.5-56.5T480-480q-33 0-56.5 23.5T400-400q0 33 23.5 56.5T480-320Z"),
+    museum_local: GMSVG("M80-80v-80h80v-360H80v-80l400-280 400 280v80h-80v360h80v80H80Zm160-80h480-480Zm80-80h80v-160l80 120 80-120v160h80v-280h-80l-80 120-80-120h-80v280Zm400 80v-454L480-782 240-614v454h480Z"),
+    indie_bookstore: GMSVG("M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560v640H240q-17 0-28.5 11.5T200-160h560v80H200Zm40-160h440v-480H240v480Zm0-480v480-480Z"),
+    vocational_school: GMSVG("M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm240-600h160v-80H400v80Zm400 360H600v80H360v-80H160v160h640v-160Zm-360 0h80v-80h-80v80Zm-280-80h200v-80h240v80h200v-200H160v200Zm320 40Z"),
+    skill_center: GMSVG("m352-522 86-87-56-57-44 44-56-56 43-44-45-45-87 87 159 158Zm328 329 87-87-45-45-44 43-56-56 43-44-57-56-86 86 158 159Zm24-567 57 57-57-57ZM290-120H120v-170l175-175L80-680l200-200 216 216 151-152q12-12 27-18t31-6q16 0 31 6t27 18l53 54q12 12 18 27t6 31q0 16-6 30.5T816-647L665-495l215 215L680-80 465-295 290-120Zm-90-80h56l392-391-57-57-391 392v56Zm420-419-29-29 57 57-28-28Z"),
+    bma_school: GMSVG("M480-120 200-272v-240L40-600l440-240 440 240v320h-80v-276l-80 44v240L480-120Zm0-332 274-148-274-148-274 148 274 148Zm0 241 200-108v-151L480-360 280-470v151l200 108Zm0-241Zm0 90Zm0 0Z"),
+    sports_field: GMSVG("M80-105.5q0-9.5 8-17.5l151-140 21-157 103-214q15-32 47.5-42t64.5 7l135 70 182-5-9-34q-20-4-38-17.5T708-695q-14-20-27-43t-26-54q-14-33 2.5-66t51.5-42l65-17q35-9 65 10.5t35 55.5q5 32 5.5 59.5T877-739q-4 32-13 53t-24 34l44 162-58 15-21-77-187 29q-12 2-24 0t-23-7l-42-20-99 136 244 293q8 9 6 18.5T672-87q-6 6-15.5 7.5T638-86L362-314l-37 83q-5 11-12.5 20T295-196L118-84q-10 6-19 4t-14-9q-5-7-5-16.5Zm496.5-751Q600-833 600-800t-23.5 56.5Q553-720 520-720t-56.5-23.5Q440-767 440-800t23.5-56.5Q487-880 520-880t56.5 23.5ZM799-696q8-2 11.5-9.5T818-736q4-22 3.5-47.5T816-843q-2-9-9.5-14t-16.5-3l-65 18q-9 2-13.5 10.5T711-815q14 33 27 56t29 40q13 14 18.5 18.5T799-696Z"),
+    sports_center: GMSVG("m414-168 12-56q3-13 12.5-21.5T462-256l124-10q13-2 24 5t16 19l16 38q39-23 70-55.5t52-72.5l-12-6q-11-8-16-19.5t-2-24.5l28-122q3-12 12.5-20t21.5-10q-5-25-12.5-48.5T764-628q-9 5-19.5 4.5T726-630l-106-64q-11-7-16-19t-2-25l8-34q-31-14-63.5-21t-66.5-7q-14 0-29 1.5t-29 4.5l30 68q5 12 2.5 25T442-680l-94 82q-10 9-23.5 10t-24.5-6l-92-56q-23 38-35.5 81.5T160-480q0 16 4 52l88-8q14-2 25.5 4.5T294-412l48 114q5 12 2.5 25T332-252l-38 32q27 20 57.5 33t62.5 19Zm72-172q-13 2-24-5t-16-19l-54-124q-5-12-1.5-25t13.5-21l102-86q9-9 22-10t24 6l112 66q11 7 17 19t3 25l-32 130q-3 13-12 21.5T618-352l-132 12Zm-6 260q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Z"),
+    recreation_center: GMSVG("M127-167q-47-47-47-113t47-113q47-47 113-47 23 0 42.5 5.5T320-418v-342l480-80v480q0 66-47 113t-113 47q-66 0-113-47t-47-113q0-66 47-113t113-47q23 0 42.5 5.5T720-498v-165l-320 63v320q0 66-47 113t-113 47q-66 0-113-47Z"),
+    senior_center: GMSVG("m320-40-64-48 104-139v-213q0-31 5-67.5t15-67.5l-60 33v142h-80v-188l176-100q25-14 43.5-21.5T494-717q25 0 45.5 21.5T587-628q32 54 58 81t56 41q11-8 19-11t19-3q25 0 43 18t18 42v420h-40v-420q0-8-6-14t-14-6q-8 0-14 6t-6 14v50h-40v-19q-54-23-84-51.5T543-557q-11 28-17.5 68.5T521-412l79 112v260h-80v-200l-71-102-9 142L320-40Zm220-700q-33 0-56.5-23.5T460-820q0-33 23.5-56.5T540-900q33 0 56.5 23.5T620-820q0 33-23.5 56.5T540-740Z"),
+    child_dev_center: GMSVG("M371.5-273Q323-306 300-360h360q-23 54-71.5 87T480-240q-60 0-108.5-33Zm-27-161.5Q330-449 330-470t14.5-35.5Q359-520 380-520t35.5 14.5Q430-491 430-470t-14.5 35.5Q401-420 380-420t-35.5-14.5Zm200 0Q530-449 530-470t14.5-35.5Q559-520 580-520t35.5 14.5Q630-491 630-470t-14.5 35.5Q601-420 580-420t-35.5-14.5ZM480-80q-75 0-140.5-28.5t-114-77q-48.5-48.5-77-114T120-440q0-32 5-62t16-59l80 14q-11 25-16 51.5t-5 55.5q0 117 81.5 198.5T480-160q117 0 198.5-81.5T760-440q0-16-2-31.5t-5-30.5q-81-9-150-48T485-651l70-41q32 37 72.5 63t88.5 39q-25-39-61.5-68.5T573-704l84-50q83 47 133 129.5T840-440q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-80ZM200-615l413-155q-32-26-70-39.5T463-823q-95 0-169.5 57.5T200-615Zm-64 110q-7-20-11.5-41t-4.5-43q0-91 51-163t129-112q-2-4-2.5-7.5t-.5-8.5q0-17 11.5-28.5T337-920q14 0 24 8t14 20q22-5 43.5-8t44.5-3q67 0 127.5 26T697-802l122-46 28 75-711 268Zm271-188Z"),
+    public_park: GMSVG("M200-80v-80h240v-160h-80q-83 0-141.5-58.5T160-520q0-60 33-110.5t89-73.5q9-75 65.5-125.5T480-880q76 0 132.5 50.5T678-704q56 23 89 73.5T800-520q0 83-58.5 141.5T600-320h-80v160h240v80H200Zm160-320h240q50 0 85-35t35-85q0-36-20.5-66T646-630l-42-18-6-46q-6-45-39.5-75.5T480-800q-45 0-78.5 30.5T362-694l-6 46-42 18q-33 14-53.5 44T240-520q0 50 35 85t85 35Zm120-200Z"),
+    art_gallery: GMSVG("M120-120v-720h720v720H120Zm80-80h560v-560H200v560Zm80-80h400L640-440 520-300l-80-100-160 200Z"),
+    online: GMSVG("M160-120v-80h280v-80H120v-560h720v560H520v80h280v80H160Zm40-240h560v-320H200v320Z")
   };
 
   // ================= CATEGORY META =================
-  const DEFAULT_CATEGORY_COLOR = "#10b981";
+  const DEFAULT_CATEGORY_COLOR = "#205a41";
   const CATEGORY_COLOR_PALETTE = [
-    "#2563eb", "#7c3aed", "#16a34a", "#f59e0b", "#06b6d4", "#ec4899",
-    "#64748b", "#f97316", "#0ea5e9", "#111827", "#ef4444", "#14b8a6"
+    "#205a41", "#67a33b", "#00c08b", "#ffb449", "#f8df52", "#0071ce", "#ec3faa"
   ];
 
   const CATEGORY_META = {
-    library: { label: "ห้องสมุด", iconKey: "library", color: "#2563eb" },
-    museum: { label: "พิพิธภัณฑ์", iconKey: "museum", color: "#7c3aed" },
-    park: { label: "สวน/ธรรมชาติ", iconKey: "park", color: "#16a34a" },
-    learning_center: { label: "ศูนย์เรียนรู้", iconKey: "learning_center", color: "#f59e0b" },
-    science: { label: "วิทยาศาสตร์", iconKey: "science", color: "#06b6d4" },
-    art: { label: "ศิลปะ", iconKey: "art", color: "#ec4899" },
-    history: { label: "ประวัติศาสตร์", iconKey: "history", color: "#64748b" },
-    kids: { label: "เด็ก/ครอบครัว", iconKey: "kids", color: "#f97316" },
-    community: { label: "ชุมชน", iconKey: "community", color: "#0ea5e9" },
-    coworking: { label: "Co-working", iconKey: "coworking", color: "#111827" },
-    sport: { label: "กีฬา", iconKey: "sport", color: "#ef4444" }
+    library: { label: "ห้องสมุด", iconKey: "library", color: "#0071ce" },
+    museum: { label: "พิพิธภัณฑ์", iconKey: "museum", color: "#ec3faa" },
+    park: { label: "สวน/ธรรมชาติ", iconKey: "park", color: "#67a33b" },
+    learning_center: { label: "ศูนย์เรียนรู้", iconKey: "learning_center", color: "#00c08b" },
+    science: { label: "วิทยาศาสตร์", iconKey: "science", color: "#0071ce" },
+    art: { label: "ศิลปะ", iconKey: "art", color: "#ec3faa" },
+    history: { label: "ประวัติศาสตร์", iconKey: "history", color: "#205a41" },
+    kids: { label: "เด็ก/ครอบครัว", iconKey: "kids", color: "#ffb449" },
+    community: { label: "ชุมชน", iconKey: "community", color: "#00c08b" },
+    coworking: { label: "Co-working", iconKey: "coworking", color: "#205a41" },
+    sport: { label: "กีฬา", iconKey: "sport", color: "#ffb449" }
   };
 
   const CATEGORY_LABEL_META = {
-    "บ้านหนังสือ": { iconKey: "book_house", color: "#1d4ed8" },
-    "พิพิธภัณฑ์เด็ก": { iconKey: "museum_kids", color: "#f97316" },
-    "พิพิธภัณฑ์ท้องถิ่น": { iconKey: "museum_local", color: "#7c3aed" },
-    "ร้านหนังสืออิสระ": { iconKey: "indie_bookstore", color: "#0ea5e9" },
-    "โรงเรียนฝึกอาชีพ": { iconKey: "vocational_school", color: "#f59e0b" },
-    "โรงเรียนสังกัดกทม.": { iconKey: "bma_school", color: "#14b8a6" },
-    "ลานกีฬา": { iconKey: "sports_field", color: "#ef4444" },
-    "ศูนย์กีฬา": { iconKey: "sports_center", color: "#dc2626" },
-    "ศูนย์นันทนาการ": { iconKey: "recreation_center", color: "#a855f7" },
-    "ศูนย์บริการผู้สูงอายุ": { iconKey: "senior_center", color: "#64748b" },
-    "ศูนย์พัฒนาเด็กเล็ก": { iconKey: "child_dev_center", color: "#22c55e" },
-    "สวนสาธารณะ": { iconKey: "public_park", color: "#16a34a" },
-    "ห้องสมุด": { iconKey: "library", color: "#2563eb" },
-    "หอศิลป์": { iconKey: "art_gallery", color: "#ec4899" },
-    "ออนไลน์": { iconKey: "online", color: "#0f172a" }
+    "บ้านหนังสือ": { iconKey: "book_house", color: "#0071ce" },
+    "พิพิธภัณฑ์เด็ก": { iconKey: "museum_kids", color: "#ffb449" },
+    "พิพิธภัณฑ์ท้องถิ่น": { iconKey: "museum_local", color: "#ec3faa" },
+    "ร้านหนังสืออิสระ": { iconKey: "indie_bookstore", color: "#0071ce" },
+    "โรงเรียนฝึกอาชีพ": { iconKey: "vocational_school", color: "#ffb449" },
+    "ศูนย์ฝึกอาชีพ": { iconKey: "skill_center", color: "#ffb449" },
+    "โรงเรียนสังกัดกทม.": { iconKey: "bma_school", color: "#00c08b" },
+    "ลานกีฬา": { iconKey: "sports_field", color: "#ffb449" },
+    "ศูนย์กีฬา": { iconKey: "sports_center", color: "#ec3faa" },
+    "ศูนย์นันทนาการ": { iconKey: "recreation_center", color: "#ec3faa" },
+    "ศูนย์บริการผู้สูงอายุ": { iconKey: "senior_center", color: "#205a41" },
+    "ศูนย์พัฒนาเด็กเล็ก": { iconKey: "child_dev_center", color: "#67a33b" },
+    "สวนสาธารณะ": { iconKey: "public_park", color: "#67a33b" },
+    "ห้องสมุด": { iconKey: "library", color: "#0071ce" },
+    "หอศิลป์": { iconKey: "art_gallery", color: "#ec3faa" },
+    "ออนไลน์": { iconKey: "online", color: "#205a41" }
   };
 
   const CATEGORY_ICON_RULES = [
@@ -323,6 +116,7 @@ if (!defined('ABSPATH')) exit;
     { test: /(พิพิธภัณฑ์ท้องถิ่น)/, iconKey: "museum_local" },
     { test: /(ร้านหนังสืออิสระ)/, iconKey: "indie_bookstore" },
     { test: /(โรงเรียนฝึกอาชีพ)/, iconKey: "vocational_school" },
+    { test: /(ศูนย์ฝึกอาชีพ)/, iconKey: "skill_center" },
     { test: /(โรงเรียนสังกัดกทม\.?)/, iconKey: "bma_school" },
     { test: /(ลานกีฬา)/, iconKey: "sports_field" },
     { test: /(ศูนย์กีฬา)/, iconKey: "sports_center" },
@@ -345,7 +139,7 @@ if (!defined('ABSPATH')) exit;
   ];
 
   const ICON_POOL = [
-    "book_house","museum_kids","museum_local","indie_bookstore","vocational_school","bma_school",
+    "book_house","museum_kids","museum_local","indie_bookstore","vocational_school","skill_center","bma_school",
     "sports_field","sports_center","recreation_center","senior_center","child_dev_center","public_park",
     "library","art_gallery","online","museum","park","learning_center","science","art","history","kids",
     "community","coworking","sport"
@@ -366,6 +160,32 @@ if (!defined('ABSPATH')) exit;
   function pickColorForCategory(slug, label) {
     const text = `${slug || ""} ${label || ""}`;
     return CATEGORY_COLOR_PALETTE[hashString(text) % CATEGORY_COLOR_PALETTE.length] || DEFAULT_CATEGORY_COLOR;
+  }
+
+  function colorToRgba(color, alpha = 0.12) {
+    const c = String(color || "").trim();
+    if (!c) return `rgba(15, 23, 42, ${alpha})`;
+
+    const hex = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hex) {
+      let h = hex[1];
+      if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    const rgb = c.match(/^rgba?\(([^)]+)\)$/i);
+    if (rgb) {
+      const parts = rgb[1].split(",").map((x) => Number(x.trim()));
+      const [r, g, b] = parts;
+      if (Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b)) {
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+    }
+
+    return c;
   }
 
   let categoryMetaIndex = null;
@@ -422,7 +242,10 @@ if (!defined('ABSPATH')) exit;
     if (fullCache.has(id)) return fullCache.get(id);
     try {
       if (!silent) setApiLoading(true, "กำลังโหลดรายละเอียด...", "drawer");
-      const res = await fetch(`${BLM_API_BASE}/location/${id}`);
+      const res = await fetch(withNoCache(`${BLM_API_BASE}/location/${id}`), {
+        cache: "no-store",
+        headers: { Accept: "application/json" }
+      });
       if (!res.ok) return null;
       const full = await res.json();
       fullCache.set(id, full);
@@ -439,6 +262,7 @@ if (!defined('ABSPATH')) exit;
     amenities: new Set(),  // facility slugs
     admissionPolicies: new Set(), // admission_policy slugs
     courseCategories: new Set(), // course_category slugs
+    courseMode: "", // "", "has_course", "no_course"
     courseLocationIds: new Set(), // location IDs from course context
     nearMeEnabled: false,
     radiusKm: 5
@@ -456,6 +280,13 @@ if (!defined('ABSPATH')) exit;
 
   let listLimit = LIST_PAGE_SIZE;
   let lastVisible = [];
+  let isLoadingMore = false;
+  const INFINITE_LOAD_OFFSET_PX = 220;
+  const NEAR_RADIUS_MIN_KM = 1;
+  const NEAR_RADIUS_MAX_KM = 20;
+  const NEAR_RADIUS_VIEW_PADDING = 1.45; // zoom out slightly so the full radius ring is visible
+  let infiniteDesktopObserver = null;
+  let infiniteMobileObserver = null;
 
   const PLACES_SOURCE_ID = "places-src";
   const LAYER_CLUSTER_CIRCLE = "places-cluster-circle";
@@ -464,6 +295,13 @@ if (!defined('ABSPATH')) exit;
   const LAYER_UNCLUSTERED_ACTIVE_RING = "places-unclustered-active-ring";
   const LAYER_UNCLUSTERED_ACTIVE = "places-unclustered-active";
   const LAYER_UNCLUSTERED_LABEL = "places-unclustered-label";
+  const PAIR_ICON_REGISTRY = new Map();
+  const NEAR_RADIUS_SOURCE_ID = "near-radius-src";
+  const LAYER_NEAR_RADIUS_FILL = "near-radius-fill";
+  const LAYER_NEAR_RADIUS_LINE = "near-radius-line";
+  // Thailand extent guard (prevent zoom/pan too far out)
+  const TH_BOUNDS = [[97.2, 5.2], [105.9, 21.0]];
+  const TH_MIN_ZOOM = 5.1;
 
   // ================= HELPERS =================
   function setApiLoading(on, text = "กำลังโหลดข้อมูล...", scope = "global") {
@@ -566,6 +404,7 @@ if (!defined('ABSPATH')) exit;
       amenities: Array.from(state.amenities || []),
       admission: Array.from(state.admissionPolicies || []),
       course_categories: Array.from(state.courseCategories || []),
+      course_mode: state.courseMode || "",
       course_locs: Array.from(state.courseLocationIds || []),
       near: state.nearMeEnabled ? 1 : 0,
       radius: Number.isFinite(state.radiusKm) ? state.radiusKm : 5,
@@ -589,6 +428,7 @@ if (!defined('ABSPATH')) exit;
     _setCsvOrDelete(sp, "amenities", s.amenities);
     _setCsvOrDelete(sp, "admission", s.admission);
     _setCsvOrDelete(sp, "course_categories", s.course_categories);
+    _setOrDelete(sp, "course_mode", s.course_mode);
     _setCsvOrDelete(sp, "course_locs", s.course_locs);
 
     _setOrDelete(sp, "near", s.near ? "1" : "");
@@ -665,6 +505,11 @@ if (!defined('ABSPATH')) exit;
     }
   }
 
+  function withNoCache(url) {
+    const sep = String(url).includes("?") ? "&" : "?";
+    return `${url}${sep}_=${API_CACHE_BUST}`;
+  }
+
   function readUrlToState() {
     const sp = new URLSearchParams(window.location.search);
     const hasNear = sp.has("near");
@@ -677,6 +522,7 @@ if (!defined('ABSPATH')) exit;
       amenities: _parseList(sp.get("amenities")),
       admission: _parseList(sp.get("admission")),
       course_categories: _parseList(sp.get("course_categories")),
+      course_mode: sp.get("course_mode") || "",
       course_locs: _parseList(sp.get("course_locs")),
       near: hasNear ? sp.get("near") === "1" : (cachedNear ?? false),
       radius: hasRadius ? Number(sp.get("radius")) : (Number.isFinite(cachedRadius) ? cachedRadius : 5),
@@ -711,6 +557,12 @@ if (!defined('ABSPATH')) exit;
     u.admission.forEach(a => state.admissionPolicies.add(a));
     state.courseCategories.clear();
     u.course_categories.forEach(a => state.courseCategories.add(a));
+    state.courseMode = u.course_mode || "";
+    if (!state.courseMode) {
+      if (state.courseCategories.has("has_course")) state.courseMode = "has_course";
+      else if (state.courseCategories.has("no_course")) state.courseMode = "no_course";
+    }
+    state.courseCategories.clear();
     state.courseLocationIds.clear();
     u.course_locs.forEach(id => {
       const n = Number(id);
@@ -724,14 +576,12 @@ if (!defined('ABSPATH')) exit;
     syncCourseCategoryUI();
 
     state.nearMeEnabled = !!u.near;
-    state.radiusKm = Number.isFinite(u.radius) ? u.radius : 5;
+    state.radiusKm = normalizeRadiusKm(u.radius);
     el("radiusKm").value = state.radiusKm;
+    updateRadiusLabel();
 
     el("nearMeRadiusWrap").classList.toggle("hidden", !state.nearMeEnabled);
-    el("chipNearMe").textContent = state.nearMeEnabled ? "ใกล้ฉัน: เปิด" : "ใกล้ฉัน: ปิด";
-    el("chipNearMe").className = state.nearMeEnabled
-      ? "px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
-      : "px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50";
+    setNearMeChipUI();
 
     if (u.map.lat != null && u.map.lng != null && u.map.zoom != null) {
       urlState.initialMap = { lat: u.map.lat, lng: u.map.lng, zoom: u.map.zoom };
@@ -783,6 +633,116 @@ if (!defined('ABSPATH')) exit;
     return R * c;
   }
 
+  function calcZoomForRadiusKm(radiusKm) {
+    if (!map || !userLocation) return null;
+    const r = Math.max(NEAR_RADIUS_MIN_KM, Number(radiusKm) || 5);
+    const latRad = (userLocation.lat * Math.PI) / 180;
+    const cosLat = Math.max(0.2, Math.cos(latRad));
+    const minPx = Math.max(280, Math.min(window.innerWidth, window.innerHeight));
+    const targetRadiusPx = minPx * 0.32;
+    const meters = r * NEAR_RADIUS_VIEW_PADDING * 1000;
+    const zoom = Math.log2((156543.03392 * cosLat * targetRadiusPx) / meters);
+    return Math.max(9, Math.min(17.5, zoom));
+  }
+
+  function syncMapZoomToRadius(radiusKm, opts = {}) {
+    if (!map || !userLocation || !state.nearMeEnabled) return;
+    const targetZoom = calcZoomForRadiusKm(radiusKm);
+    if (!Number.isFinite(targetZoom)) return;
+    const currentZoom = map.getZoom();
+    if (Math.abs(currentZoom - targetZoom) < 0.08) return;
+
+    const duration = Number.isFinite(opts.duration) ? opts.duration : 180;
+    map.stop?.();
+    map.easeTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: targetZoom,
+      duration,
+      essential: true
+    });
+  }
+
+  function nearRadiusEmptyGeojson() {
+    return { type: "FeatureCollection", features: [] };
+  }
+
+  function makeRadiusCircleGeojson(lat, lng, radiusKm, steps = 96) {
+    const earthKm = 6371;
+    const latRad = (lat * Math.PI) / 180;
+    const angDist = radiusKm / earthKm;
+    const coords = [];
+
+    for (let i = 0; i <= steps; i += 1) {
+      const bearing = (i / steps) * (2 * Math.PI);
+      const lat2 = Math.asin(
+        Math.sin(latRad) * Math.cos(angDist) +
+        Math.cos(latRad) * Math.sin(angDist) * Math.cos(bearing)
+      );
+      const lng2 = (lng * Math.PI) / 180 + Math.atan2(
+        Math.sin(bearing) * Math.sin(angDist) * Math.cos(latRad),
+        Math.cos(angDist) - Math.sin(latRad) * Math.sin(lat2)
+      );
+      coords.push([(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI]);
+    }
+
+    return {
+      type: "FeatureCollection",
+      features: [{
+        type: "Feature",
+        geometry: { type: "Polygon", coordinates: [coords] },
+        properties: {}
+      }]
+    };
+  }
+
+  function ensureNearRadiusLayers() {
+    if (!map) return;
+    if (!map.getSource(NEAR_RADIUS_SOURCE_ID)) {
+      map.addSource(NEAR_RADIUS_SOURCE_ID, {
+        type: "geojson",
+        data: nearRadiusEmptyGeojson()
+      });
+    }
+
+    if (!map.getLayer(LAYER_NEAR_RADIUS_FILL)) {
+      map.addLayer({
+        id: LAYER_NEAR_RADIUS_FILL,
+        type: "fill",
+        source: NEAR_RADIUS_SOURCE_ID,
+        paint: {
+          "fill-color": "#00744b",
+          "fill-opacity": 0.05
+        }
+      }, LAYER_UNCLUSTERED);
+    }
+
+    if (!map.getLayer(LAYER_NEAR_RADIUS_LINE)) {
+      map.addLayer({
+        id: LAYER_NEAR_RADIUS_LINE,
+        type: "line",
+        source: NEAR_RADIUS_SOURCE_ID,
+        paint: {
+          "line-color": "#00744b",
+          "line-width": 1.5,
+          "line-opacity": 0.55
+        }
+      }, LAYER_UNCLUSTERED);
+    }
+  }
+
+  function syncNearRadiusOverlay() {
+    if (!map || !map.getSource(NEAR_RADIUS_SOURCE_ID)) return;
+    const src = map.getSource(NEAR_RADIUS_SOURCE_ID);
+    const enabled = !!state.nearMeEnabled && !!userLocation && Number.isFinite(state.radiusKm);
+
+    if (!enabled) {
+      src.setData(nearRadiusEmptyGeojson());
+      return;
+    }
+
+    src.setData(makeRadiusCircleGeojson(userLocation.lat, userLocation.lng, state.radiusKm));
+  }
+
   function formatKm(km) {
     if (km == null || !Number.isFinite(km)) return "-";
     if (km < 1) return `${Math.round(km * 1000)} ม.`;
@@ -811,6 +771,59 @@ if (!defined('ABSPATH')) exit;
     return [];
   }
 
+  function getIconCategoriesForPlace(place, limit = 2) {
+    const out = [];
+    const seen = new Set();
+    for (const c of getPlaceCategories(place)) {
+      const key = String(c || "").trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(key);
+      if (out.length >= limit) break;
+    }
+    if (!out.length) out.push(getPrimaryCategory(place) || "default");
+    return out;
+  }
+
+  function pairSignatureFromCategories(catA, catB) {
+    return `${String(catA || "").trim()}||${String(catB || "").trim()}`;
+  }
+
+  function ensurePairIconId(catA, catB) {
+    const sig = pairSignatureFromCategories(catA, catB);
+    if (!PAIR_ICON_REGISTRY.has(sig)) {
+      PAIR_ICON_REGISTRY.set(sig, `pair-${hashString(sig)}`);
+    }
+    return PAIR_ICON_REGISTRY.get(sig);
+  }
+
+  function getMapIconIdForPlace(place) {
+    const cats = getIconCategoriesForPlace(place, 2);
+    if (cats.length >= 2) {
+      const pairId = ensurePairIconId(cats[0], cats[1]);
+      return `blm-${pairId}`;
+    }
+    return `blm-${(cats[0] || "default")}`;
+  }
+
+  function buildSplitBadgeHtml(catA, catB, options = {}) {
+    const mA = catMeta(catA);
+    const mB = catMeta(catB);
+    const iconA = getIconKeyFromCategory(catA);
+    const iconB = getIconKeyFromCategory(catB);
+    const w = Number(options.width || 46);
+    const h = Number(options.height || 30);
+    const r = Number(options.radius || 8);
+    const iconSizeClass = options.iconSizeClass || "icon-16";
+
+    return `
+      <span style="display:inline-flex;overflow:hidden;border-radius:${r}px;width:${w}px;height:${h}px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.08)">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:50%;height:100%;background:${mA.color || DEFAULT_CATEGORY_COLOR};color:#fff">${svgForDom(iconA, iconSizeClass)}</span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:50%;height:100%;background:${mB.color || DEFAULT_CATEGORY_COLOR};color:#fff">${svgForDom(iconB, iconSizeClass)}</span>
+      </span>
+    `.trim();
+  }
+
   function getPrimaryCategory(place) {
     return place.category || getPlaceCategories(place)[0] || "";
   }
@@ -830,7 +843,7 @@ if (!defined('ABSPATH')) exit;
 
   const DRAWER_META_ICONS = {
     address: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-4.5 7-11a7 7 0 0 0-14 0c0 6.5 7 11 7 11z"/><circle cx="12" cy="10" r="2"/></svg>`,
-    gmaps: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4"/><path d="M16 6V4"/><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 14h8"/></svg>`,
+    gmaps: `<svg viewBox="0 -960 960 960" aria-hidden="true"><path fill="currentColor" d="m600-120-240-84-186 72q-20 8-37-4.5T120-170v-560q0-13 7.5-23t20.5-15l212-72 240 84 186-72q20-8 37 4.5t17 33.5v560q0 13-7.5 23T812-192l-212 72Zm-40-98v-468l-160-56v468l160 56Zm80 0 120-40v-474l-120 46v468Zm-440-10 120-46v-468l-120 40v474Zm440-458v468-468Zm-320-56v468-468Z"/></svg>`,
     phone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.7.7 2.5a2 2 0 0 1-.4 2.1L8.1 9.6a16 16 0 0 0 6.3 6.3l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.6.6 2.5.7a2 2 0 0 1 1.7 2z"/></svg>`,
     hours: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
     admission: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V9z"/><path d="M12 7v12"/></svg>`,
@@ -873,7 +886,15 @@ if (!defined('ABSPATH')) exit;
     return true;
   }
 
-  function matchesFilters(place) {
+  function placeHasCourses(place) {
+    if (typeof place?.has_courses === "boolean") return place.has_courses;
+    if (Array.isArray(place?.course_categories) && place.course_categories.length > 0) return true;
+    if (Array.isArray(place?.course_category_parents) && place.course_category_parents.length > 0) return true;
+    return false;
+  }
+
+  function matchesFilters(place, options = {}) {
+    const ignoreNear = !!options.ignoreNear;
     if (state.courseLocationIds.size > 0) {
       const pid = String(place.id);
       if (!state.courseLocationIds.has(pid)) return false;
@@ -908,12 +929,15 @@ if (!defined('ABSPATH')) exit;
       if (!ok) return false;
     }
 
-    if (state.nearMeEnabled) {
+    if (!ignoreNear && state.nearMeEnabled) {
       if (!userLocation || !Number.isFinite(place._distanceKm)) return false;
       if (Number.isFinite(state.radiusKm) && place._distanceKm > state.radiusKm) return false;
     }
 
-    // course categories: OR logic (เลือกหลายอัน = ผ่านถ้ามีอย่างน้อย 1)
+    if (state.courseMode === "has_course" && !placeHasCourses(place)) return false;
+    if (state.courseMode === "no_course" && placeHasCourses(place)) return false;
+
+    // backward compatibility for old shared URLs
     if (state.courseCategories.size > 0) {
       const c = new Set(place.course_categories || []);
       const p = new Set(place.course_category_parents || []);
@@ -927,6 +951,24 @@ if (!defined('ABSPATH')) exit;
       if (!ok) return false;
     }
     return true;
+  }
+
+  function updateRadiusLabel() {
+    const v = Number.isFinite(state.radiusKm) ? state.radiusKm : 5;
+    const out = `${Math.round(v)} กม.`;
+    const elLabel = el("radiusKmValue");
+    if (elLabel) elLabel.textContent = out;
+  }
+
+  function normalizeRadiusKm(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 5;
+    return Math.min(NEAR_RADIUS_MAX_KM, Math.max(NEAR_RADIUS_MIN_KM, Math.round(n)));
+  }
+
+  function setNearMeChipUI() {
+    const sw = el("nearMeSwitch");
+    if (sw) sw.checked = !!state.nearMeEnabled;
   }
 
   function isInBounds(place) {
@@ -1061,15 +1103,10 @@ if (!defined('ABSPATH')) exit;
       });
     }
 
-    const labelForCourseCat = (slug) => {
-      const it = (filtersData?.course_categories || []).find(x => x.slug === slug);
-      return it?.name || slug;
-    };
-
-    for (const cc of state.courseCategories) {
+    if (state.courseMode === "has_course" || state.courseMode === "no_course") {
       chips.push({
-        label: `คอร์ส: ${labelForCourseCat(cc)}`,
-        clear: () => { state.courseCategories.delete(cc); syncCourseCategoryUI(); }
+        label: state.courseMode === "has_course" ? "มีคอร์ส" : "ไม่มีคอร์ส",
+        clear: () => { state.courseMode = ""; syncCourseCategoryUI(); }
       });
     }
 
@@ -1079,8 +1116,7 @@ if (!defined('ABSPATH')) exit;
         clear: () => {
           state.nearMeEnabled = false;
           el("nearMeRadiusWrap").classList.add("hidden");
-          el("chipNearMe").textContent = "ใกล้ฉัน: ปิด";
-          el("chipNearMe").className = "px-3 py-2 rounded-lg border text-sm font-semibold";
+          setNearMeChipUI();
         }
       });
     }
@@ -1114,6 +1150,7 @@ if (!defined('ABSPATH')) exit;
     count += state.amenities.size;
     if (state.nearMeEnabled) count += 1;
     count += state.admissionPolicies.size;
+    if (state.courseMode) count += 1;
     count += state.courseCategories.size;
     elCount.textContent = String(count);
   }
@@ -1444,33 +1481,17 @@ if (!defined('ABSPATH')) exit;
   }
 
   function getCourseCategoryItems() {
-    const terms = (filtersData?.course_categories || []);
-    const labelMap = new Map(terms.map(x => [x.slug, x.name]));
-    const parentMap = new Map(terms.map(x => [x.slug, x.parent || ""]));
-    const parentSet = new Set(terms.filter(x => !x.parent).map(x => x.slug));
-
-    const counts = new Map();
+    let hasCourseCount = 0;
+    let noCourseCount = 0;
     for (const p of allPlaces) {
-      (p.course_category_parents || []).forEach(slug => {
-        if (!slug) return;
-        counts.set(slug, (counts.get(slug) || 0) + 1);
-      });
-      (p.course_categories || []).forEach(slug => {
-        if (!slug) return;
-        counts.set(slug, (counts.get(slug) || 0) + 1);
-      });
+      if (placeHasCourses(p)) hasCourseCount += 1;
+      else noCourseCount += 1;
     }
 
-    const items = terms.map(t => ({
-      value: t.slug,
-      label: labelMap.get(t.slug) || t.slug,
-      parent: parentMap.get(t.slug) || "",
-      count: counts.get(t.slug) || 0
-    }));
-
-    const filtered = items.filter(x => x.count > 0);
-    filtered.sort((a,b) => (b.count - a.count) || a.label.localeCompare(b.label, "th"));
-    return filtered;
+    return [
+      { value: "has_course", label: "มีคอร์ส", count: hasCourseCount },
+      { value: "no_course", label: "ไม่มีคอร์ส", count: noCourseCount },
+    ].filter((x) => x.count > 0);
   }
 
   const COURSE_CAT_TOP_N = 10;
@@ -1492,15 +1513,16 @@ if (!defined('ABSPATH')) exit;
 
     const items = getCourseCategoryItems();
     if (!items.length) {
-      wrap.innerHTML = `<div class="text-xs text-slate-500">ไม่มีข้อมูลหมวดคอร์ส</div>`;
+      wrap.innerHTML = `<div class="text-xs text-slate-500">ไม่มีข้อมูลสถานะคอร์ส</div>`;
       return;
     }
 
     items.slice(0, COURSE_CAT_TOP_N).forEach(it => {
+      const showCount = it.value !== "no_course";
       wrap.appendChild(makeCourseCatPill({
         value: it.value,
-        label: it.label,
-        active: state.courseCategories.has(it.value)
+        label: `${it.label}${showCount && it.count ? ` (${it.count})` : ""}`,
+        active: state.courseMode === it.value
       }));
     });
   }
@@ -1516,15 +1538,16 @@ if (!defined('ABSPATH')) exit;
 
     grid.innerHTML = "";
     if (!items.length) {
-      grid.innerHTML = `<div class="text-sm text-slate-500">ไม่พบหมวดคอร์ส</div>`;
+      grid.innerHTML = `<div class="text-sm text-slate-500">ไม่พบสถานะคอร์ส</div>`;
       return;
     }
 
     items.forEach(it => {
+      const showCount = it.value !== "no_course";
       grid.appendChild(makeCourseCatPill({
         value: it.value,
-        label: `${it.label}${it.count ? ` (${it.count})` : ""}`,
-        active: state.courseCategories.has(it.value)
+        label: `${it.label}${showCount && it.count ? ` (${it.count})` : ""}`,
+        active: state.courseMode === it.value
       }));
     });
   }
@@ -1532,7 +1555,7 @@ if (!defined('ABSPATH')) exit;
   function syncCourseCategoryUI() {
     el("courseCatWrap")?.querySelectorAll(".ccPill").forEach(btn => {
       const v = btn.dataset.courseCat;
-      const on = state.courseCategories.has(v);
+      const on = state.courseMode === v;
       btn.classList.toggle("bg-emerald-600", on);
       btn.classList.toggle("text-white", on);
       btn.classList.toggle("border-emerald-600", on);
@@ -1542,7 +1565,7 @@ if (!defined('ABSPATH')) exit;
 
     el("courseCatModalGrid")?.querySelectorAll(".ccPill").forEach(btn => {
       const v = btn.dataset.courseCat;
-      const on = state.courseCategories.has(v);
+      const on = state.courseMode === v;
       btn.classList.toggle("bg-emerald-600", on);
       btn.classList.toggle("text-white", on);
       btn.classList.toggle("border-emerald-600", on);
@@ -1589,10 +1612,13 @@ if (!defined('ABSPATH')) exit;
     const iconKey = getIconKeyFromCategory(key);
     const btn = document.createElement("button");
     const active = state.categories.has(key);
-    btn.className = "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm " +
-      (active ? "bg-emerald-600 text-white border-emerald-600" : "bg-white hover:bg-slate-50");
+    const baseColor = meta.color || "#00744b";
+    btn.className = "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors" + (active ? " is-active-cat" : "");
+    btn.style.setProperty("--cat-color", baseColor);
+    btn.style.setProperty("--cat-bg", active ? baseColor : colorToRgba(baseColor, 0.12));
+    btn.style.setProperty("--cat-text", active ? "#ffffff" : "#0f172a");
     btn.innerHTML = `
-      <span style="color: ${active ? "#ffffff" : meta.color}">${svgForDom(iconKey, "icon-18")}</span>
+      <span style="color: ${active ? "#ffffff" : (meta.color || "#00744b")}">${svgForDom(iconKey, "icon-18")}</span>
       <span class="truncate">${meta.label}</span>
     `;
     btn.type = "button";
@@ -1614,10 +1640,11 @@ if (!defined('ABSPATH')) exit;
     if (!wrap) return;
     wrap.innerHTML = "";
 
-    const top = getTopCategoriesFromData(10);
-    if (!top.length) return;
+    const all = getAllCategoriesFromData()
+      .sort((a,b) => catMeta(a).label.localeCompare(catMeta(b).label, "th"));
+    if (!all.length) return;
 
-    top.forEach((key) => {
+    all.forEach((key) => {
       const meta = catMeta(key);
       const iconKey = getIconKeyFromCategory(key);
       const btn = document.createElement("button");
@@ -1636,12 +1663,11 @@ if (!defined('ABSPATH')) exit;
   }
 
   function renderCategoryUIs() {
-    const top = getTopCategoriesFromData(10);
     const all = getAllCategoriesFromData()
       .sort((a,b) => catMeta(a).label.localeCompare(catMeta(b).label, "th"));
     const grid = el("catGrid");
     grid.innerHTML = "";
-    top.forEach(k => grid.appendChild(makeCatButton(k)));
+    all.forEach(k => grid.appendChild(makeCatButton(k)));
     renderMobileQuickCategoryPills();
     renderCategoryModalGrid(all, el("catSearch")?.value || "");
   }
@@ -1818,6 +1844,11 @@ if (!defined('ABSPATH')) exit;
     const primaryCat = getPrimaryCategory(place);
     const meta = catMeta(primaryCat);
     const iconKey = getIconKeyFromCategory(primaryCat);
+    const iconCats = getIconCategoriesForPlace(place, 2);
+    const drawerCatLabels = iconCats.map((c) => catMeta(c).label).filter(Boolean);
+    const drawerCategoryText = drawerCatLabels.length >= 2
+      ? `${drawerCatLabels[0]} / ${drawerCatLabels[1]}`
+      : (drawerCatLabels[0] || meta.label);
 
     const setRowVisible = (id, visible) => {
       const row = el(id);
@@ -1828,10 +1859,21 @@ if (!defined('ABSPATH')) exit;
 
     el("dTitle").textContent = place.name || "";
     el("dDistrict").textContent = place.district ? `เขต${place.district}` : "";
-    el("dCategory").textContent = meta.label;
+    el("dCategory").textContent = drawerCategoryText;
     const dIconEl = el("dIcon");
-    dIconEl.innerHTML = `<span style="color: #ffffff">${svgForDom(iconKey, "icon-20")}</span>`;
-    dIconEl.style.background = meta.color || DEFAULT_CATEGORY_COLOR;
+    if (iconCats.length >= 2) {
+      dIconEl.innerHTML = buildSplitBadgeHtml(iconCats[0], iconCats[1], { width: 46, height: 30, radius: 8, iconSizeClass: "icon-16" });
+      dIconEl.style.background = "transparent";
+      dIconEl.style.width = "46px";
+      dIconEl.style.height = "30px";
+      dIconEl.style.borderRadius = "8px";
+    } else {
+      dIconEl.innerHTML = `<span style="color: #ffffff">${svgForDom(iconKey, "icon-20")}</span>`;
+      dIconEl.style.background = meta.color || DEFAULT_CATEGORY_COLOR;
+      dIconEl.style.width = "35px";
+      dIconEl.style.height = "35px";
+      dIconEl.style.borderRadius = "8px";
+    }
     renderDistanceBadge(place._distanceKm);
     el("dAddress").textContent = place.address || "";
     setRowVisible("rowAddress", !!place.address);
@@ -1856,11 +1898,14 @@ if (!defined('ABSPATH')) exit;
     el("dDescMore")?.classList.add("hidden");
     if (el("dDescMore")) el("dDescMore").textContent = "อ่านทั้งหมด ▼";
 
-    const fallbackGmaps = (typeof place.lat === "number" && typeof place.lng === "number")
+    const looksLikeHttpUrl = (v) => /^https?:\/\//i.test((v || "").trim());
+    const fromAcfMapUrl = (place.map_url || "").trim();
+    const fallbackFromLatLng = (typeof place.lat === "number" && typeof place.lng === "number")
       ? `https://maps.google.com/?q=${place.lat},${place.lng}`
       : "";
-    if (fallbackGmaps) {
-      el("dGmaps").href = fallbackGmaps;
+    const initialGmapsLink = looksLikeHttpUrl(fromAcfMapUrl) ? fromAcfMapUrl : fallbackFromLatLng;
+    if (initialGmapsLink) {
+      el("dGmaps").href = initialGmapsLink;
       setRowVisible("rowGmaps", true);
     } else {
       el("dGmaps").href = "#";
@@ -1961,7 +2006,7 @@ if (!defined('ABSPATH')) exit;
       setRowVisible("rowDesc", !!cleanDesc.trim());
 
       const gmapsLink = (full.links?.googleMaps || "").trim();
-      const finalGmapsLink = gmapsLink || fallbackGmaps;
+      const finalGmapsLink = looksLikeHttpUrl(gmapsLink) ? gmapsLink : fallbackFromLatLng;
       if (finalGmapsLink) {
         el("dGmaps").href = finalGmapsLink;
         setRowVisible("rowGmaps", true);
@@ -2610,21 +2655,25 @@ if (!defined('ABSPATH')) exit;
     const keys = new Set(cats.length ? cats : ["default"]);
     keys.add("default");
 
+    // Prepare pair icon ids from current places (first 2 categories per place)
+    for (const p of allPlaces) {
+      const pair = getIconCategoriesForPlace(p, 2);
+      if (pair.length >= 2) ensurePairIconId(pair[0], pair[1]);
+    }
+
     const tasks = [...keys].map((catKey) => {
       return new Promise((resolve) => {
         const meta = catMeta(catKey);
-        const innerPath = getSvgByKey(meta.iconKey)
-          .replace(/<svg[^>]*>/, "")
-          .replace("</svg>", "");
+        const iconSvg = getSvgByKey(meta.iconKey)
+          .replace(/fill="currentColor"/g, 'fill="#ffffff"')
+          .replace(/<svg\b([^>]*)>/i, '<svg$1 x="14" y="14" width="36" height="36" preserveAspectRatio="xMidYMid meet">');
 
         const fillColor = meta.color || DEFAULT_CATEGORY_COLOR;
 
         const svgString = `
           <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
             <rect x="4" y="4" width="56" height="56" rx="14" fill="${fillColor}" />
-            <g transform="translate(14, 14) scale(1.5)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              ${innerPath}
-            </g>
+            ${iconSvg}
           </svg>
         `.trim();
 
@@ -2646,6 +2695,54 @@ if (!defined('ABSPATH')) exit;
       });
     });
 
+    // Pair markers (horizontal split)
+    for (const [sig, pairId] of PAIR_ICON_REGISTRY.entries()) {
+      tasks.push(new Promise((resolve) => {
+        const [catA, catB] = sig.split("||");
+        const mA = catMeta(catA);
+        const mB = catMeta(catB);
+        const iconA = getSvgByKey(getIconKeyFromCategory(catA))
+          .replace(/fill="currentColor"/g, 'fill="#ffffff"')
+          .replace(/<svg\b([^>]*)>/i, '<svg$1 x="18" y="24" width="22" height="22" preserveAspectRatio="xMidYMid meet">');
+        const iconB = getSvgByKey(getIconKeyFromCategory(catB))
+          .replace(/fill="currentColor"/g, 'fill="#ffffff"')
+          .replace(/<svg\b([^>]*)>/i, '<svg$1 x="60" y="24" width="22" height="22" preserveAspectRatio="xMidYMid meet">');
+
+        const svgString = `
+          <svg width="100" height="72" viewBox="0 0 100 72" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <clipPath id="cp-${pairId}">
+                <rect x="4" y="8" width="92" height="56" rx="18" />
+              </clipPath>
+            </defs>
+            <g clip-path="url(#cp-${pairId})">
+              <rect x="4" y="8" width="92" height="56" fill="${mA.color || DEFAULT_CATEGORY_COLOR}" />
+              <rect x="50" y="8" width="46" height="56" fill="${mB.color || DEFAULT_CATEGORY_COLOR}" />
+            </g>
+            <rect x="4.5" y="8.5" width="91" height="55" rx="17.5" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1" />
+            <line x1="50" y1="12" x2="50" y2="60" stroke="#ffffff" stroke-opacity="0.45" stroke-width="1" />
+            ${iconA}
+            ${iconB}
+          </svg>
+        `.trim();
+
+        const img = new Image();
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        img.onload = () => {
+          try {
+            const id = `blm-${pairId}`;
+            if (map.hasImage(id)) map.removeImage(id);
+            map.addImage(id, img, { pixelRatio: 2 });
+          } catch (e) { console.error("Map pair image error:", e); }
+          URL.revokeObjectURL(url);
+          resolve();
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        img.src = url;
+      }));
+    }
+
     return Promise.all(tasks);
   }
 
@@ -2658,12 +2755,13 @@ if (!defined('ABSPATH')) exit;
         .map(p => {
           const primaryCat = getPrimaryCategory(p);
           const categoryKey = primaryCat || "default";
-          const iconKey = `blm-${categoryKey}`;
+          const iconKey = getMapIconIdForPlace(p);
+          const isPair = String(iconKey).startsWith("blm-pair-");
           return {
             type: "Feature",
             id: p.id,
             geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-            properties: { id: p.id, category: categoryKey, district: p.district || "", name: p.name || "", iconKey }
+            properties: { id: p.id, category: categoryKey, district: p.district || "", name: p.name || "", iconKey, isPair }
           };
         })
     };
@@ -2714,7 +2812,7 @@ if (!defined('ABSPATH')) exit;
       filter: ["!", ["has", "point_count"]],
       layout: {
         "icon-image": ["get", "iconKey"],
-        "icon-size": 1.2,
+        "icon-size": 1.38,
         "icon-allow-overlap": true,
         "icon-ignore-placement": true,
         "icon-anchor": "center"
@@ -2743,7 +2841,7 @@ if (!defined('ABSPATH')) exit;
       filter: ["all", ["!", ["has", "point_count"]], ["==", ["to-string", ["get", "id"]], ""]],
       layout: {
         "icon-image": ["get", "iconKey"],
-        "icon-size": 1.55,
+        "icon-size": 1.75,
         "icon-allow-overlap": true,
         "icon-ignore-placement": true,
         "icon-anchor": "center"
@@ -2757,7 +2855,7 @@ if (!defined('ABSPATH')) exit;
       filter: ["all", ["!", ["has", "point_count"]], ["==", ["to-string", ["get", "id"]], ""]],
       layout: {
         "icon-image": ["get", "iconKey"],
-        "icon-size": 1.6,
+        "icon-size": 1.8,
         "icon-allow-overlap": true,
         "icon-ignore-placement": true,
         "icon-anchor": "center"
@@ -2775,7 +2873,12 @@ if (!defined('ABSPATH')) exit;
         "text-font": ["Anuphan-SemiBold"],
         "text-size": 14,
         "text-anchor": "left",
-        "text-offset": [1.8, 0],
+        "text-offset": [
+          "case",
+          ["boolean", ["get", "isPair"], false],
+          ["literal", [2.55, 0]],
+          ["literal", [1.8, 0]]
+        ],
         "text-max-width": 10,
         "text-line-height": 1.1,
         "text-justify": "left"
@@ -2848,13 +2951,16 @@ if (!defined('ABSPATH')) exit;
     const primaryCat = getPrimaryCategory(place);
     const meta = catMeta(primaryCat);
     const iconKey = getIconKeyFromCategory(primaryCat);
+    const iconCats = getIconCategoriesForPlace(place, 2);
+    const catLabels = iconCats.map((c) => catMeta(c).label).filter(Boolean);
+    const categoryLabel = catLabels.length >= 2 ? `${catLabels[0]} / ${catLabels[1]}` : (catLabels[0] || meta.label);
     const distText = userLocation ? `ห่างจากคุณ ${formatKm(place._distanceKm)}` : "";
     const listImage = place?.list_image || null;
     const listImageSrc = listImage?.thumb || listImage?.medium || listImage?.large || BLM_LIST_PLACEHOLDER;
     const isPlaceholderImage = listImageSrc === BLM_LIST_PLACEHOLDER;
     const imageBgColor = isPlaceholderImage ? "#f1f1f1" : "#e2e8f0";
     const nameText = escHtml(place?.name || "");
-    const districtText = escHtml(`${meta.label}${place.district ? (" : เขต" + place.district) : ""}`);
+    const districtText = escHtml(`${categoryLabel}${place.district ? (" : เขต" + place.district) : ""}`);
     const tagsHtml = (place.tags || [])
       .slice(0, 4)
       .map((t) => `<span class="text-[11px] px-2 py-[1px] rounded-full border bg-white">${escHtml(t)}</span>`)
@@ -2862,12 +2968,16 @@ if (!defined('ABSPATH')) exit;
     const distanceText = escHtml(distText);
     const imageAlt = nameText || "สถานที่";
 
+    const badgeHtml = iconCats.length >= 2
+      ? buildSplitBadgeHtml(iconCats[0], iconCats[1], { width: 44, height: 30, radius: 8, iconSizeClass: "icon-16" })
+      : `<span class="inline-flex items-center justify-center rounded-lg text-white icon-18" style="width:35px;height:35px;background:${meta.color || DEFAULT_CATEGORY_COLOR}">${svgForDom(iconKey, "icon-18")}</span>`;
+
     const card = document.createElement("button");
     card.type = "button";
     card.className = "w-full text-left p-4 rounded-xl bg-white border hover:shadow-sm transition";
     card.innerHTML = `
       <div class="flex items-start gap-3">
-        <div class="shrink-0 mt-0.5 w-[35px] h-[35px] rounded-lg text-white flex items-center justify-center" style="background:${meta.color}">${svgForDom(iconKey, "icon-18")}</div>
+        <div class="shrink-0 mt-0.5">${badgeHtml}</div>
         <div class="min-w-0 flex-1">
           <div class="font-semibold leading-snug text-[16px]">
             <span>${nameText}</span>
@@ -2930,13 +3040,17 @@ if (!defined('ABSPATH')) exit;
 
     card.addEventListener("mouseenter", () => {
       if (!map) return;
-      map.setFilter("places-unclustered-hover", ["==", ["to-string", ["get", "id"]], String(place.id)]);
+      if (map.getLayer("places-unclustered-hover")) {
+        map.setFilter("places-unclustered-hover", ["==", ["to-string", ["get", "id"]], String(place.id)]);
+      }
       startHoverShake();
     });
 
     card.addEventListener("mouseleave", () => {
       if (!map) return;
-      map.setFilter("places-unclustered-hover", ["==", ["to-string", ["get", "id"]], ""]);
+      if (map.getLayer("places-unclustered-hover")) {
+        map.setFilter("places-unclustered-hover", ["==", ["to-string", ["get", "id"]], ""]);
+      }
       stopHoverShake();
     });
 
@@ -2950,16 +3064,26 @@ if (!defined('ABSPATH')) exit;
     return card;
   }
 
-  function renderList(places) {
+  function renderList(places, options = {}) {
+    const append = !!options.append;
     const list = el("list");
     const listMobile = el("listMobile");
-    if (list) list.innerHTML = "";
-    if (listMobile) listMobile.innerHTML = "";
+    if (!append) {
+      if (list) list.innerHTML = "";
+      if (listMobile) listMobile.innerHTML = "";
+    }
 
-    if (places.length === 0) {
+    if (!append && places.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "p-4 rounded-xl bg-white border text-slate-600";
-      empty.textContent = "ไม่พบสถานที่ในกรอบแผนที่/เงื่อนไขนี้";
+      empty.className = "py-8 text-center text-slate-600 flex flex-col items-center justify-center gap-2";
+      empty.innerHTML = `
+        <span class="icon-24 text-slate-500" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+            <path d="M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640H447l-80-80H160v480l96-320h684L837-217q-8 26-29.5 41.5T760-160H160Zm84-80h516l72-240H316l-72 240Zm0 0 72-240-72 240Zm-84-400v-80 80Z"/>
+          </svg>
+        </span>
+        <span>ไม่พบสถานที่ในกรอบแผนที่/ตัวกรองนี้</span>
+      `.trim();
       if (list) list.appendChild(empty.cloneNode(true));
       if (listMobile) listMobile.appendChild(empty);
       return;
@@ -2973,25 +3097,101 @@ if (!defined('ABSPATH')) exit;
 
   function renderLoadMoreUI(total, shown) {
     const hasMore = total > shown;
-    [el("btnLoadMoreDesktop"), el("btnLoadMoreMobile")].forEach(b => b?.classList.toggle("hidden", !hasMore));
+    [el("btnLoadMoreDesktop"), el("btnLoadMoreMobile")].forEach((b) => {
+      if (!b) return;
+      // Infinite load mode: keep buttons hidden (fallback click handler still attached)
+      b.classList.add("hidden");
+      b.disabled = isLoadingMore;
+      b.classList.toggle("opacity-60", isLoadingMore);
+      b.classList.toggle("cursor-not-allowed", isLoadingMore);
+      b.textContent = isLoadingMore ? "กำลังโหลดเพิ่ม..." : "โหลดเพิ่ม";
+    });
     [el("loadMoreHintDesktop"), el("loadMoreHintMobile")].forEach(h => {
       if (h) {
-        h.classList.toggle("hidden", !hasMore);
-        h.textContent = hasMore ? `แสดง ${shown} จาก ${total} รายการ` : "";
+        h.classList.toggle("hidden", !hasMore && !isLoadingMore);
+        h.textContent = isLoadingMore
+          ? "กำลังโหลดเพิ่ม..."
+          : (hasMore ? `แสดง ${shown} จาก ${total} รายการ • เลื่อนลงเพื่อโหลดเพิ่ม` : "");
       }
     });
   }
 
-  function applyLoadMore() {
-    listLimit += LIST_PAGE_SIZE;
-    const slice = lastVisible.slice(0, listLimit);
-    renderList(slice);
-    renderLoadMoreUI(lastVisible.length, slice.length);
+  async function applyLoadMore() {
+    if (isLoadingMore) return;
+    const prevLimit = Math.min(listLimit, lastVisible.length);
+    if (prevLimit >= lastVisible.length) return;
+
+    isLoadingMore = true;
+    renderLoadMoreUI(lastVisible.length, prevLimit);
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+
+    listLimit = Math.min(listLimit + LIST_PAGE_SIZE, lastVisible.length);
+    const appendSlice = lastVisible.slice(prevLimit, listLimit);
+    renderList(appendSlice, { append: true });
+
+    isLoadingMore = false;
+    renderLoadMoreUI(lastVisible.length, listLimit);
+  }
+
+  function setupInfiniteLoadObservers() {
+    infiniteDesktopObserver?.disconnect?.();
+    infiniteMobileObserver?.disconnect?.();
+
+    const desktopRoot = el("listSectionDesktop");
+    const desktopTarget = el("infiniteSentinelDesktop");
+    if (desktopRoot && desktopTarget && "IntersectionObserver" in window) {
+      infiniteDesktopObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          if (!isElementActuallyVisible(desktopRoot)) continue;
+          applyLoadMore();
+        }
+      }, { root: desktopRoot, rootMargin: `0px 0px ${INFINITE_LOAD_OFFSET_PX}px 0px`, threshold: 0.01 });
+      infiniteDesktopObserver.observe(desktopTarget);
+    }
+
+    const mobileRoot = el("listSectionMobile");
+    const mobileTarget = el("infiniteSentinelMobile");
+    if (mobileRoot && mobileTarget && "IntersectionObserver" in window) {
+      infiniteMobileObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          if (!isElementActuallyVisible(mobileRoot)) continue;
+          applyLoadMore();
+        }
+      }, { root: mobileRoot, rootMargin: `0px 0px ${INFINITE_LOAD_OFFSET_PX}px 0px`, threshold: 0.01 });
+      infiniteMobileObserver.observe(mobileTarget);
+    }
+  }
+
+  function getActiveListContainer() {
+    if (isMobile()) return el("listSectionMobile");
+    return el("listSectionDesktop");
+  }
+
+  function isElementActuallyVisible(node) {
+    if (!node) return false;
+    const style = window.getComputedStyle(node);
+    return style.display !== "none" && style.visibility !== "hidden";
+  }
+
+  function maybeTriggerInfiniteLoad(container = null) {
+    if (isLoadingMore) return;
+    if (listLimit >= lastVisible.length) return;
+    const root = container || getActiveListContainer();
+    if (!root || !isElementActuallyVisible(root)) return;
+    const canScrollInRoot = root.scrollHeight > (root.clientHeight + 4);
+    if (!canScrollInRoot) return;
+    if (root.scrollTop <= 0) return;
+    const remain = root.scrollHeight - (root.scrollTop + root.clientHeight);
+    if (remain <= INFINITE_LOAD_OFFSET_PX) applyLoadMore();
   }
 
   // ================= REFRESH =================
   function refresh() {
     if (!map) return;
+    isLoadingMore = false;
     computeDistances();
 
     const visible = allPlaces
@@ -3020,6 +3220,7 @@ if (!defined('ABSPATH')) exit;
     renderLoadMoreUI(visible.length, slice.length);
 
     syncPlacesSource(visible);
+    syncNearRadiusOverlay();
 
     if (selectedId) {
       const p = allPlaces.find(x => x.id === selectedId);
@@ -3059,24 +3260,12 @@ if (!defined('ABSPATH')) exit;
     }, { enableHighAccuracy: true });
   }
 
-  function toggleNearMe() {
-    state.nearMeEnabled = !state.nearMeEnabled;
-    el("nearMeRadiusWrap").classList.toggle("hidden", !state.nearMeEnabled);
-    el("chipNearMe").textContent = state.nearMeEnabled ? "ใกล้ฉัน: เปิด" : "ใกล้ฉัน: ปิด";
-    el("chipNearMe").className = state.nearMeEnabled
-      ? "px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
-      : "px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50";
-    resetListLimit();
-    refresh();
-    writeUrlFromState("push");
-    saveLocationCache();
-  }
-
   // ================= LOAD DATA =================
   async function loadPlaces() {
     try {
       setApiLoading(true, "กำลังโหลดสถานที่...");
-      const res = await fetch(`${BLM_API_BASE}/locations-light`, {
+      const res = await fetch(withNoCache(`${BLM_API_BASE}/locations-light`), {
+        cache: "no-store",
         headers: { Accept: "application/json" }
       });
       if (!res.ok) {
@@ -3112,7 +3301,8 @@ if (!defined('ABSPATH')) exit;
 
   async function loadFilters() {
     try {
-      const res = await fetch(`${BLM_API_BASE}/filters`, {
+      const res = await fetch(withNoCache(`${BLM_API_BASE}/filters`), {
+        cache: "no-store",
         headers: { Accept: "application/json" }
       });
       if (!res.ok) return;
@@ -3175,21 +3365,40 @@ if (!defined('ABSPATH')) exit;
 
     bindTap(el("btnLocate"), requestLocation);
     bindTap(el("btnLocateMobile"), requestLocation);
+    updateRadiusLabel();
+    setNearMeChipUI();
 
-    el("chipNearMe")?.addEventListener("click", () => {
-      if (!userLocation) requestLocation();
-      else toggleNearMe();
+    el("nearMeSwitch")?.addEventListener("change", (e) => {
+      if (!userLocation) {
+        requestLocation();
+        e.target.checked = false;
+        return;
+      }
+      state.nearMeEnabled = !!e.target.checked;
+      el("nearMeRadiusWrap").classList.toggle("hidden", !state.nearMeEnabled);
+      setNearMeChipUI();
+      resetListLimit();
+      refresh();
+      syncMapZoomToRadius(state.radiusKm, { duration: 220 });
+      writeUrlFromState("push");
+      saveLocationCache();
     });
 
     el("radiusKm")?.addEventListener("input", () => {
-      state.radiusKm = Number(el("radiusKm").value || 5);
+      state.radiusKm = normalizeRadiusKm(el("radiusKm").value || 5);
+      el("radiusKm").value = state.radiusKm;
+      updateRadiusLabel();
       if (state.nearMeEnabled) refresh();
+      syncMapZoomToRadius(state.radiusKm, { duration: 120 });
       writeUrlFromState("replace");
       saveLocationCache();
     });
 
     el("btnLoadMoreDesktop")?.addEventListener("click", applyLoadMore);
     el("btnLoadMoreMobile")?.addEventListener("click", applyLoadMore);
+    setupInfiniteLoadObservers();
+    el("listSectionDesktop")?.addEventListener("scroll", () => maybeTriggerInfiniteLoad(el("listSectionDesktop")), { passive: true });
+    el("listSectionMobile")?.addEventListener("scroll", () => maybeTriggerInfiniteLoad(el("listSectionMobile")), { passive: true });
     el("btnSheetToggle")?.addEventListener("click", () => {
       if (Date.now() < suppressSheetHandleClickUntil) return;
       mobileSheetExpanded = !mobileSheetExpanded;
@@ -3333,8 +3542,8 @@ if (!defined('ABSPATH')) exit;
       if (!btn) return;
       const value = btn.dataset.courseCat;
       if (!value) return;
-      if (state.courseCategories.has(value)) state.courseCategories.delete(value);
-      else state.courseCategories.add(value);
+      state.courseMode = state.courseMode === value ? "" : value;
+      state.courseCategories.clear();
       syncCourseCategoryUI();
       resetListLimit();
       refresh();
@@ -3346,8 +3555,8 @@ if (!defined('ABSPATH')) exit;
       if (!btn) return;
       const value = btn.dataset.courseCat;
       if (!value) return;
-      if (state.courseCategories.has(value)) state.courseCategories.delete(value);
-      else state.courseCategories.add(value);
+      state.courseMode = state.courseMode === value ? "" : value;
+      state.courseCategories.clear();
       syncCourseCategoryUI();
       resetListLimit();
       refresh();
@@ -3356,6 +3565,7 @@ if (!defined('ABSPATH')) exit;
 
     function clearCourseCategories() {
       state.courseCategories.clear();
+      state.courseMode = "";
       syncCourseCategoryUI();
       renderCourseCategoryPillsTop();
       renderCourseCategoryModalGrid(el("courseCatSearch")?.value || "");
@@ -3402,6 +3612,7 @@ if (!defined('ABSPATH')) exit;
       state.amenities.clear();
       state.admissionPolicies.clear();
       state.courseCategories.clear();
+      state.courseMode = "";
       state.nearMeEnabled = false;
 
       searchQuery = "";
@@ -3417,9 +3628,7 @@ if (!defined('ABSPATH')) exit;
       syncCourseCategoryUI();
 
       el("nearMeRadiusWrap").classList.add("hidden");
-      el("chipNearMe").textContent = "ใกล้ฉัน: ปิด";
-      el("chipNearMe").className =
-        "px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50";
+      setNearMeChipUI();
 
     renderCategoryUIs();
     renderCourseCategoryPillsTop();
@@ -3506,6 +3715,8 @@ if (!defined('ABSPATH')) exit;
       style: MAPTILER_STYLE,
       center: initialCenter,
       zoom: initialZoom,
+      minZoom: TH_MIN_ZOOM,
+      maxBounds: TH_BOUNDS,
       transformRequest: (url, resourceType) => {
         if (resourceType === "Glyphs" || url.endsWith(".pbf")) {
           const match = /\/fonts\/([^/]+)\/(\d+-\d+)\.pbf/.exec(url);
@@ -3531,6 +3742,7 @@ if (!defined('ABSPATH')) exit;
     map.on("load", async () => {
       await addSvgImagesToMap();
       ensurePlacesLayers();
+      ensureNearRadiusLayers();
       if (userLocation) {
         el("locStatus").textContent = "ใช้ตำแหน่งปัจจุบันอยู่";
         el("nearMeWrap").classList.remove("hidden");

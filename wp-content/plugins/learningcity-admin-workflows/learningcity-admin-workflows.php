@@ -1370,6 +1370,126 @@ function lcaw_pexels_search_first_photo($query, $api_key) {
     ];
 }
 
+function lcaw_pexels_fetch_photos($query, $api_key, $per_page = 20, $page = 1) {
+    $query = trim((string) $query);
+    $api_key = trim((string) $api_key);
+    $per_page = max(1, min(80, (int) $per_page));
+    $page = max(1, (int) $page);
+    if ($query === '' || $api_key === '') return [];
+
+    $url = add_query_arg([
+        'query' => $query,
+        'per_page' => $per_page,
+        'page' => $page,
+        'orientation' => 'landscape',
+        'size' => 'large',
+    ], 'https://api.pexels.com/v1/search');
+
+    $res = wp_remote_get($url, [
+        'timeout' => 20,
+        'headers' => [
+            'Authorization' => $api_key,
+        ],
+    ]);
+
+    if (is_wp_error($res)) return [];
+    $code = (int) wp_remote_retrieve_response_code($res);
+    if ($code < 200 || $code >= 300) return [];
+
+    $body = wp_remote_retrieve_body($res);
+    $data = json_decode($body, true);
+    if (!is_array($data) || empty($data['photos']) || !is_array($data['photos'])) return [];
+    return $data['photos'];
+}
+
+function lcaw_map_pexels_photo($photo) {
+    if (!is_array($photo)) return null;
+    $src = isset($photo['src']) && is_array($photo['src']) ? $photo['src'] : [];
+    $image_url = '';
+    foreach (['landscape', 'large2x', 'large', 'original'] as $k) {
+        if (!empty($src[$k]) && is_string($src[$k])) {
+            $image_url = $src[$k];
+            break;
+        }
+    }
+    if ($image_url === '') return null;
+
+    return [
+        'image_url' => $image_url,
+        'photographer' => isset($photo['photographer']) ? (string) $photo['photographer'] : '',
+        'photographer_url' => isset($photo['photographer_url']) ? (string) $photo['photographer_url'] : '',
+        'photo_url' => isset($photo['url']) ? (string) $photo['url'] : '',
+        'pexels_id' => isset($photo['id']) ? (int) $photo['id'] : 0,
+    ];
+}
+
+function lcaw_pexels_search_alternative_photo($query, $api_key, $exclude_pexels_id = 0, $cursor = 0) {
+    $exclude_pexels_id = (int) $exclude_pexels_id;
+    $cursor = max(0, (int) $cursor);
+
+    $pages = [1, 2];
+    foreach ($pages as $page) {
+        $photos = lcaw_pexels_fetch_photos($query, $api_key, 20, $page);
+        if (empty($photos)) continue;
+
+        $count = count($photos);
+        for ($i = 0; $i < $count; $i++) {
+            $idx = ($cursor + $i) % $count;
+            $mapped = lcaw_map_pexels_photo($photos[$idx]);
+            if (!$mapped || empty($mapped['image_url'])) continue;
+            if ($exclude_pexels_id > 0 && (int) $mapped['pexels_id'] === $exclude_pexels_id) continue;
+            return [
+                'photo' => $mapped,
+                'next_cursor' => ($idx + 1) % max(1, $count),
+            ];
+        }
+    }
+
+    return null;
+}
+
+function lcaw_pexels_search_mapped_photos($query, $api_key, $limit = 5, $page = 1) {
+    $limit = max(1, min(20, (int) $limit));
+    $photos = lcaw_pexels_fetch_photos($query, $api_key, $limit, $page);
+    if (empty($photos)) return [];
+
+    $mapped = [];
+    foreach ($photos as $photo) {
+        $item = lcaw_map_pexels_photo($photo);
+        if (!$item || empty($item['image_url'])) continue;
+        $mapped[] = $item;
+        if (count($mapped) >= $limit) break;
+    }
+    return $mapped;
+}
+
+function lcaw_apply_pexels_photo_to_course($post_id, $photo, $query = '', $success_message = '') {
+    $post_id = (int) $post_id;
+    if ($post_id <= 0 || !is_array($photo) || empty($photo['image_url'])) {
+        return ['status' => 'error', 'message' => 'invalid_photo', 'query' => (string) $query];
+    }
+
+    $desc = 'Featured image for course #' . (int) $post_id;
+    $attachment_id = lcaw_attach_external_image_to_post((string) $photo['image_url'], $post_id, $desc);
+    if ($attachment_id <= 0) {
+        lcaw_set_featured_status($post_id, 'error', 'ดาวน์โหลด/แนบรูปไม่สำเร็จ', (string) $query);
+        return ['status' => 'error', 'message' => 'ดาวน์โหลด/แนบรูปไม่สำเร็จ', 'query' => (string) $query];
+    }
+
+    set_post_thumbnail($post_id, $attachment_id);
+    update_post_meta($post_id, '_lcaw_featured_source', 'pexels');
+    update_post_meta($post_id, '_lcaw_featured_photographer', (string) ($photo['photographer'] ?? ''));
+    update_post_meta($post_id, '_lcaw_featured_photographer_url', (string) ($photo['photographer_url'] ?? ''));
+    update_post_meta($post_id, '_lcaw_featured_photo_url', (string) ($photo['photo_url'] ?? ''));
+    update_post_meta($post_id, '_lcaw_featured_pexels_id', (int) ($photo['pexels_id'] ?? 0));
+    update_post_meta($post_id, '_lcaw_featured_last_query', sanitize_text_field((string) $query));
+
+    $msg = $success_message !== '' ? $success_message : 'ตั้ง Featured Image จาก Pexels สำเร็จ';
+    lcaw_set_featured_status($post_id, 'success', $msg, (string) $query);
+
+    return ['status' => 'success', 'message' => $msg, 'query' => (string) $query];
+}
+
 function lcaw_attach_external_image_to_post($image_url, $post_id, $desc = '') {
     if (!function_exists('media_sideload_image')) {
         require_once ABSPATH . 'wp-admin/includes/media.php';
@@ -1446,36 +1566,99 @@ function lcaw_generate_featured_for_course($post_id, $force_overwrite = false, $
         return ['status' => 'error', 'message' => 'ไม่พบรูปจาก Pexels (' . $query_source . ')', 'query' => $query_text];
     }
 
-    $desc = 'Featured image for course #' . (int) $post_id;
-    $attachment_id = lcaw_attach_external_image_to_post($photo['image_url'], $post_id, $desc);
-    if ($attachment_id <= 0) {
-        lcaw_set_featured_status($post_id, 'error', 'ดาวน์โหลด/แนบรูปไม่สำเร็จ', $used_query);
-        return ['status' => 'error', 'message' => 'ดาวน์โหลด/แนบรูปไม่สำเร็จ', 'query' => $used_query];
+    return lcaw_apply_pexels_photo_to_course(
+        $post_id,
+        $photo,
+        $used_query,
+        'ตั้ง Featured Image จาก Pexels สำเร็จ (' . $query_source . ')'
+    );
+}
+
+function lcaw_generate_featured_alternative_for_course($post_id) {
+    $post_id = (int) $post_id;
+    $post = get_post($post_id);
+    if (!$post || $post->post_type !== 'course') {
+        return ['status' => 'error', 'message' => 'invalid_course', 'query' => ''];
     }
 
-    set_post_thumbnail($post_id, $attachment_id);
-    update_post_meta($post_id, '_lcaw_featured_source', 'pexels');
-    update_post_meta($post_id, '_lcaw_featured_photographer', (string) ($photo['photographer'] ?? ''));
-    update_post_meta($post_id, '_lcaw_featured_photographer_url', (string) ($photo['photographer_url'] ?? ''));
-    update_post_meta($post_id, '_lcaw_featured_photo_url', (string) ($photo['photo_url'] ?? ''));
-    update_post_meta($post_id, '_lcaw_featured_pexels_id', (int) ($photo['pexels_id'] ?? 0));
-    lcaw_set_featured_status($post_id, 'success', 'ตั้ง Featured Image จาก Pexels สำเร็จ (' . $query_source . ')', $used_query);
-    return ['status' => 'success', 'message' => 'ตั้ง Featured Image จาก Pexels สำเร็จ (' . $query_source . ')', 'query' => $used_query];
+    $api_key = lcaw_get_pexels_api_key();
+    if ($api_key === '') {
+        lcaw_set_featured_status($post_id, 'error', 'ไม่พบ Pexels API Key');
+        return ['status' => 'error', 'message' => 'ไม่พบ Pexels API Key', 'query' => ''];
+    }
+
+    $query = trim((string) get_post_meta($post_id, '_lcaw_featured_last_query', true));
+    if ($query === '') {
+        $use_translate = lcaw_get_option('lcaw_pexels_translate_to_en', '1') === '1';
+        $queries = lcaw_get_course_category_queries($post_id, $use_translate);
+        if (empty($queries)) $queries = lcaw_get_course_title_queries($post_id, $use_translate);
+        $query = !empty($queries) ? (string) $queries[0] : '';
+    }
+    if ($query === '') {
+        lcaw_set_featured_status($post_id, 'error', 'ไม่พบคำค้นสำหรับเปลี่ยนรูป');
+        return ['status' => 'error', 'message' => 'ไม่พบคำค้นสำหรับเปลี่ยนรูป', 'query' => ''];
+    }
+
+    $current_pexels_id = (int) get_post_meta($post_id, '_lcaw_featured_pexels_id', true);
+    $cursor = (int) get_post_meta($post_id, '_lcaw_featured_query_cursor', true);
+    $picked = lcaw_pexels_search_alternative_photo($query, $api_key, $current_pexels_id, $cursor);
+    if (!$picked || empty($picked['photo']['image_url'])) {
+        lcaw_set_featured_status($post_id, 'error', 'ไม่พบรูปอื่นจากผลค้นหาเดิม', $query);
+        return ['status' => 'error', 'message' => 'ไม่พบรูปอื่นจากผลค้นหาเดิม', 'query' => $query];
+    }
+
+    $photo = $picked['photo'];
+    $result = lcaw_apply_pexels_photo_to_course(
+        $post_id,
+        $photo,
+        $query,
+        'เปลี่ยนรูปจากผลค้นหา Pexels สำเร็จ'
+    );
+    if (($result['status'] ?? 'error') !== 'success') {
+        return $result;
+    }
+
+    update_post_meta($post_id, '_lcaw_featured_query_cursor', (int) ($picked['next_cursor'] ?? 0));
+    return ['status' => 'success', 'message' => 'เปลี่ยนรูปจากผลค้นหา Pexels สำเร็จ', 'query' => $query];
 }
 
 if (!function_exists('lcaw_get_featured_status_html')) {
     function lcaw_get_featured_status_html($post_id) {
         $html = '<div class="lcaw-featured-status" style="margin-top:10px;padding-top:10px;border-top:1px solid #dcdcde;line-height:1.5;">';
-        $html .= '<strong>Pexels Featured Image</strong>';
+        $html .= '<strong>ค้นหาภาพ Stock ฟรี</strong>';
+        $ajax_nonce = wp_create_nonce('lcaw_featured_ajax_' . (int) $post_id);
 
-        $find_url = wp_nonce_url(
-            admin_url('admin-post.php?action=lcaw_find_course_image&post_id=' . (int) $post_id),
-            'lcaw_find_course_image_' . (int) $post_id
-        );
-        $html .= '<div style="margin-top:8px;">';
-        $html .= '<a class="button button-small" href="' . esc_url($find_url) . '">ค้นหารูปจาก Pexels</a>';
+        $saved_keyword = (string) get_post_meta($post_id, '_lcaw_featured_manual_keyword', true);
+        $results = get_post_meta($post_id, '_lcaw_featured_manual_results', true);
+        if (!is_array($results)) $results = [];
+        $panel_open = (!empty($saved_keyword) || !empty($results));
+
+        $html .= '<div class="lcaw-featured-tools" data-post-id="' . (int) $post_id . '" data-nonce="' . esc_attr($ajax_nonce) . '" data-open="' . ($panel_open ? '1' : '0') . '" style="margin-top:8px;">';
+        $html .= '<button type="button" class="button button-small lcaw-btn-toggle-panel">' . ($panel_open ? 'ซ่อนแผงค้นหารูป' : 'เปิดแผงค้นหารูป') . '</button>';
         $html .= '</div>';
 
+        $html .= '<div class="lcaw-panel" style="margin-top:12px;' . ($panel_open ? '' : 'display:none;') . '">';
+        $html .= '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+        $html .= '<input type="text" class="lcaw-keyword" value="' . esc_attr($saved_keyword) . '" placeholder="พิมพ์ keyword เพื่อค้นหารูป" style="min-width:220px;">';
+        $html .= '<button type="button" class="button button-small lcaw-btn-search">ค้นหา</button>';
+        $html .= '<button type="button" class="button button-small lcaw-btn-shuffle">สุ่มใหม่</button>';
+        $html .= '</div>';
+
+        if (!empty($results)) {
+            $html .= '<div style="margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">';
+            foreach ($results as $idx => $item) {
+                if (!is_array($item) || empty($item['image_url'])) continue;
+                $html .= '<div style="border:1px solid #dcdcde;border-radius:6px;padding:6px;background:#fff;">';
+                $html .= '<img src="' . esc_url((string) $item['image_url']) . '" alt="" style="width:100%;height:70px;object-fit:cover;border-radius:4px;">';
+                $html .= '<button type="button" class="button button-small lcaw-btn-pick" data-idx="' . (int) $idx . '" style="margin-top:6px;width:100%;text-align:center;">ใช้รูปนี้</button>';
+                $html .= '</div>';
+            }
+            $html .= '</div>';
+        }
+
+        $html .= '<div class="lcaw-feedback" style="margin-top:8px;font-size:12px;color:#646970;"></div>';
+
+        $html .= '</div>';
         $html .= '</div>';
         return $html;
     }
@@ -1571,16 +1754,567 @@ add_action('admin_post_lcaw_find_course_image', function () {
         $result = lcaw_generate_featured_for_course($post_id, false, false);
     }
 
-    // Stay on current edit screen when triggered from post editor.
-    $referer = wp_get_referer();
-    $fallback = get_edit_post_link($post_id, 'raw');
-    $redirect_url = $referer ? $referer : $fallback;
-    if (!$redirect_url) {
-        $redirect_url = admin_url('post.php?post=' . (int) $post_id . '&action=edit');
-    }
+    $redirect_url = admin_url('post.php?post=' . (int) $post_id . '&action=edit');
 
     wp_safe_redirect($redirect_url);
     exit;
+});
+
+add_action('admin_post_lcaw_change_course_image', function () {
+    $post_id = isset($_GET['post_id']) ? (int) $_GET['post_id'] : 0;
+    if ($post_id <= 0) wp_die('Invalid post ID');
+    if (!current_user_can('edit_post', $post_id)) wp_die('Forbidden');
+    check_admin_referer('lcaw_change_course_image_' . $post_id);
+
+    lcaw_generate_featured_alternative_for_course($post_id);
+
+    $redirect_url = admin_url('post.php?post=' . (int) $post_id . '&action=edit');
+
+    wp_safe_redirect($redirect_url);
+    exit;
+});
+
+add_action('admin_post_lcaw_search_course_image', function () {
+    $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
+    if ($post_id <= 0) wp_die('Invalid post ID');
+    if (!current_user_can('edit_post', $post_id)) wp_die('Forbidden');
+    check_admin_referer('lcaw_search_course_image_' . $post_id);
+
+    $keyword = isset($_POST['keyword']) ? sanitize_text_field((string) $_POST['keyword']) : '';
+    $keyword = trim($keyword);
+    $prev_keyword = (string) get_post_meta($post_id, '_lcaw_featured_manual_keyword', true);
+    $manual_page = (int) get_post_meta($post_id, '_lcaw_featured_manual_page', true);
+    if ($manual_page < 1) $manual_page = 0;
+    $next_page = ($keyword !== '' && $keyword === $prev_keyword) ? ($manual_page + 1) : 1;
+
+    update_post_meta($post_id, '_lcaw_featured_manual_keyword', $keyword);
+
+    $results = [];
+    if ($keyword !== '') {
+        $api_key = lcaw_get_pexels_api_key();
+        if ($api_key !== '') {
+            $results = lcaw_pexels_search_mapped_photos($keyword, $api_key, 5, $next_page);
+            if (empty($results) && $next_page > 1) {
+                $next_page = 1;
+                $results = lcaw_pexels_search_mapped_photos($keyword, $api_key, 5, $next_page);
+            }
+        }
+    }
+    update_post_meta($post_id, '_lcaw_featured_manual_results', $results);
+    update_post_meta($post_id, '_lcaw_featured_manual_page', $next_page);
+
+    $redirect_url = admin_url('post.php?post=' . (int) $post_id . '&action=edit');
+
+    wp_safe_redirect($redirect_url);
+    exit;
+});
+
+add_action('admin_post_lcaw_pick_course_image', function () {
+    $post_id = isset($_GET['post_id']) ? (int) $_GET['post_id'] : 0;
+    $idx = isset($_GET['idx']) ? (int) $_GET['idx'] : -1;
+    if ($post_id <= 0 || $idx < 0) wp_die('Invalid request');
+    if (!current_user_can('edit_post', $post_id)) wp_die('Forbidden');
+    check_admin_referer('lcaw_pick_course_image_' . $post_id);
+
+    $results = get_post_meta($post_id, '_lcaw_featured_manual_results', true);
+    if (!is_array($results) || empty($results[$idx]) || !is_array($results[$idx])) {
+        wp_safe_redirect(get_edit_post_link($post_id, 'raw'));
+        exit;
+    }
+
+    $keyword = (string) get_post_meta($post_id, '_lcaw_featured_manual_keyword', true);
+    lcaw_apply_pexels_photo_to_course($post_id, $results[$idx], $keyword, 'ตั้ง Featured Image จาก Advanced Search สำเร็จ');
+
+    $redirect_url = admin_url('post.php?post=' . (int) $post_id . '&action=edit');
+
+    wp_safe_redirect($redirect_url);
+    exit;
+});
+
+function lcaw_render_featured_box_html($post_id) {
+    $post_id = (int) $post_id;
+    if ($post_id <= 0) return '';
+    $thumb_id = (int) get_post_thumbnail_id($post_id);
+    // _wp_post_thumbnail_html() already runs the admin_post_thumbnail_html filter.
+    return _wp_post_thumbnail_html($thumb_id, $post_id);
+}
+
+add_action('wp_ajax_lcaw_ajax_find_course_image', function () {
+    $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
+    if ($post_id <= 0) wp_send_json_error(['message' => 'invalid_post_id'], 400);
+    if (!current_user_can('edit_post', $post_id)) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_featured_ajax_' . $post_id);
+
+    $result = has_post_thumbnail($post_id)
+        ? ['status' => 'skip', 'message' => 'ข้าม: มี Featured Image อยู่แล้ว']
+        : lcaw_generate_featured_for_course($post_id, false, false);
+
+    wp_send_json_success([
+        'result' => $result,
+        'box_html' => lcaw_render_featured_box_html($post_id),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_change_course_image', function () {
+    $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
+    if ($post_id <= 0) wp_send_json_error(['message' => 'invalid_post_id'], 400);
+    if (!current_user_can('edit_post', $post_id)) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_featured_ajax_' . $post_id);
+
+    $result = lcaw_generate_featured_alternative_for_course($post_id);
+    wp_send_json_success([
+        'result' => $result,
+        'box_html' => lcaw_render_featured_box_html($post_id),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_search_course_image', function () {
+    $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
+    if ($post_id <= 0) wp_send_json_error(['message' => 'invalid_post_id'], 400);
+    if (!current_user_can('edit_post', $post_id)) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_featured_ajax_' . $post_id);
+
+    $input_keyword = isset($_POST['keyword']) ? sanitize_text_field((string) wp_unslash($_POST['keyword'])) : '';
+    $input_keyword = trim($input_keyword);
+    $mode = isset($_POST['mode']) ? sanitize_key((string) wp_unslash($_POST['mode'])) : 'reset';
+
+    $prev_keyword = (string) get_post_meta($post_id, '_lcaw_featured_manual_keyword', true);
+    $keyword = ($input_keyword !== '') ? $input_keyword : $prev_keyword;
+    $manual_page = (int) get_post_meta($post_id, '_lcaw_featured_manual_page', true);
+    if ($manual_page < 1) $manual_page = 0;
+
+    if ($keyword === '') {
+        $next_page = 0;
+    } elseif ($mode === 'next' && $keyword === $prev_keyword) {
+        $next_page = $manual_page + 1;
+    } else {
+        $next_page = 1;
+    }
+
+    update_post_meta($post_id, '_lcaw_featured_manual_keyword', $keyword);
+
+    $results = [];
+    if ($keyword !== '') {
+        $api_key = lcaw_get_pexels_api_key();
+        if ($api_key !== '') {
+            $results = lcaw_pexels_search_mapped_photos($keyword, $api_key, 6, max(1, $next_page));
+            if (empty($results) && $next_page > 1) {
+                $next_page = 1;
+                $results = lcaw_pexels_search_mapped_photos($keyword, $api_key, 6, $next_page);
+            }
+        }
+    }
+    update_post_meta($post_id, '_lcaw_featured_manual_results', $results);
+    update_post_meta($post_id, '_lcaw_featured_manual_page', $next_page);
+
+    $count = is_array($results) ? count($results) : 0;
+    wp_send_json_success([
+        'result' => ['status' => 'success', 'message' => 'พบรูป ' . (int) $count . ' รูป', 'query' => $keyword],
+        'box_html' => lcaw_render_featured_box_html($post_id),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_pick_course_image', function () {
+    $post_id = isset($_POST['post_id']) ? (int) $_POST['post_id'] : 0;
+    $idx = isset($_POST['idx']) ? (int) $_POST['idx'] : -1;
+    if ($post_id <= 0 || $idx < 0) wp_send_json_error(['message' => 'invalid_request'], 400);
+    if (!current_user_can('edit_post', $post_id)) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_featured_ajax_' . $post_id);
+
+    $results = get_post_meta($post_id, '_lcaw_featured_manual_results', true);
+    if (!is_array($results) || empty($results[$idx]) || !is_array($results[$idx])) {
+        wp_send_json_error(['message' => 'invalid_result'], 400);
+    }
+    $keyword = (string) get_post_meta($post_id, '_lcaw_featured_manual_keyword', true);
+    $result = lcaw_apply_pexels_photo_to_course($post_id, $results[$idx], $keyword, 'ตั้ง Featured Image จาก Advanced Search สำเร็จ');
+
+    wp_send_json_success([
+        'result' => $result,
+        'box_html' => lcaw_render_featured_box_html($post_id),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_bulk_search_images', function () {
+    if (!current_user_can('edit_posts')) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_bulk_modal_nonce');
+
+    $keyword = isset($_POST['keyword']) ? sanitize_text_field((string) wp_unslash($_POST['keyword'])) : '';
+    $keyword = trim($keyword);
+    if ($keyword === '') {
+        wp_send_json_error(['message' => 'กรุณากรอก keyword'], 400);
+    }
+
+    $api_key = lcaw_get_pexels_api_key();
+    if ($api_key === '') {
+        wp_send_json_error(['message' => 'ไม่พบ Pexels API Key'], 400);
+    }
+
+    $page = isset($_POST['page']) ? (int) $_POST['page'] : 1;
+    if ($page < 1) $page = 1;
+    $results = lcaw_pexels_search_mapped_photos($keyword, $api_key, 5, $page);
+    if (empty($results) && $page > 1) {
+        $page = 1;
+        $results = lcaw_pexels_search_mapped_photos($keyword, $api_key, 5, $page);
+    }
+
+    wp_send_json_success([
+        'keyword' => $keyword,
+        'page' => $page,
+        'results' => $results,
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_bulk_apply_image', function () {
+    if (!current_user_can('edit_posts')) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_bulk_modal_nonce');
+
+    $post_ids = isset($_POST['post_ids']) ? (array) $_POST['post_ids'] : [];
+    $post_ids = array_values(array_filter(array_map('intval', $post_ids)));
+    if (empty($post_ids)) {
+        wp_send_json_error(['message' => 'ไม่ได้เลือกคอร์ส'], 400);
+    }
+
+    $keyword = isset($_POST['keyword']) ? sanitize_text_field((string) wp_unslash($_POST['keyword'])) : '';
+    $photo = [
+        'image_url' => isset($_POST['image_url']) ? esc_url_raw((string) wp_unslash($_POST['image_url'])) : '',
+        'photographer' => isset($_POST['photographer']) ? sanitize_text_field((string) wp_unslash($_POST['photographer'])) : '',
+        'photographer_url' => isset($_POST['photographer_url']) ? esc_url_raw((string) wp_unslash($_POST['photographer_url'])) : '',
+        'photo_url' => isset($_POST['photo_url']) ? esc_url_raw((string) wp_unslash($_POST['photo_url'])) : '',
+        'pexels_id' => isset($_POST['pexels_id']) ? (int) $_POST['pexels_id'] : 0,
+    ];
+    if ($photo['image_url'] === '') {
+        wp_send_json_error(['message' => 'ข้อมูลรูปไม่ครบ'], 400);
+    }
+
+    $success = 0;
+    $skip = 0;
+    $error = 0;
+    $error_messages = [];
+
+    foreach ($post_ids as $post_id) {
+        if (!current_user_can('edit_post', $post_id)) {
+            $error++;
+            continue;
+        }
+        if (get_post_type($post_id) !== 'course') {
+            $skip++;
+            continue;
+        }
+
+        $result = lcaw_apply_pexels_photo_to_course($post_id, $photo, $keyword, 'ตั้ง Featured Image จาก Bulk สำเร็จ');
+        $status = isset($result['status']) ? (string) $result['status'] : 'error';
+        if ($status === 'success') {
+            $success++;
+        } elseif ($status === 'skip') {
+            $skip++;
+        } else {
+            $error++;
+            $msg = isset($result['message']) ? sanitize_text_field((string) $result['message']) : 'unknown_error';
+            if ($msg === '') $msg = 'unknown_error';
+            if (!isset($error_messages[$msg])) $error_messages[$msg] = 0;
+            $error_messages[$msg]++;
+        }
+    }
+
+    $error_summary = '';
+    if (!empty($error_messages)) {
+        arsort($error_messages);
+        $parts = [];
+        foreach ($error_messages as $msg => $count) {
+            $parts[] = $msg . ' (' . (int) $count . ')';
+            if (count($parts) >= 3) break;
+        }
+        $error_summary = implode(' | ', $parts);
+    }
+
+    $return_url = isset($_POST['return_url']) ? esc_url_raw((string) wp_unslash($_POST['return_url'])) : '';
+    $default_return_url = add_query_arg(['post_type' => 'course'], admin_url('edit.php'));
+    if ($return_url === '' || strpos($return_url, '/wp-admin/edit.php') === false) {
+        $return_url = $default_return_url;
+    }
+    $return_url = remove_query_arg([
+        'lcaw_bulk_done',
+        'lcaw_bulk_success',
+        'lcaw_bulk_skip',
+        'lcaw_bulk_error',
+        'lcaw_bulk_error_summary',
+    ], $return_url);
+
+    $redirect_url = add_query_arg([
+        'post_type' => 'course',
+        'lcaw_bulk_done' => 1,
+        'lcaw_bulk_success' => $success,
+        'lcaw_bulk_skip' => $skip,
+        'lcaw_bulk_error' => $error,
+        'lcaw_bulk_error_summary' => $error_summary,
+    ], $return_url);
+
+    wp_send_json_success([
+        'success' => $success,
+        'skip' => $skip,
+        'error' => $error,
+        'redirect_url' => $redirect_url,
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_bulk_apply_keywords', function () {
+    if (!current_user_can('edit_posts')) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_bulk_modal_nonce');
+
+    $rows_raw = isset($_POST['rows']) ? (array) $_POST['rows'] : [];
+    if (empty($rows_raw)) {
+        wp_send_json_error(['message' => 'ไม่ได้ส่งรายการคอร์ส'], 400);
+    }
+
+    $api_key = lcaw_get_pexels_api_key();
+    if ($api_key === '') {
+        wp_send_json_error(['message' => 'ไม่พบ Pexels API Key'], 400);
+    }
+
+    $success = 0;
+    $skip = 0;
+    $error = 0;
+    $error_messages = [];
+
+    foreach ($rows_raw as $row_json) {
+        $row = json_decode(wp_unslash((string) $row_json), true);
+        if (!is_array($row)) {
+            $error++;
+            $msg = 'รูปแบบข้อมูลแถวไม่ถูกต้อง';
+            if (!isset($error_messages[$msg])) $error_messages[$msg] = 0;
+            $error_messages[$msg]++;
+            continue;
+        }
+        $post_id = isset($row['post_id']) ? (int) $row['post_id'] : 0;
+        $keyword = isset($row['keyword']) ? sanitize_text_field((string) $row['keyword']) : '';
+        $keyword = trim($keyword);
+        $selected_photo = [
+            'image_url' => isset($row['image_url']) ? esc_url_raw((string) $row['image_url']) : '',
+            'photographer' => isset($row['photographer']) ? sanitize_text_field((string) $row['photographer']) : '',
+            'photographer_url' => isset($row['photographer_url']) ? esc_url_raw((string) $row['photographer_url']) : '',
+            'photo_url' => isset($row['photo_url']) ? esc_url_raw((string) $row['photo_url']) : '',
+            'pexels_id' => isset($row['pexels_id']) ? (int) $row['pexels_id'] : 0,
+        ];
+        $has_selected_photo = $selected_photo['image_url'] !== '';
+
+        if ($post_id <= 0) {
+            $skip++;
+            continue;
+        }
+        if (!$has_selected_photo && $keyword === '') {
+            $skip++;
+            continue;
+        }
+        if (!current_user_can('edit_post', $post_id)) {
+            $error++;
+            continue;
+        }
+        if (get_post_type($post_id) !== 'course') {
+            $skip++;
+            continue;
+        }
+
+        $photo = $selected_photo;
+        if (!$has_selected_photo) {
+            $photo = lcaw_pexels_search_first_photo($keyword, $api_key);
+            if (!$photo || empty($photo['image_url'])) {
+                $error++;
+                $msg = 'ไม่พบรูปจาก keyword';
+                if (!isset($error_messages[$msg])) $error_messages[$msg] = 0;
+                $error_messages[$msg]++;
+                continue;
+            }
+        }
+
+        $result = lcaw_apply_pexels_photo_to_course($post_id, $photo, $keyword, 'ตั้ง Featured Image จาก Bulk (ต่างกัน) สำเร็จ');
+        $status = isset($result['status']) ? (string) $result['status'] : 'error';
+        if ($status === 'success') {
+            $success++;
+        } elseif ($status === 'skip') {
+            $skip++;
+        } else {
+            $error++;
+            $msg = isset($result['message']) ? sanitize_text_field((string) $result['message']) : 'unknown_error';
+            if ($msg === '') $msg = 'unknown_error';
+            if (!isset($error_messages[$msg])) $error_messages[$msg] = 0;
+            $error_messages[$msg]++;
+        }
+    }
+
+    $error_summary = '';
+    if (!empty($error_messages)) {
+        arsort($error_messages);
+        $parts = [];
+        foreach ($error_messages as $msg => $count) {
+            $parts[] = $msg . ' (' . (int) $count . ')';
+            if (count($parts) >= 3) break;
+        }
+        $error_summary = implode(' | ', $parts);
+    }
+
+    $return_url = isset($_POST['return_url']) ? esc_url_raw((string) wp_unslash($_POST['return_url'])) : '';
+    $default_return_url = add_query_arg(['post_type' => 'course'], admin_url('edit.php'));
+    if ($return_url === '' || strpos($return_url, '/wp-admin/edit.php') === false) {
+        $return_url = $default_return_url;
+    }
+    $return_url = remove_query_arg([
+        'lcaw_bulk_done',
+        'lcaw_bulk_success',
+        'lcaw_bulk_skip',
+        'lcaw_bulk_error',
+        'lcaw_bulk_error_summary',
+    ], $return_url);
+
+    $redirect_url = add_query_arg([
+        'post_type' => 'course',
+        'lcaw_bulk_done' => 1,
+        'lcaw_bulk_success' => $success,
+        'lcaw_bulk_skip' => $skip,
+        'lcaw_bulk_error' => $error,
+        'lcaw_bulk_error_summary' => $error_summary,
+    ], $return_url);
+
+    wp_send_json_success([
+        'success' => $success,
+        'skip' => $skip,
+        'error' => $error,
+        'redirect_url' => $redirect_url,
+    ]);
+});
+
+add_action('wp_ajax_lcaw_ajax_bulk_title_en', function () {
+    if (!current_user_can('edit_posts')) wp_send_json_error(['message' => 'forbidden'], 403);
+    check_ajax_referer('lcaw_bulk_modal_nonce');
+
+    $post_ids = isset($_POST['post_ids']) ? (array) $_POST['post_ids'] : [];
+    $post_ids = array_values(array_filter(array_map('intval', $post_ids)));
+    if (empty($post_ids)) {
+        wp_send_json_success(['titles' => []]);
+    }
+
+    $titles = [];
+    foreach ($post_ids as $post_id) {
+        if (!current_user_can('edit_post', $post_id)) continue;
+        if (get_post_type($post_id) !== 'course') continue;
+
+        $title = trim((string) get_the_title($post_id));
+        if ($title === '') continue;
+        if (!lcaw_contains_thai($title)) continue;
+
+        $en = lcaw_translate_to_english($title);
+        if ($en === '') continue;
+        $titles[(string) $post_id] = $en;
+    }
+
+    wp_send_json_success([
+        'titles' => $titles,
+    ]);
+});
+
+add_action('admin_footer-post.php', function () {
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->base !== 'post' || $screen->post_type !== 'course') return;
+    ?>
+    <script>
+    (function () {
+      function bindLCAW() {
+        const wrap = document.querySelector('#postimagediv .lcaw-featured-status');
+        if (!wrap || wrap.dataset.bound === '1') return;
+        wrap.dataset.bound = '1';
+
+        const tools = wrap.querySelector('.lcaw-featured-tools');
+        if (!tools) return;
+        const postId = tools.getAttribute('data-post-id');
+        const nonce = tools.getAttribute('data-nonce');
+        const feedback = wrap.querySelector('.lcaw-feedback');
+
+        const setFeedback = (msg, isError) => {
+          if (!feedback) return;
+          feedback.textContent = msg || '';
+          feedback.style.color = isError ? '#b42318' : '#646970';
+        };
+
+        const replaceFeaturedBox = (html) => {
+          const inside = document.querySelector('#postimagediv .inside');
+          if (!inside || !html) return;
+          inside.innerHTML = html;
+          bindLCAW();
+        };
+
+        const send = async (action, payload) => {
+          const fd = new FormData();
+          fd.append('action', action);
+          fd.append('post_id', postId);
+          fd.append('_ajax_nonce', nonce);
+          Object.keys(payload || {}).forEach((k) => fd.append(k, String(payload[k])));
+
+          const res = await fetch(ajaxurl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: fd
+          });
+          const json = await res.json();
+          if (!res.ok || !json || !json.success || !json.data) {
+            throw new Error((json && json.data && json.data.message) ? json.data.message : 'request_failed');
+          }
+          return json.data;
+        };
+
+        const runAction = async (action, payload, loadingText) => {
+          try {
+            setFeedback(loadingText || 'กำลังประมวลผล...', false);
+            const data = await send(action, payload);
+            const msg = data.result && data.result.message ? data.result.message : 'สำเร็จ';
+            setFeedback(msg, false);
+            replaceFeaturedBox(data.box_html || '');
+          } catch (e) {
+            setFeedback(e && e.message ? e.message : 'เกิดข้อผิดพลาด', true);
+          }
+        };
+
+        const panel = wrap.querySelector('.lcaw-panel');
+        const btnTogglePanel = wrap.querySelector('.lcaw-btn-toggle-panel');
+        if (btnTogglePanel && panel) {
+          const isOpen = tools.getAttribute('data-open') === '1';
+          panel.style.display = isOpen ? '' : 'none';
+          btnTogglePanel.textContent = isOpen ? 'ซ่อนแผงค้นหารูป' : 'เปิดแผงค้นหารูป';
+          btnTogglePanel.addEventListener('click', () => {
+            const openNow = panel.style.display === 'none';
+            panel.style.display = openNow ? '' : 'none';
+            btnTogglePanel.textContent = openNow ? 'ซ่อนแผงค้นหารูป' : 'เปิดแผงค้นหารูป';
+          });
+        }
+
+        const btnSearch = wrap.querySelector('.lcaw-btn-search');
+        const keyword = wrap.querySelector('.lcaw-keyword');
+        if (btnSearch) {
+          btnSearch.addEventListener('click', () => {
+            const kw = keyword ? keyword.value : '';
+            runAction('lcaw_ajax_search_course_image', { keyword: kw, mode: 'reset' }, 'กำลังค้นหา...');
+          });
+        }
+
+        const btnShuffle = wrap.querySelector('.lcaw-btn-shuffle');
+        if (btnShuffle) {
+          btnShuffle.addEventListener('click', () => {
+            const kw = keyword ? keyword.value : '';
+            runAction('lcaw_ajax_search_course_image', { keyword: kw, mode: 'next' }, 'กำลังสุ่มผลใหม่...');
+          });
+        }
+
+        wrap.querySelectorAll('.lcaw-btn-pick').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = btn.getAttribute('data-idx');
+            runAction('lcaw_ajax_pick_course_image', { idx: idx }, 'กำลังตั้งรูป...');
+          });
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', bindLCAW);
+      bindLCAW();
+    })();
+    </script>
+    <?php
 });
 
 add_filter('bulk_actions-edit-course', function ($bulk_actions) {
@@ -1679,4 +2413,417 @@ add_action('admin_notices', function () {
     if ($status === 'error') $class = 'notice-error';
 
     echo '<div class="notice ' . esc_attr($class) . ' is-dismissible"><p><strong>Pexels:</strong> ' . esc_html($message) . '</p></div>';
+});
+
+add_action('admin_footer-edit.php', function () {
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->base !== 'edit' || $screen->post_type !== 'course') return;
+    $nonce = wp_create_nonce('lcaw_bulk_modal_nonce');
+    ?>
+    <style>
+      .lcaw-bulk-modal { position: fixed; inset: 0; z-index: 100000; display: none; }
+      .lcaw-bulk-modal.is-open { display: block; }
+      .lcaw-bulk-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+      .lcaw-bulk-card { position: relative; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 64px); overflow: auto; margin: 32px auto; background: #fff; border-radius: 12px; padding: 16px; }
+      .lcaw-bulk-grid { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; margin-top: 12px; }
+      .lcaw-bulk-item { border: 1px solid #dcdcde; border-radius: 6px; padding: 6px; }
+      .lcaw-bulk-item img { width: 100%; height: 100px; object-fit: cover; border-radius: 4px; display: block; }
+      .lcaw-tabs { display:flex; gap:8px; margin-top:10px; }
+      .lcaw-tab-btn.is-active { background:#2271b1; color:#fff; border-color:#2271b1; }
+      .lcaw-tab-panel { margin-top:10px; }
+      .lcaw-tab-panel[hidden] { display:none !important; }
+      .lcaw-diff-list { margin-top:10px; display:grid; gap:8px; }
+      .lcaw-diff-item { border:1px solid #dcdcde; border-radius:6px; padding:8px; background:#fff; display:grid; gap:8px; }
+      .lcaw-diff-item-head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+      .lcaw-diff-row-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+      .lcaw-diff-results { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; }
+      .lcaw-diff-result { border:1px solid #dcdcde; border-radius:6px; padding:4px; background:#fff; }
+      .lcaw-diff-result.is-selected { border-color:#2271b1; box-shadow:0 0 0 1px #2271b1 inset; }
+      .lcaw-diff-result img { width:100%; height:72px; object-fit:cover; border-radius:4px; display:block; }
+      .lcaw-diff-feedback { font-size:12px; color:#646970; }
+    </style>
+    <script>
+    (function () {
+      const NONCE = <?php echo wp_json_encode($nonce); ?>;
+      const ACTION_KEY = 'lcaw_find_images';
+
+      function getCheckedPostIds() {
+        return Array.from(document.querySelectorAll('#the-list th.check-column input[type="checkbox"]:checked'))
+          .map((el) => parseInt(el.value, 10))
+          .filter((n) => Number.isFinite(n) && n > 0);
+      }
+
+      function selectedBulkAction() {
+        const top = document.getElementById('bulk-action-selector-top');
+        const bottom = document.getElementById('bulk-action-selector-bottom');
+        const topVal = top ? top.value : '-1';
+        const bottomVal = bottom ? bottom.value : '-1';
+        return topVal !== '-1' ? topVal : bottomVal;
+      }
+
+      function createModal() {
+        const wrap = document.createElement('div');
+        wrap.className = 'lcaw-bulk-modal';
+        wrap.innerHTML = `
+          <div class="lcaw-bulk-backdrop"></div>
+          <div class="lcaw-bulk-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <h3 style="margin:0;">ค้นหาภาพ Stock ฟรี (Bulk)</h3>
+              <button type="button" class="button lcaw-close">ปิด</button>
+            </div>
+            <p class="description">เลือกภาพ 1 รูปเพื่อใช้กับคอร์สที่ติ๊กไว้ทั้งหมด</p>
+            <div class="lcaw-tabs">
+              <button type="button" class="button lcaw-tab-btn is-active" data-tab="same">เหมือนกันทุกโพสต์</button>
+              <button type="button" class="button lcaw-tab-btn" data-tab="diff">แตกต่างกัน</button>
+            </div>
+            <div class="lcaw-tab-panel lcaw-tab-same">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input type="text" class="lcaw-keyword" placeholder="ค้นหาด้วย keyword ภาษาอังกฤษ" style="min-width:260px;">
+                <button type="button" class="button button-primary lcaw-search">ค้นหา</button>
+                <button type="button" class="button lcaw-next">สุ่มใหม่</button>
+              </div>
+              <div class="lcaw-feedback" style="margin-top:8px;color:#646970;"></div>
+              <div class="lcaw-bulk-grid"></div>
+            </div>
+            <div class="lcaw-tab-panel lcaw-tab-diff" hidden>
+            <div class="description">ใส่ keyword ภาษาอังกฤษแยกแต่ละโพสต์ แล้วกดตั้งรูปทั้งหมด</div>
+              <div class="lcaw-diff-list"></div>
+              <div style="margin-top:10px;">
+                <button type="button" class="button button-primary lcaw-apply-diff">ตั้งรูปตาม keyword ที่กรอก</button>
+              </div>
+              <div class="lcaw-feedback-diff" style="margin-top:8px;color:#646970;"></div>
+            </div>
+          </div>`;
+        document.body.appendChild(wrap);
+        return wrap;
+      }
+
+      const modal = createModal();
+      const card = modal.querySelector('.lcaw-bulk-card');
+      const backdrop = modal.querySelector('.lcaw-bulk-backdrop');
+      const closeBtn = modal.querySelector('.lcaw-close');
+      const keywordInput = modal.querySelector('.lcaw-keyword');
+      const searchBtn = modal.querySelector('.lcaw-search');
+      const nextBtn = modal.querySelector('.lcaw-next');
+      const feedback = modal.querySelector('.lcaw-feedback');
+      const grid = modal.querySelector('.lcaw-bulk-grid');
+      const feedbackDiff = modal.querySelector('.lcaw-feedback-diff');
+      const diffList = modal.querySelector('.lcaw-diff-list');
+      const applyDiffBtn = modal.querySelector('.lcaw-apply-diff');
+      const tabButtons = modal.querySelectorAll('.lcaw-tab-btn');
+      const tabSame = modal.querySelector('.lcaw-tab-same');
+      const tabDiff = modal.querySelector('.lcaw-tab-diff');
+      let currentPage = 1;
+      let currentKeyword = '';
+      let currentResults = [];
+      let selectedPostIds = [];
+      let selectedRows = [];
+
+      function setFeedback(msg, isError) {
+        feedback.textContent = msg || '';
+        feedback.style.color = isError ? '#b42318' : '#646970';
+      }
+      function setFeedbackDiff(msg, isError) {
+        if (!feedbackDiff) return;
+        feedbackDiff.textContent = msg || '';
+        feedbackDiff.style.color = isError ? '#b42318' : '#646970';
+      }
+
+      function activateTab(name) {
+        tabButtons.forEach((btn) => {
+          const active = btn.getAttribute('data-tab') === name;
+          btn.classList.toggle('is-active', active);
+        });
+        if (tabSame) tabSame.hidden = name !== 'same';
+        if (tabDiff) tabDiff.hidden = name !== 'diff';
+      }
+
+      function escapeHtml(str) {
+        return String(str || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+
+      function getSelectedRows(postIds) {
+        return postIds.map((id) => {
+          const titleEl = document.querySelector(`#post-${id} .row-title`);
+          const title = titleEl ? titleEl.textContent.trim() : `Course #${id}`;
+          return { post_id: id, title, title_en: '', keyword: '', page: 1, results: [], selected: null, loading: false, feedback: '' };
+        });
+      }
+
+      function renderDiffList() {
+        if (!diffList) return;
+        if (!selectedRows.length) {
+          diffList.innerHTML = '<div class="description">ไม่ได้เลือกคอร์ส</div>';
+          return;
+        }
+        diffList.innerHTML = selectedRows.map((row, idx) => `
+          <div class="lcaw-diff-item">
+            <div><strong>${escapeHtml(row.title || '')}</strong></div>
+            ${row.title_en ? `<div class="description">(${escapeHtml(row.title_en)})</div>` : ''}
+            <div class="lcaw-diff-item-head">
+              <input type="text" class="lcaw-diff-keyword" data-idx="${idx}" placeholder="ค้นหาด้วย keyword ภาษาอังกฤษ" value="${escapeHtml(row.keyword || '')}" style="min-width:240px;">
+              <div class="lcaw-diff-row-actions">
+                <button type="button" class="button button-small lcaw-diff-search" data-idx="${idx}">${row.loading ? 'กำลังค้นหา...' : 'ค้นหา 5 รูป'}</button>
+                <button type="button" class="button button-small lcaw-diff-next" data-idx="${idx}" ${row.results && row.results.length ? '' : 'disabled'}>สุ่มใหม่</button>
+              </div>
+            </div>
+            <div class="lcaw-diff-feedback">${escapeHtml(row.feedback || '')}</div>
+            <div class="lcaw-diff-results">
+              ${(row.results || []).map((it, photoIdx) => `
+                <div class="lcaw-diff-result ${row.selected === photoIdx ? 'is-selected' : ''}">
+                  <img src="${escapeHtml(it.image_url || '')}" alt="">
+                  <button type="button" class="button button-small lcaw-diff-pick" data-idx="${idx}" data-photo="${photoIdx}" style="margin-top:4px;width:100%;">${row.selected === photoIdx ? 'เลือกแล้ว' : 'ใช้รูปนี้'}</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      async function searchDiffRow(idx, mode) {
+        const row = selectedRows[idx];
+        if (!row) return;
+        const kw = String(row.keyword || '').trim();
+        if (!kw) {
+          row.feedback = 'กรุณากรอก keyword';
+          renderDiffList();
+          return;
+        }
+        if (mode === 'reset') row.page = 1;
+        if (mode === 'next') row.page = (parseInt(row.page || 1, 10) || 1) + 1;
+        row.loading = true;
+        row.feedback = 'กำลังค้นหา...';
+        renderDiffList();
+        try {
+          const data = await postAjax('lcaw_ajax_bulk_search_images', { keyword: kw, page: row.page || 1 });
+          row.page = parseInt(data.page || 1, 10) || 1;
+          row.results = Array.isArray(data.results) ? data.results : [];
+          row.selected = null;
+          row.feedback = row.results.length ? `พบรูป ${row.results.length} รูป` : 'ไม่พบรูปจาก keyword นี้';
+        } catch (e) {
+          row.feedback = e && e.message ? e.message : 'ค้นหารูปไม่สำเร็จ';
+        } finally {
+          row.loading = false;
+          renderDiffList();
+        }
+      }
+
+      function openModal(postIds) {
+        selectedPostIds = postIds.slice();
+        selectedRows = getSelectedRows(postIds);
+        modal.classList.add('is-open');
+        setFeedback(`เลือกแล้ว ${postIds.length} คอร์ส`, false);
+        setFeedbackDiff('', false);
+        activateTab('same');
+        renderDiffList();
+        hydrateEnglishTitles();
+      }
+      function closeModal() {
+        modal.classList.remove('is-open');
+      }
+
+      async function hydrateEnglishTitles() {
+        if (!selectedPostIds.length) return;
+        try {
+          const data = await postAjax('lcaw_ajax_bulk_title_en', { post_ids: selectedPostIds });
+          const titles = (data && data.titles && typeof data.titles === 'object') ? data.titles : {};
+          selectedRows = selectedRows.map((row) => {
+            const titleEn = titles[String(row.post_id)] || '';
+            return Object.assign({}, row, { title_en: titleEn });
+          });
+          renderDiffList();
+        } catch (_) {
+          // no-op: translation is optional in UI
+        }
+      }
+
+      function renderResults(items) {
+        currentResults = Array.isArray(items) ? items : [];
+        if (!currentResults.length) {
+          grid.innerHTML = '';
+          setFeedback('ไม่พบรูปจาก keyword นี้', true);
+          return;
+        }
+        grid.innerHTML = currentResults.map((it, idx) => `
+          <div class="lcaw-bulk-item">
+            <img src="${String(it.image_url || '').replace(/"/g, '&quot;')}" alt="">
+            <button type="button" class="button button-small lcaw-pick" data-idx="${idx}" style="margin-top:6px;width:100%;">ใช้รูปนี้</button>
+          </div>
+        `).join('');
+        grid.querySelectorAll('.lcaw-pick').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = parseInt(btn.getAttribute('data-idx'), 10);
+            const item = currentResults[idx];
+            if (!item) return;
+            applyBulkImage(item);
+          });
+        });
+      }
+
+      async function postAjax(action, payload) {
+        const fd = new FormData();
+        fd.append('action', action);
+        fd.append('_ajax_nonce', NONCE);
+        Object.keys(payload || {}).forEach((k) => {
+          const v = payload[k];
+          if (Array.isArray(v)) {
+            v.forEach((x) => fd.append(k + '[]', String(x)));
+          } else {
+            fd.append(k, String(v));
+          }
+        });
+        const res = await fetch(ajaxurl, { method: 'POST', credentials: 'same-origin', body: fd });
+        const json = await res.json();
+        if (!res.ok || !json || !json.success || !json.data) {
+          throw new Error((json && json.data && json.data.message) ? json.data.message : 'request_failed');
+        }
+        return json.data;
+      }
+
+      async function search(mode) {
+        const kw = (keywordInput.value || '').trim();
+        if (!kw) {
+          setFeedback('กรุณากรอก keyword', true);
+          return;
+        }
+        currentKeyword = kw;
+        if (mode === 'reset') currentPage = 1;
+        if (mode === 'next') currentPage += 1;
+        setFeedback('กำลังค้นหารูป...', false);
+        try {
+          const data = await postAjax('lcaw_ajax_bulk_search_images', { keyword: currentKeyword, page: currentPage });
+          currentPage = parseInt(data.page || 1, 10) || 1;
+          renderResults(data.results || []);
+          setFeedback(`พบรูป ${(data.results || []).length} รูป`, false);
+        } catch (e) {
+          setFeedback(e && e.message ? e.message : 'ค้นหารูปไม่สำเร็จ', true);
+        }
+      }
+
+      async function applyBulkImage(item) {
+        if (!selectedPostIds.length) {
+          setFeedback('ไม่ได้เลือกคอร์ส', true);
+          return;
+        }
+        setFeedback('กำลังตั้งรูปให้คอร์สที่เลือก...', false);
+        try {
+          const data = await postAjax('lcaw_ajax_bulk_apply_image', {
+            post_ids: selectedPostIds,
+            keyword: currentKeyword,
+            return_url: window.location.href || '',
+            image_url: item.image_url || '',
+            photographer: item.photographer || '',
+            photographer_url: item.photographer_url || '',
+            photo_url: item.photo_url || '',
+            pexels_id: item.pexels_id || 0
+          });
+          if (data.redirect_url) {
+            window.location.href = data.redirect_url;
+          } else {
+            window.location.reload();
+          }
+        } catch (e) {
+          setFeedback(e && e.message ? e.message : 'ตั้งรูปไม่สำเร็จ', true);
+        }
+      }
+
+      async function applyBulkByKeywords() {
+        if (!selectedRows.length) {
+          setFeedbackDiff('ไม่ได้เลือกคอร์ส', true);
+          return;
+        }
+        const inputs = Array.from(diffList.querySelectorAll('.lcaw-diff-keyword'));
+        const rows = inputs.map((input) => {
+          const idx = parseInt(input.getAttribute('data-idx'), 10);
+          const row = selectedRows[idx] || {};
+          const payloadRow = { post_id: row.post_id, keyword: (input.value || '').trim() };
+          const picked = Number.isInteger(row.selected) && row.results && row.results[row.selected] ? row.results[row.selected] : null;
+          if (picked && picked.image_url) {
+            payloadRow.image_url = picked.image_url || '';
+            payloadRow.photographer = picked.photographer || '';
+            payloadRow.photographer_url = picked.photographer_url || '';
+            payloadRow.photo_url = picked.photo_url || '';
+            payloadRow.pexels_id = picked.pexels_id || 0;
+          }
+          return payloadRow;
+        }).filter((row) => Number.isFinite(Number(row.post_id)) && row.post_id > 0 && (row.keyword !== '' || row.image_url));
+
+        if (!rows.length) {
+          setFeedbackDiff('กรุณากรอก keyword อย่างน้อย 1 รายการ', true);
+          return;
+        }
+        setFeedbackDiff('กำลังตั้งรูปจาก keyword รายโพสต์...', false);
+        try {
+          const data = await postAjax('lcaw_ajax_bulk_apply_keywords', {
+            rows: rows.map((r) => JSON.stringify(r)),
+            return_url: window.location.href || ''
+          });
+          if (data.redirect_url) {
+            window.location.href = data.redirect_url;
+          } else {
+            window.location.reload();
+          }
+        } catch (e) {
+          setFeedbackDiff(e && e.message ? e.message : 'ตั้งรูปไม่สำเร็จ', true);
+        }
+      }
+
+      searchBtn.addEventListener('click', () => search('reset'));
+      nextBtn.addEventListener('click', () => search('next'));
+      if (applyDiffBtn) applyDiffBtn.addEventListener('click', applyBulkByKeywords);
+      if (diffList) {
+        diffList.addEventListener('input', (e) => {
+          const target = e.target;
+          if (!(target instanceof HTMLInputElement) || !target.classList.contains('lcaw-diff-keyword')) return;
+          const idx = parseInt(target.getAttribute('data-idx'), 10);
+          if (!Number.isFinite(idx) || !selectedRows[idx]) return;
+          selectedRows[idx].keyword = (target.value || '').trim();
+        });
+        diffList.addEventListener('click', (e) => {
+          const target = e.target;
+          if (!(target instanceof HTMLElement)) return;
+          const searchBtnEl = target.closest('.lcaw-diff-search');
+          if (searchBtnEl) {
+            const idx = parseInt(searchBtnEl.getAttribute('data-idx'), 10);
+            if (Number.isFinite(idx)) searchDiffRow(idx, 'reset');
+            return;
+          }
+          const nextBtnEl = target.closest('.lcaw-diff-next');
+          if (nextBtnEl) {
+            const idx = parseInt(nextBtnEl.getAttribute('data-idx'), 10);
+            if (Number.isFinite(idx)) searchDiffRow(idx, 'next');
+            return;
+          }
+          const pickBtnEl = target.closest('.lcaw-diff-pick');
+          if (pickBtnEl) {
+            const idx = parseInt(pickBtnEl.getAttribute('data-idx'), 10);
+            const photoIdx = parseInt(pickBtnEl.getAttribute('data-photo'), 10);
+            if (!Number.isFinite(idx) || !selectedRows[idx]) return;
+            if (!Number.isFinite(photoIdx) || !selectedRows[idx].results || !selectedRows[idx].results[photoIdx]) return;
+            selectedRows[idx].selected = photoIdx;
+            selectedRows[idx].feedback = 'เลือกรูปแล้ว';
+            renderDiffList();
+          }
+        });
+      }
+      tabButtons.forEach((btn) => {
+        btn.addEventListener('click', () => activateTab(btn.getAttribute('data-tab')));
+      });
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+      document.querySelectorAll('#doaction, #doaction2').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          const action = selectedBulkAction();
+          if (action !== ACTION_KEY) return;
+          const ids = getCheckedPostIds();
+          if (!ids.length) return;
+          e.preventDefault();
+          openModal(ids);
+        });
+      });
+    })();
+    </script>
+    <?php
 });

@@ -24,26 +24,33 @@ if (!defined('ABSPATH')) exit;
     </div>
 
     <div class="rounded-xl border p-3 bg-white space-y-2 blm-location-box">
-      <div class="flex items-center justify-between gap-2">
+      <div class="blm-near-actions">
         <button id="btnLocate"
-          class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+          class="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 inline-flex items-center gap-2">
+          <span aria-hidden="true" class="icon-20">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
+              <path d="M536.5-503.5Q560-527 560-560t-23.5-56.5Q513-640 480-640t-56.5 23.5Q400-593 400-560t23.5 56.5Q447-480 480-480t56.5-23.5ZM480-186q122-112 181-203.5T720-552q0-109-69.5-178.5T480-800q-101 0-170.5 69.5T240-552q0 71 59 162.5T480-186Zm0 106Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z"/>
+            </svg>
+          </span>
           ใช้ตำแหน่งปัจจุบัน
         </button>
 
         <div id="nearMeWrap" class="hidden">
-          <button id="chipNearMe"
-            class="px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50">
-            ใกล้ฉัน: ปิด
-          </button>
+          <label for="nearMeSwitch" class="blm-near-switch-wrap">
+            <span id="nearMeSwitchLabel" class="blm-near-switch-label">ค้นหาใกล้ฉัน</span>
+            <input id="nearMeSwitch" type="checkbox" class="sr-only">
+            <span class="blm-ios-switch" aria-hidden="true"></span>
+          </label>
         </div>
       </div>
 
       <div id="nearMeRadiusWrap" class="hidden">
         <div class="flex items-center justify-between gap-2 mt-2">
           <label class="text-xs text-slate-600">รัศมี (กม.)</label>
-          <input id="radiusKm" type="number" min="0.1" step="0.1" value="5"
-                 class="w-24 rounded-lg border px-2 py-1 text-sm text-right"/>
+          <span id="radiusKmValue" class="text-sm font-semibold text-slate-800">5 กม.</span>
         </div>
+        <input id="radiusKm" type="range" min="1" max="20" step="1" value="5"
+               class="w-full mt-2"/>
       </div>
 
       <div id="locStatus" class="text-xs text-slate-500">ใช้ตำแหน่งปัจจุบัน</div>
@@ -53,7 +60,6 @@ if (!defined('ABSPATH')) exit;
     <div class="space-y-2">
       <div class="flex items-center justify-between">
         <label class="text-sm font-semibold">ประเภทสถานที่</label>
-        <button id="btnAllCats" class="blm-view-all">ดูทั้งหมด +</button>
       </div>
 
       <div id="catGrid" class="grid grid-cols-2 gap-2"></div>
@@ -91,8 +97,7 @@ if (!defined('ABSPATH')) exit;
 
     <div class="space-y-2">
       <div class="flex items-center justify-between">
-        <label class="text-sm font-semibold">หมวดคอร์ส</label>
-        <button id="btnAllCourseCats" class="blm-view-all">ดูทั้งหมด +</button>
+        <label class="text-sm font-semibold">สถานะคอร์ส</label>
       </div>
       <div id="courseCatWrap" class="flex flex-wrap gap-2"></div>
     </div>

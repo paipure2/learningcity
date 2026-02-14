@@ -283,6 +283,14 @@ add_action('acf/init', function () {
                 ],
               ],
               [
+                'key' => 'field_lc_report_locations',
+                'label' => 'Related Locations',
+                'name' => 'report_locations',
+                'type' => 'textarea',
+                'rows' => 3,
+                'instructions' => 'สถานที่ที่ผู้แจ้งเลือกจากหน้าคอร์ส',
+              ],
+              [
                 'key' => 'field_lc_report_details',
                 'label' => 'Details',
                 'name' => 'report_details',
@@ -463,9 +471,24 @@ function lc_report_course() {
 
   $topics = isset($_POST['topics']) ? (array) $_POST['topics'] : [];
   $topics = array_values(array_intersect($topics, lc_report_allowed_topics()));
+  $location_ids = isset($_POST['location_ids']) ? (array) $_POST['location_ids'] : [];
+  $location_ids = array_values(array_unique(array_filter(array_map('intval', $location_ids))));
   $details = isset($_POST['details']) ? sanitize_textarea_field($_POST['details']) : '';
   $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
   $contact = isset($_POST['contact']) ? sanitize_text_field($_POST['contact']) : '';
+
+  $allowed_location_ids = lc_get_course_location_ids_for_report($post_id);
+  if (!empty($allowed_location_ids) && !empty($location_ids)) {
+    $location_ids = array_values(array_intersect($location_ids, $allowed_location_ids));
+  } else {
+    $location_ids = [];
+  }
+
+  $location_titles = [];
+  foreach ($location_ids as $lid) {
+    $title = get_the_title($lid);
+    if ($title) $location_titles[] = $title;
+  }
 
   if (empty($topics) && mb_strlen($details) < 3) {
     wp_send_json_error(['message' => 'missing details'], 400);
@@ -480,6 +503,7 @@ function lc_report_course() {
     'status' => 'pending',
     'report_details_group' => [
       'report_topics' => $topics,
+      'report_locations' => !empty($location_titles) ? implode("\n", $location_titles) : '',
       'report_details' => $details,
       'reporter_name' => $name,
       'reporter_contact' => $contact,
@@ -494,6 +518,44 @@ function lc_report_course() {
 
   lc_recalc_report_counts($post_id);
   wp_send_json_success(['message' => 'ok']);
+}
+
+function lc_get_course_location_ids_for_report($course_id) {
+  $course_id = (int) $course_id;
+  if ($course_id <= 0) return [];
+
+  $session_ids = get_posts([
+    'post_type' => 'session',
+    'post_status' => 'publish',
+    'posts_per_page' => -1,
+    'fields' => 'ids',
+    'meta_query' => [
+      [
+        'key' => 'course',
+        'value' => $course_id,
+        'compare' => '=',
+      ],
+    ],
+  ]);
+
+  if (empty($session_ids)) return [];
+
+  $ids = [];
+  foreach ($session_ids as $sid) {
+    $location = function_exists('get_field') ? get_field('location', $sid) : get_post_meta($sid, 'location', true);
+    $location_id = 0;
+    if (is_object($location) && isset($location->ID)) {
+      $location_id = (int) $location->ID;
+    } elseif (is_numeric($location)) {
+      $location_id = (int) $location;
+    }
+
+    if ($location_id > 0 && get_post_type($location_id) === 'location') {
+      $ids[] = $location_id;
+    }
+  }
+
+  return array_values(array_unique($ids));
 }
 
 

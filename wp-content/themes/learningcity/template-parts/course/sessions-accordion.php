@@ -302,8 +302,8 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
                   </ul>
 
                   <a href="<?php echo esc_url($location_map_page_url); ?>" target="_blank" rel="noopener"
-                     class="mt-3 inline-flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/20 rounded-full text-fs14 font-semibold py-2 px-4 hover:bg-primary/20 transition-colors">
-                    ดูสถานที่นี้บนแผนที่กรุงเทพฯ
+                     class="mt-3 inline-flex items-center justify-center gap-2 bg-white text-primary border border-primary/30 rounded-full text-fs14 font-semibold py-2 px-4 hover:bg-slate-50 transition-colors">
+                    ดูสถานที่นี้ในแผนที่แหล่งเรียนรู้
                   </a>
                 </div>
               <?php endif; ?>

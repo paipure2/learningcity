@@ -17,10 +17,11 @@ if (!defined('ABSPATH')) exit;
 
     <button id="btnLoadMoreDesktop" type="button"
       class="hidden w-full px-4 py-3 rounded-xl border bg-white hover:bg-slate-50 font-semibold text-sm">
-      โหลดเพิ่มอีก 10 รายการ
+      โหลดเพิ่ม
     </button>
 
     <div id="loadMoreHintDesktop" class="hidden text-xs text-slate-500 text-center"></div>
+    <div id="infiniteSentinelDesktop" aria-hidden="true" class="h-1"></div>
   </div>
 </section>
 
@@ -45,9 +46,10 @@ if (!defined('ABSPATH')) exit;
 
     <button id="btnLoadMoreMobile" type="button"
       class="hidden w-full px-4 py-3 rounded-xl border bg-white hover:bg-slate-50 font-semibold text-sm">
-      โหลดเพิ่มอีก 10 รายการ
+      โหลดเพิ่ม
     </button>
 
     <div id="loadMoreHintMobile" class="hidden text-xs text-slate-500 text-center"></div>
+    <div id="infiniteSentinelMobile" aria-hidden="true" class="h-1"></div>
   </div>
 </section>

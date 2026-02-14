@@ -322,6 +322,8 @@
       if (input) input.value = courseId;
       if (courseId) window.__LC_ACTIVE_COURSE_ID = String(courseId);
 
+      populateReportLocationOptions(btn);
+
       // Buttons injected by AJAX won't have modal.js direct binding,
       // so open target modal via delegation.
       const modalId = btn.getAttribute("data-modal-id") || "modal-course-report";
@@ -335,6 +337,42 @@
       body.style.overflow = "hidden";
       body.style.paddingRight = `${scrollbarWidth}px`;
     });
+  }
+
+  function extractLocationsFromRoot(root) {
+    if (!root) return [];
+    const out = [];
+    const seen = new Set();
+    root.querySelectorAll(".accordion-item[data-location-id]").forEach((item) => {
+      const id = String(item.getAttribute("data-location-id") || "").trim();
+      if (!id || seen.has(id)) return;
+      const nameEl = item.querySelector(".accordion-header span.block");
+      const name = (nameEl?.textContent || "").trim();
+      if (!name) return;
+      seen.add(id);
+      out.push({ id, name });
+    });
+    return out;
+  }
+
+  function populateReportLocationOptions(triggerBtn) {
+    const box = document.getElementById("courseReportLocations");
+    if (!box) return;
+
+    const fromModal = triggerBtn?.closest('[data-modal-content="modal-course"]');
+    let locations = extractLocationsFromRoot(fromModal || document);
+
+    if (!locations.length) {
+      box.innerHTML = '<div class="text-slate-500">ไม่พบรายการสถานที่ของคอร์สนี้</div>';
+      return;
+    }
+
+    box.innerHTML = locations.map((loc) => (
+      `<label class="flex items-center gap-2">
+        <input type="checkbox" name="report_location_ids[]" value="${loc.id}">
+        <span>${loc.name}</span>
+      </label>`
+    )).join("");
   }
 
   function bindReportSubmit() {
@@ -362,6 +400,7 @@
       const contact = form.querySelector('input[name="report_contact"]')?.value?.trim() || "";
       const website = form.querySelector('input[name="report_website"]')?.value?.trim() || "";
       const topics = Array.from(form.querySelectorAll('input[name="report_topics[]"]:checked')).map((el) => el.value);
+      const locationIds = Array.from(form.querySelectorAll('input[name="report_location_ids[]"]:checked')).map((el) => el.value);
 
       if (!courseId) {
         show(errEl, "ไม่พบคอร์สที่ต้องการแจ้งแก้ไข");
@@ -375,6 +414,7 @@
       fd.append("nonce", CFG.report_nonce || "");
       fd.append("course_id", courseId);
       topics.forEach((t) => fd.append("topics[]", t));
+      locationIds.forEach((id) => fd.append("location_ids[]", id));
       fd.append("details", details);
       fd.append("name", name);
       fd.append("contact", contact);

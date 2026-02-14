@@ -180,7 +180,27 @@ function blm_get_top_term_slug($term, $tax) {
   return $slug;
 }
 
+function blm_meta_value_to_ids($raw) {
+  if (is_array($raw)) {
+    $out = [];
+    foreach ($raw as $v) {
+      if (is_numeric($v)) $out[] = (int) $v;
+    }
+    return array_values(array_unique(array_filter($out)));
+  }
+
+  if (!is_string($raw) && !is_numeric($raw)) return [];
+
+  $value = maybe_unserialize($raw);
+  if (is_array($value)) return blm_meta_value_to_ids($value);
+  if (is_numeric($value)) return [intval($value)];
+
+  return [];
+}
+
 function blm_build_location_course_categories_map() {
+  global $wpdb;
+
   $session_ids = get_posts([
     'post_type'      => 'session',
     'post_status'    => 'publish',
@@ -191,30 +211,53 @@ function blm_build_location_course_categories_map() {
 
   if (empty($session_ids)) return [];
 
-  $course_term_cache = [];
-  $map = [];
+  $session_to_locations = [];
+  $session_to_courses = [];
 
+  foreach (array_chunk(array_map('intval', $session_ids), 800) as $chunk) {
+    if (empty($chunk)) continue;
+    $ph = implode(',', array_fill(0, count($chunk), '%d'));
+    $sql = $wpdb->prepare(
+      "SELECT post_id, meta_key, meta_value
+       FROM {$wpdb->postmeta}
+       WHERE post_id IN ($ph) AND meta_key IN ('location','course')",
+      $chunk
+    );
+    $rows = $wpdb->get_results($sql, ARRAY_A);
+    if (empty($rows)) continue;
+
+    foreach ($rows as $row) {
+      $sid = (int)($row['post_id'] ?? 0);
+      if ($sid <= 0) continue;
+      $ids = blm_meta_value_to_ids($row['meta_value'] ?? null);
+      if (empty($ids)) continue;
+
+      if (($row['meta_key'] ?? '') === 'location') {
+        if (!isset($session_to_locations[$sid])) $session_to_locations[$sid] = [];
+        foreach ($ids as $id) $session_to_locations[$sid][$id] = true;
+      } elseif (($row['meta_key'] ?? '') === 'course') {
+        if (!isset($session_to_courses[$sid])) $session_to_courses[$sid] = [];
+        foreach ($ids as $id) $session_to_courses[$sid][$id] = true;
+      }
+    }
+  }
+
+  $location_has_course = [];
   foreach ($session_ids as $sid) {
-    $loc_id = blm_location_id_from_session($sid);
-    if (!$loc_id) continue;
+    $locs = array_keys($session_to_locations[(int)$sid] ?? []);
+    $courses = array_keys($session_to_courses[(int)$sid] ?? []);
+    if (empty($locs) || empty($courses)) continue;
 
-    $course_id = blm_course_id_from_session($sid);
-    if (!$course_id) continue;
-
-    if (!isset($course_term_cache[$course_id])) {
-      $terms = get_the_terms($course_id, 'course_category');
-      $course_term_cache[$course_id] = is_wp_error($terms) || empty($terms) ? [] : $terms;
+    foreach ($locs as $loc_id) {
+      $loc_id = (int) $loc_id;
+      if ($loc_id <= 0) continue;
+      $location_has_course[$loc_id] = true;
     }
+  }
 
-    foreach ($course_term_cache[$course_id] as $term) {
-      $term_slug = blm_slug_decode($term->slug ?? '');
-      if (!$term_slug) continue;
-
-      $parent_slug = blm_get_top_term_slug($term, 'course_category');
-      if (!isset($map[$loc_id])) $map[$loc_id] = ['terms' => [], 'parents' => []];
-      $map[$loc_id]['terms'][$term_slug] = true;
-      if ($parent_slug) $map[$loc_id]['parents'][$parent_slug] = true;
-    }
+  $map = [];
+  foreach ($location_has_course as $loc_id => $has_course) {
+    $map[$loc_id] = ['has_course' => (bool)$has_course];
   }
 
   return $map;
@@ -278,28 +321,6 @@ function blm_get_terms_simple($tax, $args = []) {
   ], $terms);
 }
 
-function blm_get_terms_simple_with_parent_slug($tax, $args = []) {
-  $terms = get_terms(array_merge([
-    'taxonomy'   => $tax,
-    'hide_empty' => false,
-  ], is_array($args) ? $args : []));
-  if (is_wp_error($terms) || empty($terms)) return [];
-
-  return array_map(function ($t) use ($tax) {
-    $parent_slug = '';
-    if (!empty($t->parent)) {
-      $p = get_term((int)$t->parent, $tax);
-      $parent_slug = $p && !is_wp_error($p) ? blm_slug_decode($p->slug) : '';
-    }
-    return [
-      'slug'  => blm_slug_decode($t->slug),
-      'name'  => (string)$t->name,
-      'parent' => $parent_slug,
-      'count' => intval($t->count),
-    ];
-  }, $terms);
-}
-
 /**
  * Guard REST callbacks so PHP notices/warnings do not leak as HTML into JSON responses.
  */
@@ -325,9 +346,7 @@ function blm_rest_guard(callable $fn) {
 /** ---------- cache builders ---------- */
 
 function blm_build_locations_light_payload() {
-  // NOTE: Keep this endpoint lightweight. Building course-category map from all sessions
-  // can exhaust memory on large datasets.
-  $location_course_categories = [];
+  $location_course_categories = blm_build_location_course_categories_map();
   $q = new WP_Query([
     'post_type'              => 'location',
     'post_status'            => 'publish',
@@ -358,8 +377,8 @@ function blm_build_locations_light_payload() {
     $tags      = blm_all_term_slugs($post_id, 'age_range');
     $amenities = blm_all_term_slugs($post_id, 'facility');
     $admission = blm_all_term_slugs($post_id, 'admission_policy');
-    $course_cats = [];
-    $course_cat_parents = [];
+    $cc_meta = $location_course_categories[$post_id] ?? null;
+    $has_courses = !empty($cc_meta['has_course']);
 
     $address = $meta['address'][0] ?? '';
 
@@ -373,8 +392,7 @@ function blm_build_locations_light_payload() {
       'tags'      => $tags,
       'amenities' => $amenities,
       'admission_policies' => $admission,
-      'course_categories' => $course_cats,
-      'course_category_parents' => $course_cat_parents,
+      'has_courses' => $has_courses,
       'lat'       => $lat,
       'lng'       => $lng,
       'address'   => is_string($address) ? trim($address) : (string)$address,
@@ -386,7 +404,7 @@ function blm_build_locations_light_payload() {
     'places' => $places,
     'meta' => [
       'count' => count($places),
-      'schema_version' => 5,
+      'schema_version' => 9,
       'generated_at' => time(),
     ],
   ];
@@ -412,7 +430,6 @@ function blm_build_filters_payload() {
     'age_ranges' => blm_get_terms_simple('age_range'),
     'facilities' => blm_get_terms_simple('facility'),
     'admission_policies' => blm_get_terms_simple('admission_policy'),
-    'course_categories' => blm_get_terms_simple_with_parent_slug('course_category'),
     'meta' => [
       'generated_at' => time(),
     ],
@@ -543,6 +560,10 @@ function blm_build_location_first_image($post_id) {
 /** ---------- cache invalidation ---------- */
 
 function blm_clear_light_cache() {
+  delete_transient('blm_locations_light_v16');
+  delete_transient('blm_locations_light_v15');
+  delete_transient('blm_locations_light_v14');
+  delete_transient('blm_locations_light_v13');
   delete_transient('blm_locations_light_v12');
   delete_transient('blm_locations_light_v11');
   delete_transient('blm_locations_light_v10');
@@ -583,7 +604,7 @@ add_action('blm_rebuild_caches_event', function ($post_id = 0) {
 
   // rebuild light
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v12', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v16', $light, 6 * HOUR_IN_SECONDS);
 
   // rebuild filters
   $filters = blm_build_filters_payload();
@@ -761,7 +782,7 @@ register_activation_hook(__FILE__, function () {
 
   // อุ่น cache ทันทีหลังเปิด (กัน request แรกช้า)
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v12', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v16', $light, 6 * HOUR_IN_SECONDS);
 
   $filters = blm_build_filters_payload();
   set_transient('blm_filters_v6', $filters, 6 * HOUR_IN_SECONDS);
@@ -776,7 +797,7 @@ register_deactivation_hook(__FILE__, function () {
 /** ให้ cron มาสร้าง cache ใหม่เป็นช่วง ๆ */
 add_action('blm_refresh_caches', function () {
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v12', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v16', $light, 6 * HOUR_IN_SECONDS);
 
   $filters = blm_build_filters_payload();
   set_transient('blm_filters_v6', $filters, 6 * HOUR_IN_SECONDS);
@@ -795,13 +816,17 @@ add_action('rest_api_init', function () {
     'callback' => function (WP_REST_Request $req) {
       return blm_rest_guard(function () {
         // อ่านจาก cache เป็นหลัก
-        $resp = get_transient('blm_locations_light_v12');
+        $resp = get_transient('blm_locations_light_v16');
+        if (!$resp) $resp = get_transient('blm_locations_light_v15');
+        if (!$resp) $resp = get_transient('blm_locations_light_v14');
+        if (!$resp) $resp = get_transient('blm_locations_light_v13');
+        if (!$resp) $resp = get_transient('blm_locations_light_v12');
         if (!$resp) $resp = get_transient('blm_locations_light_v11');
         if (!$resp) $resp = get_transient('blm_locations_light_v10');
         if (!$resp) $resp = get_transient('blm_locations_light_v9');
         // backward fallback (old key)
         if (!$resp) $resp = get_transient('blm_locations_light_v7');
-        if (is_array($resp) && intval($resp['meta']['schema_version'] ?? 0) < 5) {
+        if (is_array($resp) && intval($resp['meta']['schema_version'] ?? 0) < 9) {
           $resp = null;
         }
 
@@ -809,14 +834,14 @@ add_action('rest_api_init', function () {
         if (!$resp) {
           try {
             $resp = blm_build_locations_light_payload();
-            set_transient('blm_locations_light_v12', $resp, 6 * HOUR_IN_SECONDS);
+            set_transient('blm_locations_light_v16', $resp, 6 * HOUR_IN_SECONDS);
           } catch (Throwable $e) {
             error_log('[BLM API] locations-light rebuild failed: ' . $e->getMessage());
             $resp = [
               'places' => [],
               'meta' => [
                 'count' => 0,
-                'schema_version' => 5,
+                'schema_version' => 9,
                 'generated_at' => time(),
               ],
             ];
@@ -867,7 +892,6 @@ add_action('rest_api_init', function () {
               'age_ranges' => [],
               'facilities' => [],
               'admission_policies' => [],
-              'course_categories' => [],
               'meta' => ['generated_at' => time()],
             ];
           }
@@ -921,6 +945,7 @@ add_action('rest_api_init', function () {
       if ($description === '') $description = $meta['description'][0] ?? '';
 
       // links
+      $acfMapUrl  = $meta['map_url'][0] ?? '';
       $googleMaps = $meta['google_maps'][0] ?? '';
       $facebook   = $meta['facebook'][0] ?? '';
 
@@ -941,7 +966,9 @@ add_action('rest_api_init', function () {
       'hours' => is_string($hours) ? trim($hours) : (string)$hours,
       'description' => is_string($description) ? trim($description) : (string)$description,
         'links' => [
-          'googleMaps' => is_string($googleMaps) ? trim($googleMaps) : '',
+          'googleMaps' => (is_string($acfMapUrl) && trim($acfMapUrl) !== '')
+            ? trim($acfMapUrl)
+            : (is_string($googleMaps) ? trim($googleMaps) : ''),
           'facebook'   => is_string($facebook) ? trim($facebook) : '',
         ],
       'images' => $images,
