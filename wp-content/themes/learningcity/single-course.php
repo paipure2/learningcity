@@ -67,7 +67,14 @@ set_query_var('mode', 'single');
                   get_template_part('template-parts/course/sessions-accordion');
                 ?>
 
-                
+                <div class="pt-3 pb-8 flex justify-center">
+                  <button class="inline-flex items-center gap-2 rounded-xl border border-red-500 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                          data-modal-id="modal-course-report"
+                          data-course-report-open
+                          data-course-id="<?php echo esc_attr($post_id); ?>">
+                    แจ้งแก้ไขข้อมูล
+                  </button>
+                </div>
 
               </div>
             </div>

@@ -144,7 +144,9 @@ add_action('wp_enqueue_scripts', function () {
   $data = [
     'ajax_url'    => admin_url('admin-ajax.php'),
     'nonce'       => wp_create_nonce('course_modal_nonce'),
+    'report_nonce'=> wp_create_nonce('lc_report_course'),
     'archive_url' => get_post_type_archive_link('course'),
+    'current_course_id' => is_singular('course') ? (int) get_queried_object_id() : 0,
   ];
 
   wp_add_inline_script(
@@ -317,6 +319,13 @@ add_action('acf/init', function () {
           'value' => 'location',
         ],
       ],
+      [
+        [
+          'param' => 'post_type',
+          'operator' => '==',
+          'value' => 'course',
+        ],
+      ],
     ],
     'position' => 'normal',
     'style' => 'default',
@@ -330,7 +339,8 @@ function lc_report_allowed_topics() {
 }
 
 function lc_recalc_report_counts($post_id) {
-  if (get_post_type($post_id) !== 'location') return;
+  $post_type = get_post_type($post_id);
+  if (!in_array($post_type, ['location', 'course'], true)) return;
   if (!function_exists('get_field')) return;
 
   $rows = get_field('field_lc_reports', $post_id);
@@ -363,12 +373,15 @@ function lc_recalc_report_counts($post_id) {
 }
 
 add_action('acf/save_post', function ($post_id) {
-  if (get_post_type($post_id) !== 'location') return;
+  $post_type = get_post_type($post_id);
+  if (!in_array($post_type, ['location', 'course'], true)) return;
   lc_recalc_report_counts($post_id);
 }, 20);
 
 add_action('wp_ajax_lc_report_location', 'lc_report_location');
 add_action('wp_ajax_nopriv_lc_report_location', 'lc_report_location');
+add_action('wp_ajax_lc_report_course', 'lc_report_course');
+add_action('wp_ajax_nopriv_lc_report_course', 'lc_report_course');
 
 function lc_report_location() {
   check_ajax_referer('lc_report_location', 'nonce');
@@ -425,6 +438,61 @@ function lc_report_location() {
 
   lc_recalc_report_counts($post_id);
 
+  wp_send_json_success(['message' => 'ok']);
+}
+
+function lc_report_course() {
+  check_ajax_referer('lc_report_course', 'nonce');
+
+  $post_id = isset($_POST['course_id']) ? intval($_POST['course_id']) : 0;
+  if (!$post_id || get_post_type($post_id) !== 'course' || get_post_status($post_id) !== 'publish') {
+    wp_send_json_error(['message' => 'invalid course'], 400);
+  }
+
+  $website = isset($_POST['website']) ? trim((string) $_POST['website']) : '';
+  if ($website !== '') {
+    wp_send_json_success(['message' => 'ok']);
+  }
+
+  $ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : 'unknown';
+  $rate_key = 'lc_report_course_rl_' . md5($ip);
+  if (get_transient($rate_key)) {
+    wp_send_json_error(['message' => 'rate_limited'], 429);
+  }
+  set_transient($rate_key, 1, 60);
+
+  $topics = isset($_POST['topics']) ? (array) $_POST['topics'] : [];
+  $topics = array_values(array_intersect($topics, lc_report_allowed_topics()));
+  $details = isset($_POST['details']) ? sanitize_textarea_field($_POST['details']) : '';
+  $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
+  $contact = isset($_POST['contact']) ? sanitize_text_field($_POST['contact']) : '';
+
+  if (empty($topics) && mb_strlen($details) < 3) {
+    wp_send_json_error(['message' => 'missing details'], 400);
+  }
+
+  if (!function_exists('add_row')) {
+    wp_send_json_error(['message' => 'acf not available'], 500);
+  }
+
+  $row = [
+    'reported_at' => current_time('Y-m-d H:i'),
+    'status' => 'pending',
+    'report_details_group' => [
+      'report_topics' => $topics,
+      'report_details' => $details,
+      'reporter_name' => $name,
+      'reporter_contact' => $contact,
+      'admin_note' => '',
+    ],
+  ];
+
+  $added = add_row('field_lc_reports', $row, $post_id);
+  if (!$added) {
+    wp_send_json_error(['message' => 'failed to save'], 500);
+  }
+
+  lc_recalc_report_counts($post_id);
   wp_send_json_success(['message' => 'ok']);
 }
 
@@ -642,6 +710,247 @@ function lc_render_location_reports_page() {
   echo '<table class="wp-list-table widefat fixed striped">';
   echo '<thead><tr>';
   echo '<th>ชื่อสถานที่</th>';
+  echo '<th style="width:140px">จำนวนรายงานค้าง</th>';
+  echo '<th style="width:180px">วันที่รายงานล่าสุด</th>';
+  echo '</tr></thead>';
+  echo '<tbody>';
+
+  if ($q->have_posts()) {
+    while ($q->have_posts()) {
+      $q->the_post();
+      $post_id = get_the_ID();
+      $open = (int) get_post_meta($post_id, '_lc_report_open_count', true);
+      $last_at = (int) get_post_meta($post_id, '_lc_report_last_at', true);
+      $last_text = $last_at ? date_i18n('Y-m-d H:i', $last_at) : '-';
+      $edit_link = get_edit_post_link($post_id);
+
+      echo '<tr>';
+      echo '<td><a href="' . esc_url($edit_link) . '"><strong>' . esc_html(get_the_title()) . '</strong></a></td>';
+      echo '<td>' . esc_html($open) . '</td>';
+      echo '<td>' . esc_html($last_text) . '</td>';
+      echo '</tr>';
+    }
+    wp_reset_postdata();
+  } else {
+    echo '<tr><td colspan="3">ไม่มีรายการ</td></tr>';
+  }
+
+  echo '</tbody></table>';
+  echo '</div>';
+}
+
+/* =========================================================
+ * [ADMIN] Course Reports page
+ * ========================================================= */
+add_action('admin_menu', function () {
+  $counts = lc_course_reports_tab_counts();
+  $pending = intval($counts['pending'] ?? 0);
+  $badge = $pending > 0
+    ? ' <span class="update-plugins count-' . $pending . '"><span class="update-count">' . $pending . '</span></span>'
+    : '';
+
+  add_submenu_page(
+    'edit.php?post_type=course',
+    'Course Reports',
+    'แจ้งแก้ไข' . $badge,
+    'edit_posts',
+    'lc-course-reports',
+    'lc_render_course_reports_page'
+  );
+}, 10);
+
+add_action('admin_menu', function () {
+  global $submenu;
+  $parent = 'edit.php?post_type=course';
+  if (empty($submenu[$parent]) || !is_array($submenu[$parent])) return;
+
+  $items = $submenu[$parent];
+  $target = null;
+  foreach ($items as $i => $item) {
+    if (!empty($item[2]) && $item[2] === 'lc-course-reports') {
+      $target = $item;
+      unset($items[$i]);
+      break;
+    }
+  }
+  if (!$target) return;
+
+  $new = [];
+  $inserted = false;
+  foreach ($items as $item) {
+    $new[] = $item;
+    if (!empty($item[2]) && $item[2] === 'edit.php?post_type=course') {
+      $new[] = $target;
+      $inserted = true;
+    }
+  }
+  if (!$inserted) $new[] = $target;
+
+  $submenu[$parent] = $new;
+}, 999);
+
+function lc_course_reports_tab_counts() {
+  $counts = [
+    'pending' => 0,
+    'reviewing' => 0,
+    'resolved' => 0,
+    'all' => 0,
+  ];
+
+  $q_all = new WP_Query([
+    'post_type' => 'course',
+    'post_status' => 'publish',
+    'fields' => 'ids',
+    'posts_per_page' => -1,
+    'no_found_rows' => false,
+    'meta_query' => [
+      [
+        'key' => '_lc_report_total_count',
+        'value' => 0,
+        'compare' => '>',
+        'type' => 'NUMERIC',
+      ],
+    ],
+  ]);
+  $counts['all'] = (int) $q_all->found_posts;
+
+  $q_pending = new WP_Query([
+    'post_type' => 'course',
+    'post_status' => 'publish',
+    'fields' => 'ids',
+    'posts_per_page' => -1,
+    'no_found_rows' => false,
+    'meta_query' => [
+      [
+        'key' => '_lc_report_pending_count',
+        'value' => 0,
+        'compare' => '>',
+        'type' => 'NUMERIC',
+      ],
+    ],
+  ]);
+  $counts['pending'] = (int) $q_pending->found_posts;
+
+  $q_review = new WP_Query([
+    'post_type' => 'course',
+    'post_status' => 'publish',
+    'fields' => 'ids',
+    'posts_per_page' => -1,
+    'no_found_rows' => false,
+    'meta_query' => [
+      [
+        'key' => '_lc_report_reviewing_count',
+        'value' => 0,
+        'compare' => '>',
+        'type' => 'NUMERIC',
+      ],
+    ],
+  ]);
+  $counts['reviewing'] = (int) $q_review->found_posts;
+
+  $q_resolved = new WP_Query([
+    'post_type' => 'course',
+    'post_status' => 'publish',
+    'fields' => 'ids',
+    'posts_per_page' => -1,
+    'no_found_rows' => false,
+    'meta_query' => [
+      [
+        'key' => '_lc_report_total_count',
+        'value' => 0,
+        'compare' => '>',
+        'type' => 'NUMERIC',
+      ],
+      [
+        'key' => '_lc_report_open_count',
+        'value' => 0,
+        'compare' => '=',
+        'type' => 'NUMERIC',
+      ],
+    ],
+  ]);
+  $counts['resolved'] = (int) $q_resolved->found_posts;
+
+  return $counts;
+}
+
+function lc_render_course_reports_page() {
+  if (!current_user_can('edit_posts')) return;
+
+  $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'pending';
+  if (!in_array($tab, ['pending', 'reviewing', 'resolved', 'all'], true)) $tab = 'pending';
+
+  $counts = lc_course_reports_tab_counts();
+
+  $meta_query = [];
+  if ($tab === 'pending') {
+    $meta_query[] = [
+      'key' => '_lc_report_pending_count',
+      'value' => 0,
+      'compare' => '>',
+      'type' => 'NUMERIC',
+    ];
+  } elseif ($tab === 'reviewing') {
+    $meta_query[] = [
+      'key' => '_lc_report_reviewing_count',
+      'value' => 0,
+      'compare' => '>',
+      'type' => 'NUMERIC',
+    ];
+  } elseif ($tab === 'resolved') {
+    $meta_query[] = [
+      'key' => '_lc_report_total_count',
+      'value' => 0,
+      'compare' => '>',
+      'type' => 'NUMERIC',
+    ];
+    $meta_query[] = [
+      'key' => '_lc_report_open_count',
+      'value' => 0,
+      'compare' => '=',
+      'type' => 'NUMERIC',
+    ];
+  } else {
+    $meta_query[] = [
+      'key' => '_lc_report_total_count',
+      'value' => 0,
+      'compare' => '>',
+      'type' => 'NUMERIC',
+    ];
+  }
+
+  $q = new WP_Query([
+    'post_type' => 'course',
+    'post_status' => 'publish',
+    'posts_per_page' => 50,
+    'orderby' => 'meta_value_num',
+    'meta_key' => '_lc_report_last_at',
+    'order' => 'DESC',
+    'meta_query' => $meta_query,
+  ]);
+
+  echo '<div class="wrap">';
+  echo '<h1>แจ้งแก้ไข</h1>';
+
+  $base_url = admin_url('edit.php?post_type=course&page=lc-course-reports');
+  echo '<h2 class="nav-tab-wrapper">';
+  $tabs = [
+    'pending' => 'ยังไม่แก้ไข',
+    'reviewing' => 'กำลังตรวจสอบ',
+    'resolved' => 'แก้ไขแล้ว',
+    'all' => 'ทั้งหมด',
+  ];
+  foreach ($tabs as $key => $label) {
+    $url = esc_url(add_query_arg('tab', $key, $base_url));
+    $class = $tab === $key ? 'nav-tab nav-tab-active' : 'nav-tab';
+    $count = intval($counts[$key] ?? 0);
+    echo '<a class="' . esc_attr($class) . '" href="' . $url . '">' . esc_html($label) . ' <span class="count">(' . $count . ')</span></a>';
+  }
+  echo '</h2>';
+
+  echo '<table class="wp-list-table widefat fixed striped">';
+  echo '<thead><tr>';
+  echo '<th>ชื่อคอร์ส</th>';
   echo '<th style="width:140px">จำนวนรายงานค้าง</th>';
   echo '<th style="width:180px">วันที่รายงานล่าสุด</th>';
   echo '</tr></thead>';

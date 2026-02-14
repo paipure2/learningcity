@@ -301,10 +301,12 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
+  transition: opacity 0.24s ease, visibility 0s linear 0.24s;
 }
 
 .modal.modal-active {
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
+  transition: opacity 0.24s ease, visibility 0s linear 0s;
 }/*# sourceMappingURL=style.css.map */

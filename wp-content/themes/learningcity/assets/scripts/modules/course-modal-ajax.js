@@ -23,8 +23,37 @@
 
   function qs(sel) { return document.querySelector(sel); }
 
+  function setActiveCourseReportId(courseId) {
+    const id = String(courseId || "");
+    window.__LC_ACTIVE_COURSE_ID = id;
+    document.querySelectorAll("[data-course-report-open]").forEach((btn) => {
+      const inModalCourse = btn.closest('[data-modal-content="modal-course"]');
+      if (inModalCourse) btn.setAttribute("data-course-id", id);
+    });
+    const input = document.getElementById("courseReportCourseId");
+    if (input) input.value = id;
+  }
+
   function getModalEl() {
     return qs('[data-modal-content="modal-course"]');
+  }
+
+  function openFirstAccordionInModal(modal) {
+    if (!modal) return;
+    const firstItem = modal.querySelector(".accordion-item");
+    if (!firstItem) return;
+
+    const firstPanel = firstItem.querySelector(".accordion-panel");
+    if (!firstPanel) return;
+
+    modal.querySelectorAll(".accordion-item").forEach((it) => {
+      it.classList.remove("is-active");
+      const p = it.querySelector(".accordion-panel");
+      if (p) p.style.maxHeight = "";
+    });
+
+    firstItem.classList.add("is-active");
+    firstPanel.style.maxHeight = `${firstPanel.scrollHeight}px`;
   }
 
   // ✅ ใช้ class is-loading ให้เข้ากับ CSS:
@@ -49,6 +78,8 @@
     clearSkeletonTimer();
     skeletonTimer = setTimeout(() => {
       setSkeleton(modal, false);
+      // Wait until content is visible before calculating panel height.
+      requestAnimationFrame(() => openFirstAccordionInModal(modal));
       document.dispatchEvent(new CustomEvent('courseModal:loaded', { detail: { courseId } }));
     }, SKELETON_DELAY_MS);
   }
@@ -147,6 +178,8 @@
     if (controller) controller.abort();
 
     try {
+      setActiveCourseReportId(courseId);
+
       let data;
       if (cache.has(courseId)) {
         data = cache.get(courseId);
@@ -256,6 +289,178 @@
     const id = getCourseIdFromUrl();
     if (id) loadIntoModal(id, '');
   });
+})();
+
+// ===== Course report modal submit (single + course popup) =====
+(() => {
+  const CFG = window.COURSE_MODAL || {};
+  if (!window.__LC_ACTIVE_COURSE_ID && CFG.current_course_id) {
+    window.__LC_ACTIVE_COURSE_ID = String(CFG.current_course_id);
+  }
+
+  function hide(el) {
+    if (el) el.classList.add("hidden");
+  }
+
+  function show(el, text) {
+    if (!el) return;
+    el.textContent = text || "";
+    el.classList.remove("hidden");
+  }
+
+  function bindReportOpenButtons() {
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-course-report-open]");
+      if (!btn) return;
+
+      e.preventDefault();
+      const courseId =
+        btn.getAttribute("data-course-id") ||
+        String(window.__LC_ACTIVE_COURSE_ID || "") ||
+        String(CFG.current_course_id || "");
+      const input = document.getElementById("courseReportCourseId");
+      if (input) input.value = courseId;
+      if (courseId) window.__LC_ACTIVE_COURSE_ID = String(courseId);
+
+      // Buttons injected by AJAX won't have modal.js direct binding,
+      // so open target modal via delegation.
+      const modalId = btn.getAttribute("data-modal-id") || "modal-course-report";
+      const modalWrap = document.querySelector(`[data-modal-content="${modalId}"]`);
+      if (!modalWrap) return;
+      modalWrap.classList.add("modal-active");
+
+      const body = document.body;
+      body.setAttribute("data-scroll", "hidden");
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      body.style.overflow = "hidden";
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    });
+  }
+
+  function bindReportSubmit() {
+    const form = document.getElementById("courseReportForm");
+    if (!form || form.dataset.bound === "1") return;
+    form.dataset.bound = "1";
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const submitBtn = document.getElementById("courseReportSubmit");
+      const errEl = document.getElementById("courseReportError");
+      const okEl = document.getElementById("courseReportSuccess");
+
+      hide(errEl);
+      hide(okEl);
+
+      const courseId =
+        document.getElementById("courseReportCourseId")?.value ||
+        String(window.__LC_ACTIVE_COURSE_ID || "") ||
+        String(CFG.current_course_id || "");
+
+      const details = form.querySelector('textarea[name="report_details"]')?.value?.trim() || "";
+      const name = form.querySelector('input[name="report_name"]')?.value?.trim() || "";
+      const contact = form.querySelector('input[name="report_contact"]')?.value?.trim() || "";
+      const website = form.querySelector('input[name="report_website"]')?.value?.trim() || "";
+      const topics = Array.from(form.querySelectorAll('input[name="report_topics[]"]:checked')).map((el) => el.value);
+
+      if (!courseId) {
+        show(errEl, "ไม่พบคอร์สที่ต้องการแจ้งแก้ไข");
+        return;
+      }
+      const idInput = document.getElementById("courseReportCourseId");
+      if (idInput) idInput.value = String(courseId);
+
+      const fd = new FormData();
+      fd.append("action", "lc_report_course");
+      fd.append("nonce", CFG.report_nonce || "");
+      fd.append("course_id", courseId);
+      topics.forEach((t) => fd.append("topics[]", t));
+      fd.append("details", details);
+      fd.append("name", name);
+      fd.append("contact", contact);
+      fd.append("website", website);
+
+      const oldText = submitBtn?.textContent || "";
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "กำลังส่ง...";
+      }
+
+      try {
+        const res = await fetch(CFG.ajax_url, {
+          method: "POST",
+          credentials: "same-origin",
+          body: fd,
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+
+        const raw = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(raw);
+        } catch (_) {
+          throw new Error("ระบบขัดข้องชั่วคราว (response ไม่ถูกต้อง)");
+        }
+
+        if (!res.ok || !data?.success) {
+          let msg = data?.data?.message || "ส่งรายงานไม่สำเร็จ";
+          if (msg === "missing details") msg = "กรุณาเลือกหัวข้อหรือกรอกรายละเอียดอย่างน้อย 3 ตัวอักษร";
+          if (msg === "invalid course") msg = "ไม่พบคอร์สที่ต้องการแจ้งแก้ไข";
+          if (msg === "rate_limited") msg = "ส่งถี่เกินไป กรุณารอ 1 นาทีแล้วลองใหม่";
+          if (msg === "-1") msg = "หมดเวลา session กรุณารีเฟรชหน้าแล้วลองใหม่";
+          throw new Error(msg);
+        }
+
+        show(okEl, "ส่งรายงานเรียบร้อย ขอบคุณสำหรับข้อมูล");
+        form.reset();
+      } catch (err) {
+        show(errEl, err?.message || "ส่งรายงานไม่สำเร็จ");
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = oldText || "ส่งรายงาน";
+        }
+      }
+    });
+  }
+
+  function closeCourseReportModalOnly() {
+    const reportModal = document.querySelector('[data-modal-content="modal-course-report"]');
+    if (!reportModal) return;
+
+    reportModal.classList.remove("modal-active");
+
+    const hasActiveModal = !!document.querySelector(".modal.modal-active");
+    if (!hasActiveModal) {
+      const body = document.body;
+      body.removeAttribute("data-scroll");
+      body.style.overflow = "";
+      body.style.paddingRight = "";
+    }
+  }
+
+  function bindReportCloseButtons() {
+    document.addEventListener("click", (e) => {
+      const closeBtn = e.target.closest(".close-course-report-modal");
+      const overlay = e.target.closest(".overlay-course-report");
+      if (!closeBtn && !overlay) return;
+
+      e.preventDefault();
+      closeCourseReportModalOnly();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      bindReportOpenButtons();
+      bindReportSubmit();
+      bindReportCloseButtons();
+    });
+  } else {
+    bindReportOpenButtons();
+    bindReportSubmit();
+    bindReportCloseButtons();
+  }
 })();
 
 // ===== Distance sort for course sessions (single + modal) =====

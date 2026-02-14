@@ -57,6 +57,11 @@ get_template_part('template-parts/course/hero');
 get_template_part('template-parts/course/stats');
 get_template_part('template-parts/course/description');
 get_template_part('template-parts/course/sessions-accordion');
+
+echo '<div class="pt-3 pb-8 flex justify-center">';
+echo '  <button class="inline-flex items-center gap-2 rounded-xl border border-red-500 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50" data-modal-id="modal-course-report" data-course-report-open data-course-id="' . esc_attr($course_id) . '">แจ้งแก้ไขข้อมูล</button>';
+echo '</div>';
+
 get_template_part('template-parts/course/modal-style');
 
 wp_reset_postdata();

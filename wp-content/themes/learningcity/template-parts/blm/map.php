@@ -172,7 +172,7 @@ if (!defined('ABSPATH')) exit;
 
               <div id="rowReportIssue" class="hidden pt-1">
                 <button id="btnReportIssue"
-                        class="inline-flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+                        class="inline-flex items-center gap-2 rounded-xl border border-red-500 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
                   แจ้งแก้ไขข้อมูล
                 </button>
               </div>
