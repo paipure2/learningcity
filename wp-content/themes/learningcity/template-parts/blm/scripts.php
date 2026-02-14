@@ -9,6 +9,7 @@ if (!defined('ABSPATH')) exit;
   const SITE_BASE = window.location.origin + (SITE_PATH || "");
   const SITE_ROOT = SITE_BASE.replace(/\/+$/, "");
   const BLM_API_BASE = `${SITE_ROOT}/wp-json/blm/v1`;
+  const BLM_LIST_PLACEHOLDER = `${SITE_ROOT}/wp-content/themes/learningcity/assets/images/placeholder-gray.png`;
   const LOCAL_GLYPHS_BASE = `${SITE_BASE}/wp-content/themes/learningcity/assets/fonts/map-font`;
   // Must match the folder name exactly (see MapLibre Font Maker output)
   const LOCAL_GLYPH_FONT = "Anuphan-SemiBold";
@@ -27,7 +28,7 @@ if (!defined('ABSPATH')) exit;
   const REPORT_AJAX_URL = "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
   const REPORT_NONCE = "<?php echo esc_js(wp_create_nonce('lc_report_location')); ?>";
   const LOCATION_CACHE_KEY = "lc_user_location_v1";
-  const PLACES_CACHE_KEY = "lc_blm_places_cache_v1";
+  const PLACES_CACHE_KEY = "lc_blm_places_cache_v2";
   const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
   const PLACES_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes
   const WELCOME_SEEN_KEY = "lc_blm_welcome_seen_v1";
@@ -416,17 +417,18 @@ if (!defined('ABSPATH')) exit;
 
   // ================= FULL DATA =================
   const fullCache = new Map();
-  async function loadFullForId(id) {
+  async function loadFullForId(id, options = {}) {
+    const silent = !!options.silent;
     if (fullCache.has(id)) return fullCache.get(id);
     try {
-      setApiLoading(true, "กำลังโหลดรายละเอียด...", "drawer");
+      if (!silent) setApiLoading(true, "กำลังโหลดรายละเอียด...", "drawer");
       const res = await fetch(`${BLM_API_BASE}/location/${id}`);
       if (!res.ok) return null;
       const full = await res.json();
       fullCache.set(id, full);
       return full;
     } finally {
-      setApiLoading(false, "", "drawer");
+      if (!silent) setApiLoading(false, "", "drawer");
     }
   }
 
@@ -544,6 +546,15 @@ if (!defined('ABSPATH')) exit;
     const csv = _toCsv(setOrArr);
     if (!csv) sp.delete(key);
     else sp.set(key, csv);
+  }
+
+  function escHtml(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function getCurrentUrlState() {
@@ -2177,7 +2188,7 @@ if (!defined('ABSPATH')) exit;
 
       zone.addEventListener("pointerdown", (e) => {
         if (!canStartFromTarget(e.target)) return;
-        if (e.pointerType !== "mouse" && e.pointerType !== "touch" && e.pointerType !== "pen") return;
+        if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
         activePointerId = e.pointerId;
         if (zone.setPointerCapture) {
           try { zone.setPointerCapture(e.pointerId); } catch (err) {}
@@ -2222,6 +2233,7 @@ if (!defined('ABSPATH')) exit;
     let startTs = 0;
     let dragMoved = false;
     let activePointerId = null;
+    let dragInputType = ""; // "touch" | "pen" | ""
     let wasExpanded = false;
     let startScrollEl = null;
     let gesturePrimed = false;
@@ -2251,10 +2263,11 @@ if (!defined('ABSPATH')) exit;
       return null;
     };
 
-    const startDrag = (clientY) => {
+    const startDrag = (clientY, inputType = "") => {
       if (!isMobile()) return;
       if (sheet.classList.contains("is-hidden")) return;
       dragging = true;
+      dragInputType = inputType || "";
       startY = clientY;
       startTs = Date.now();
       dragMoved = false;
@@ -2277,6 +2290,7 @@ if (!defined('ABSPATH')) exit;
     const resetGesture = () => {
       dragging = false;
       gestureMode = "";
+      dragInputType = "";
       startScrollEl = null;
       gesturePrimed = false;
     };
@@ -2303,7 +2317,7 @@ if (!defined('ABSPATH')) exit;
       mobileSheetExpanded = nextExpanded;
       sheet.classList.toggle("is-expanded", nextExpanded);
       sheet.classList.toggle("is-collapsed", !nextExpanded);
-      if (dragMoved) {
+      if (dragMoved && dragInputType === "touch") {
         suppressSheetHandleClickUntil = Date.now() + 350;
         suppressSheetCardClickUntil = Date.now() + 400;
       }
@@ -2345,7 +2359,7 @@ if (!defined('ABSPATH')) exit;
       // In expanded state, only drag-down at top should control the sheet (otherwise keep list scrolling).
       const shouldDrag = !isExpandedNow ? true : (draggingDown && atTop);
       gestureMode = shouldDrag ? "drag" : "scroll";
-      if (gestureMode === "drag") startDrag(startY);
+      if (gestureMode === "drag") startDrag(startY, "touch");
       return gestureMode;
     };
 
@@ -2358,7 +2372,7 @@ if (!defined('ABSPATH')) exit;
     sheet.addEventListener("touchcancel", endDrag);
 
     sheet.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.pointerType === "mouse") return;
       activePointerId = e.pointerId;
       if (sheet.setPointerCapture) {
         try { sheet.setPointerCapture(e.pointerId); } catch (err) {}
@@ -2394,7 +2408,8 @@ if (!defined('ABSPATH')) exit;
     window.addEventListener("pointercancel", () => { activePointerId = null; });
 
     sheet.addEventListener("click", (e) => {
-      if (Date.now() < suppressSheetCardClickUntil) {
+      const isTouchClick = !!(e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents);
+      if (isTouchClick && Date.now() < suppressSheetCardClickUntil) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -2834,6 +2849,19 @@ if (!defined('ABSPATH')) exit;
     const meta = catMeta(primaryCat);
     const iconKey = getIconKeyFromCategory(primaryCat);
     const distText = userLocation ? `ห่างจากคุณ ${formatKm(place._distanceKm)}` : "";
+    const listImage = place?.list_image || null;
+    const listImageSrc = listImage?.thumb || listImage?.medium || listImage?.large || BLM_LIST_PLACEHOLDER;
+    const isPlaceholderImage = listImageSrc === BLM_LIST_PLACEHOLDER;
+    const imageBgColor = isPlaceholderImage ? "#f1f1f1" : "#e2e8f0";
+    const nameText = escHtml(place?.name || "");
+    const districtText = escHtml(`${meta.label}${place.district ? (" : เขต" + place.district) : ""}`);
+    const tagsHtml = (place.tags || [])
+      .slice(0, 4)
+      .map((t) => `<span class="text-[11px] px-2 py-[1px] rounded-full border bg-white">${escHtml(t)}</span>`)
+      .join("");
+    const distanceText = escHtml(distText);
+    const imageAlt = nameText || "สถานที่";
+
     const card = document.createElement("button");
     card.type = "button";
     card.className = "w-full text-left p-4 rounded-xl bg-white border hover:shadow-sm transition";
@@ -2842,18 +2870,63 @@ if (!defined('ABSPATH')) exit;
         <div class="shrink-0 mt-0.5 w-[35px] h-[35px] rounded-lg text-white flex items-center justify-center" style="background:${meta.color}">${svgForDom(iconKey, "icon-18")}</div>
         <div class="min-w-0 flex-1">
           <div class="font-semibold leading-snug text-[16px]">
-            <span>${place.name}</span>
+            <span>${nameText}</span>
           </div>
           <div class="text-[14px] text-slate-700">
-            <span>${meta.label}${place.district ? (" : เขต" + place.district) : ""}</span>
+            <span>${districtText}</span>
           </div>
           <div class="mt-2 flex flex-wrap gap-1">
-            ${(place.tags || []).slice(0,4).map(t => `<span class="text-[11px] px-2 py-[1px] rounded-full border bg-white">${t}</span>`).join("")}
+            ${tagsHtml}
           </div>
-          <div class="text-[14px] font-semibold text-emerald-700 mt-2">${distText}</div>
+          <div class="text-[14px] font-semibold text-emerald-700 mt-2">${distanceText}</div>
+        </div>
+        <div class="shrink-0 rounded-lg overflow-hidden" style="width:80px;height:80px;border:none;background:${imageBgColor};">
+          <img
+            data-role="list-thumb"
+            src="${escHtml(listImageSrc)}"
+            alt="${imageAlt}"
+            class="w-full h-full object-cover"
+            style="width:80px;height:80px;border:none;"
+            loading="lazy"
+            decoding="async"
+            fetchpriority="low"
+            width="80"
+            height="80"
+          >
         </div>
       </div>
     `;
+
+    // Fallback lazy hydrate: when card enters viewport, pull first image from /location/:id
+    const imgEl = card.querySelector('img[data-role="list-thumb"]');
+    const hasApiThumb = !!(listImage && (listImage.thumb || listImage.medium || listImage.large));
+    if (imgEl && !hasApiThumb) {
+      const hydrateImage = async () => {
+        if (imgEl.dataset.hydrated === "1") return;
+        imgEl.dataset.hydrated = "1";
+        try {
+          const full = await loadFullForId(place.id, { silent: true });
+          const first = Array.isArray(full?.images) && full.images.length ? full.images[0] : null;
+          const src = first?.medium || first?.url || first?.large || "";
+          if (src) imgEl.src = src;
+        } catch (_) {
+          // keep placeholder on failure
+        }
+      };
+
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries, ob) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            ob.unobserve(entry.target);
+            hydrateImage();
+          });
+        }, { rootMargin: "160px 0px" });
+        observer.observe(card);
+      } else {
+        hydrateImage();
+      }
+    }
 
     card.addEventListener("mouseenter", () => {
       if (!map) return;

@@ -14,7 +14,7 @@ function blm_float_or_null($v) {
 }
 
 function blm_location_full_cache_key($location_id) {
-  return 'blm_location_full_v2_' . intval($location_id);
+  return 'blm_location_full_v3_' . intval($location_id);
 }
 
 function blm_get_location_description_from_content($post_id) {
@@ -325,15 +325,17 @@ function blm_rest_guard(callable $fn) {
 /** ---------- cache builders ---------- */
 
 function blm_build_locations_light_payload() {
-  $location_course_categories = blm_build_location_course_categories_map();
+  // NOTE: Keep this endpoint lightweight. Building course-category map from all sessions
+  // can exhaust memory on large datasets.
+  $location_course_categories = [];
   $q = new WP_Query([
     'post_type'              => 'location',
     'post_status'            => 'publish',
     'posts_per_page'         => -1,
     'fields'                 => 'ids',
     'no_found_rows'          => true,
-    'update_post_term_cache' => true,
-    'update_post_meta_cache' => true,
+    'update_post_term_cache' => false,
+    'update_post_meta_cache' => false,
     'orderby'                => 'date',
     'order'                  => 'DESC',
   ]);
@@ -356,12 +358,8 @@ function blm_build_locations_light_payload() {
     $tags      = blm_all_term_slugs($post_id, 'age_range');
     $amenities = blm_all_term_slugs($post_id, 'facility');
     $admission = blm_all_term_slugs($post_id, 'admission_policy');
-    $course_cats = isset($location_course_categories[$post_id]['terms'])
-      ? array_values(array_keys($location_course_categories[$post_id]['terms']))
-      : [];
-    $course_cat_parents = isset($location_course_categories[$post_id]['parents'])
-      ? array_values(array_keys($location_course_categories[$post_id]['parents']))
-      : [];
+    $course_cats = [];
+    $course_cat_parents = [];
 
     $address = $meta['address'][0] ?? '';
 
@@ -380,6 +378,7 @@ function blm_build_locations_light_payload() {
       'lat'       => $lat,
       'lng'       => $lng,
       'address'   => is_string($address) ? trim($address) : (string)$address,
+      'list_image' => blm_build_location_first_image($post_id),
     ];
   }
 
@@ -387,7 +386,7 @@ function blm_build_locations_light_payload() {
     'places' => $places,
     'meta' => [
       'count' => count($places),
-      'schema_version' => 2,
+      'schema_version' => 5,
       'generated_at' => time(),
     ],
   ];
@@ -422,10 +421,17 @@ function blm_build_filters_payload() {
 
 function blm_build_location_images($post_id) {
   $images = [];
-  if (!function_exists('get_field')) return $images;
+  $gallery = function_exists('get_field') ? get_field('images', $post_id) : null;
 
-  $gallery = get_field('images', $post_id);
-  if (!is_array($gallery)) return $images;
+  // Fallback: read raw postmeta for gallery field
+  if (!is_array($gallery) || empty($gallery)) {
+    $raw = get_post_meta($post_id, 'images', true);
+    if (is_string($raw)) $raw = maybe_unserialize($raw);
+    if (is_array($raw)) $gallery = $raw;
+    elseif (!empty($raw)) $gallery = [$raw];
+  }
+
+  if (!is_array($gallery) || empty($gallery)) return $images;
 
   foreach ($gallery as $img) {
     // ACF image array
@@ -459,9 +465,87 @@ function blm_build_location_images($post_id) {
   return $images;
 }
 
+function blm_normalize_image_for_list($value) {
+  if (!$value) return null;
+
+  // ACF image array
+  if (is_array($value) && !empty($value['url'])) {
+    $url = $value['url'];
+    return [
+      'thumb' => $value['sizes']['thumbnail'] ?? $url,
+      'medium' => $value['sizes']['medium'] ?? $url,
+      'large' => $value['sizes']['large'] ?? $url,
+      'caption' => (string) ($value['caption'] ?? ''),
+    ];
+  }
+
+  // Attachment ID
+  if (is_numeric($value)) {
+    $id = (int) $value;
+    $full = wp_get_attachment_url($id);
+    if (!$full) return null;
+    $thumb = wp_get_attachment_image_src($id, 'thumbnail');
+    $med = wp_get_attachment_image_src($id, 'medium');
+    $lg = wp_get_attachment_image_src($id, 'large');
+    $caption = wp_get_attachment_caption($id);
+    return [
+      'thumb' => is_array($thumb) ? $thumb[0] : $full,
+      'medium' => is_array($med) ? $med[0] : $full,
+      'large' => is_array($lg) ? $lg[0] : $full,
+      'caption' => $caption ?: '',
+    ];
+  }
+
+  // Raw URL
+  if (is_string($value) && $value !== '') {
+    return [
+      'thumb' => $value,
+      'medium' => $value,
+      'large' => $value,
+      'caption' => '',
+    ];
+  }
+
+  return null;
+}
+
+function blm_build_location_first_image($post_id) {
+  // Lightweight mode for locations-light: read only raw postmeta to avoid memory spikes.
+  $raw = get_post_meta($post_id, 'images', true);
+  if (is_string($raw)) $raw = maybe_unserialize($raw);
+
+  if (is_array($raw) && !empty($raw)) {
+    $img = blm_normalize_image_for_list(reset($raw));
+    if ($img) return $img;
+  } else {
+    $img = blm_normalize_image_for_list($raw);
+    if ($img) return $img;
+  }
+
+  // Fallbacks if images gallery empty
+  foreach (['image', 'thumbnail', 'cover', 'featured_image'] as $field_name) {
+    $v = get_post_meta($post_id, $field_name, true);
+    if (is_string($v)) $v = maybe_unserialize($v);
+    $img = blm_normalize_image_for_list($v);
+    if ($img) return $img;
+  }
+
+  // Final fallback: WP featured image
+  $thumb_id = get_post_thumbnail_id($post_id);
+  if ($thumb_id) {
+    $img = blm_normalize_image_for_list((int) $thumb_id);
+    if ($img) return $img;
+  }
+
+  return null;
+}
+
 /** ---------- cache invalidation ---------- */
 
 function blm_clear_light_cache() {
+  delete_transient('blm_locations_light_v12');
+  delete_transient('blm_locations_light_v11');
+  delete_transient('blm_locations_light_v10');
   delete_transient('blm_locations_light_v9');
   delete_transient('blm_filters_v6');
 }
@@ -499,7 +583,7 @@ add_action('blm_rebuild_caches_event', function ($post_id = 0) {
 
   // rebuild light
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v9', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v12', $light, 6 * HOUR_IN_SECONDS);
 
   // rebuild filters
   $filters = blm_build_filters_payload();
@@ -677,7 +761,7 @@ register_activation_hook(__FILE__, function () {
 
   // อุ่น cache ทันทีหลังเปิด (กัน request แรกช้า)
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v9', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v12', $light, 6 * HOUR_IN_SECONDS);
 
   $filters = blm_build_filters_payload();
   set_transient('blm_filters_v6', $filters, 6 * HOUR_IN_SECONDS);
@@ -692,7 +776,7 @@ register_deactivation_hook(__FILE__, function () {
 /** ให้ cron มาสร้าง cache ใหม่เป็นช่วง ๆ */
 add_action('blm_refresh_caches', function () {
   $light = blm_build_locations_light_payload();
-  set_transient('blm_locations_light_v9', $light, 6 * HOUR_IN_SECONDS);
+  set_transient('blm_locations_light_v12', $light, 6 * HOUR_IN_SECONDS);
 
   $filters = blm_build_filters_payload();
   set_transient('blm_filters_v6', $filters, 6 * HOUR_IN_SECONDS);
@@ -711,22 +795,28 @@ add_action('rest_api_init', function () {
     'callback' => function (WP_REST_Request $req) {
       return blm_rest_guard(function () {
         // อ่านจาก cache เป็นหลัก
-        $resp = get_transient('blm_locations_light_v9');
+        $resp = get_transient('blm_locations_light_v12');
+        if (!$resp) $resp = get_transient('blm_locations_light_v11');
+        if (!$resp) $resp = get_transient('blm_locations_light_v10');
+        if (!$resp) $resp = get_transient('blm_locations_light_v9');
         // backward fallback (old key)
         if (!$resp) $resp = get_transient('blm_locations_light_v7');
+        if (is_array($resp) && intval($resp['meta']['schema_version'] ?? 0) < 5) {
+          $resp = null;
+        }
 
         // fallback: ถ้ายังไม่เคยมี cache (เช่นเพิ่งย้าย server/ลบ transient)
         if (!$resp) {
           try {
             $resp = blm_build_locations_light_payload();
-            set_transient('blm_locations_light_v9', $resp, 6 * HOUR_IN_SECONDS);
+            set_transient('blm_locations_light_v12', $resp, 6 * HOUR_IN_SECONDS);
           } catch (Throwable $e) {
             error_log('[BLM API] locations-light rebuild failed: ' . $e->getMessage());
             $resp = [
               'places' => [],
               'meta' => [
                 'count' => 0,
-                'schema_version' => 2,
+                'schema_version' => 5,
                 'generated_at' => time(),
               ],
             ];
