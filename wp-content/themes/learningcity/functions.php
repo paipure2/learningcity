@@ -1413,6 +1413,9 @@ add_action('pre_get_posts', function ($q) {
   if (!$is_course_context) return;
 
   $q->set('post_type', 'course');
+  if (isset($_GET['q']) && $_GET['q'] !== '') {
+    $q->set('s', sanitize_text_field(wp_unslash($_GET['q'])));
+  }
 
   $existing_mq = $q->get('meta_query');
   if (!is_array($existing_mq)) $existing_mq = [];
@@ -1452,6 +1455,257 @@ add_action('pre_get_posts', function ($q) {
     $q->set('meta_query', $open_filter);
   }
 }, 20);
+
+function lc_is_course_archive_context() {
+  return (
+    is_post_type_archive('course') ||
+    is_tax('course_category') ||
+    is_tax('course_provider') ||
+    is_tax('audience')
+  );
+}
+
+function lc_get_course_open_filter_meta_query() {
+  return [
+    'relation' => 'OR',
+    [
+      'key'     => '_lc_open_reg',
+      'value'   => 1,
+      'compare' => '=',
+      'type'    => 'NUMERIC',
+    ],
+    [
+      'key'     => '_lc_reg_missing',
+      'value'   => 1,
+      'compare' => '=',
+      'type'    => 'NUMERIC',
+    ],
+    [
+      'key'     => 'learning_link',
+      'value'   => '',
+      'compare' => '!=',
+    ],
+  ];
+}
+
+function lc_course_filter_build_query_args($payload = []) {
+  $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
+
+  $page      = isset($payload['page']) ? max(1, (int) $payload['page']) : 1;
+  $open_only = !isset($payload['open_only']) || (int) $payload['open_only'] !== 0;
+
+  $context_taxonomy = isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '';
+  $context_term     = isset($payload['context_term']) ? sanitize_title($payload['context_term']) : '';
+  if (!in_array($context_taxonomy, $allowed_taxonomies, true)) {
+    $context_taxonomy = '';
+    $context_term = '';
+  }
+
+  $selected = [
+    'course_category' => isset($payload['course_category']) ? sanitize_title($payload['course_category']) : '',
+    'course_provider' => isset($payload['course_provider']) ? sanitize_title($payload['course_provider']) : '',
+    'audience'        => isset($payload['audience']) ? sanitize_title($payload['audience']) : '',
+  ];
+  $keyword = isset($payload['q']) ? sanitize_text_field($payload['q']) : '';
+
+  $tax_query = ['relation' => 'AND'];
+  foreach ($allowed_taxonomies as $tax) {
+    $term = $selected[$tax];
+    if (!$term && $context_taxonomy === $tax) {
+      $term = $context_term;
+    }
+
+    if ($term !== '') {
+      $tax_query[] = [
+        'taxonomy' => $tax,
+        'field'    => 'slug',
+        'terms'    => [$term],
+      ];
+    }
+  }
+
+  $args = [
+    'post_type'      => 'course',
+    'post_status'    => 'publish',
+    'paged'          => $page,
+    'posts_per_page' => (int) get_option('posts_per_page'),
+    'orderby'        => 'date',
+    'order'          => 'DESC',
+  ];
+
+  if (count($tax_query) > 1) {
+    $args['tax_query'] = $tax_query;
+  }
+
+  if ($open_only) {
+    $args['meta_query'] = lc_get_course_open_filter_meta_query();
+  }
+  if ($keyword !== '') {
+    $args['s'] = $keyword;
+  }
+
+  return [$args, $open_only, $page];
+}
+
+function lc_course_filter_get_facet_options($payload = []) {
+  $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
+
+  $context_taxonomy = isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '';
+  if (!in_array($context_taxonomy, $allowed_taxonomies, true)) {
+    $context_taxonomy = '';
+  }
+
+  $selected = [
+    'course_category' => isset($payload['course_category']) ? sanitize_title($payload['course_category']) : '',
+    'course_provider' => isset($payload['course_provider']) ? sanitize_title($payload['course_provider']) : '',
+    'audience'        => isset($payload['audience']) ? sanitize_title($payload['audience']) : '',
+  ];
+  $open_only = !isset($payload['open_only']) || (int) $payload['open_only'] !== 0;
+  $context_term = isset($payload['context_term']) ? sanitize_title($payload['context_term']) : '';
+  $keyword = isset($payload['q']) ? sanitize_text_field($payload['q']) : '';
+
+  $options = [];
+
+  foreach ($allowed_taxonomies as $taxonomy) {
+    if ($taxonomy === $context_taxonomy) continue;
+
+    $facet_payload = [
+      'page'             => 1,
+      'open_only'        => $open_only ? 1 : 0,
+      'context_taxonomy' => $context_taxonomy,
+      'context_term'     => $context_term,
+      'course_category'  => $selected['course_category'],
+      'course_provider'  => $selected['course_provider'],
+      'audience'         => $selected['audience'],
+      'q'                => $keyword,
+    ];
+    // intersection: keep other selected filters, clear only the current facet key
+    $facet_payload[$taxonomy] = '';
+
+    [$args] = lc_course_filter_build_query_args($facet_payload);
+    $args['fields'] = 'ids';
+    $args['posts_per_page'] = -1;
+    $args['no_found_rows'] = true;
+    $args['orderby'] = 'none';
+    $args['paged'] = 1;
+
+    $course_ids = get_posts($args);
+    $terms = [];
+
+    if (!empty($course_ids)) {
+      $term_ids = wp_get_object_terms($course_ids, $taxonomy, ['fields' => 'ids']);
+      if (!is_wp_error($term_ids) && !empty($term_ids)) {
+        $terms = get_terms([
+          'taxonomy'   => $taxonomy,
+          'hide_empty' => false,
+          'include'    => array_map('intval', $term_ids),
+          'orderby'    => 'name',
+          'order'      => 'ASC',
+        ]);
+      }
+    }
+
+    if (!empty($selected[$taxonomy])) {
+      $exists = false;
+      foreach ($terms as $term) {
+        if ($term->slug === $selected[$taxonomy]) {
+          $exists = true;
+          break;
+        }
+      }
+      if (!$exists) {
+        $selected_term = get_term_by('slug', $selected[$taxonomy], $taxonomy);
+        if ($selected_term && !is_wp_error($selected_term)) {
+          $terms[] = $selected_term;
+        }
+      }
+    }
+
+    $options[$taxonomy] = array_map(function ($term) {
+      return [
+        'slug' => (string) $term->slug,
+        'name' => (string) $term->name,
+      ];
+    }, is_array($terms) ? $terms : []);
+  }
+
+  return $options;
+}
+
+function lc_course_filter_render_results_html($query, $open_only = true, $page = 1) {
+  ob_start();
+
+  set_query_var('lc_archive_open_only', $open_only);
+
+  if ($query->have_posts()) {
+    echo '<div class="grid lg:grid-cols-2 grid-cols-1 sm:gap-6 gap-4" id="lc-course-grid">';
+    while ($query->have_posts()) {
+      $query->the_post();
+      get_template_part('template-parts/archive/course-card');
+    }
+    echo '</div>';
+
+    set_query_var('max_pages', (int) $query->max_num_pages);
+    set_query_var('paged', (int) $page);
+    get_template_part('template-parts/archive/course-pagination');
+  } else {
+    echo '<div class="py-10 text-center text-fs16 opacity-70">';
+    echo $open_only
+      ? 'ยังไม่มีคอร์สที่ “เปิดรับสมัคร” ในเงื่อนไขนี้'
+      : 'ยังไม่พบคอร์สในเงื่อนไขนี้';
+    echo '</div>';
+  }
+
+  set_query_var('lc_archive_open_only', true);
+
+  return ob_get_clean();
+}
+
+add_action('wp_ajax_lc_filter_courses', 'lc_ajax_filter_courses');
+add_action('wp_ajax_nopriv_lc_filter_courses', 'lc_ajax_filter_courses');
+function lc_ajax_filter_courses() {
+  check_ajax_referer('lc_course_filter_nonce', 'nonce');
+
+  $payload = wp_unslash($_POST);
+  [$args, $open_only, $page] = lc_course_filter_build_query_args($payload);
+
+  $query = new WP_Query($args);
+  $html = lc_course_filter_render_results_html($query, $open_only, $page);
+
+  wp_reset_postdata();
+
+  wp_send_json_success([
+    'html'       => $html,
+    'found_posts'=> (int) $query->found_posts,
+    'max_pages'  => (int) $query->max_num_pages,
+    'page'       => (int) $page,
+    'options'    => lc_course_filter_get_facet_options($payload),
+  ]);
+}
+
+add_action('wp_enqueue_scripts', function () {
+  if (!lc_is_course_archive_context()) return;
+
+  $script_path = get_template_directory() . '/assets/scripts/modules/course-archive-filter.js';
+  wp_enqueue_script(
+    'lc-course-archive-filter',
+    get_template_directory_uri() . '/assets/scripts/modules/course-archive-filter.js',
+    [],
+    file_exists($script_path) ? filemtime($script_path) : null,
+    true
+  );
+
+  $payload = [
+    'ajax_url' => admin_url('admin-ajax.php'),
+    'nonce'    => wp_create_nonce('lc_course_filter_nonce'),
+  ];
+
+  wp_add_inline_script(
+    'lc-course-archive-filter',
+    'window.LC_COURSE_FILTER = ' . wp_json_encode($payload) . ';',
+    'before'
+  );
+}, 30);
 
 add_action('init', function () {
   register_taxonomy_for_object_type('post_tag', 'course');
@@ -1932,8 +2186,29 @@ add_action('admin_head', function () {
     echo '<style>
         #titlediv { display:none !important; }
         #edit-slug-box { display:none !important; }
-    </style>';
+	    </style>';
 });
+
+/* =========================================================
+ * [ADMIN] ซ่อน Brevo web push meta box
+ * - กล่องนี้มาจากปลั๊กอิน mailin (Brevo)
+ * - ซ่อนสำหรับหน้าแก้ไขโพสต์ทั้งหมดที่ถูกเพิ่มกล่อง
+ * ========================================================= */
+add_action('add_meta_boxes', function ($post_type) {
+    if (!$post_type) return;
+    remove_meta_box('sib_push_meta_box', $post_type, 'normal');
+    remove_meta_box('sib_push_meta_box', $post_type, 'side');
+    remove_meta_box('sib_push_meta_box', $post_type, 'advanced');
+}, 999);
+
+add_action('admin_head', function () {
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->base !== 'post') return;
+
+    echo '<style>
+      #sib_push_meta_box { display: none !important; }
+    </style>';
+}, 999);
 
 add_action('template_redirect', function () {
     if (is_singular('session')) {
