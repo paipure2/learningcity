@@ -38,6 +38,18 @@
     return qs('[data-modal-content="modal-course"]');
   }
 
+  function openCourseModal() {
+    const modal = getModalEl();
+    if (!modal) return;
+
+    modal.classList.add('modal-active');
+    document.body.setAttribute('data-scroll', 'hidden');
+
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+  }
+
   function openFirstAccordionInModal(modal) {
     if (!modal) return;
     const firstItem = modal.querySelector(".accordion-item");
@@ -219,10 +231,14 @@
 
       a.addEventListener('click', async (e) => {
         e.preventDefault();
+        e.stopPropagation();
 
         const courseId = a.getAttribute('data-course-id');
         const fallbackUrl = a.getAttribute('data-course-url') || a.getAttribute('href') || '';
         if (!courseId) return;
+
+        // เปิด modal ได้แม้การ์ดถูก inject มาจาก AJAX รอบหลัง
+        openCourseModal();
 
         // ✅ URL bar เป็นลิงก์แชร์แบบเปิด modal
         const shareUrl = buildModalUrl(courseId);

@@ -27,6 +27,9 @@ const safe = (name, fn) => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  // expose for non-module scripts that update DOM via AJAX
+  window.initSvgInjections = initSvgInjections;
+
   const yearElement = document.getElementById("current-year");
   if (yearElement) yearElement.textContent = new Date().getFullYear();
 
