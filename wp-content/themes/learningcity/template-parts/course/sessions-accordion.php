@@ -66,6 +66,7 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
       <div class="py-6 text-center text-fs16 opacity-70">
         ขณะนี้ยังยังไม่มีสถานที่เปิดคอร์สเรียนนี้ กรุณารอรอเปิดรับสมัคร
       </div>
+      <?php do_action('lcw_render_waitlist_form', get_the_ID(), $mode); ?>
     <?php else: ?>
       <!-- กรณีไม่มีสถานที่ แต่มี learning_link (ถ้าไม่อยากแสดงอะไร ก็ปล่อยว่างได้) -->
     <?php endif; ?>

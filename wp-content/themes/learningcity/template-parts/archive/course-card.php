@@ -1,7 +1,10 @@
 <?php
 $post_id = get_the_ID();
 
-if (function_exists('lc_course_should_show_in_archive') && !lc_course_should_show_in_archive($post_id)) {
+// Default: show only courses that are open now (or always open/no-session+link logic).
+// Can be overridden by query_var('lc_archive_open_only') = false in AJAX/custom filter mode.
+$open_only = get_query_var('lc_archive_open_only', true);
+if ($open_only && function_exists('lc_course_should_show_in_archive') && !lc_course_should_show_in_archive($post_id)) {
     return;
 }
 

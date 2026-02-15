@@ -1,0 +1,98 @@
+.lcw-waitlist-wrap {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 116, 75, 0.18);
+  background: #eff9f5;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.lcw-waitlist-wrap .lcw-title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lcw-waitlist-wrap .lcw-title .lcw-title-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.lcw-waitlist-wrap .lcw-desc {
+  margin: 6px 0 0 0;
+  color: #475467;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.lcw-waitlist-form {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.lcw-waitlist-form .lcw-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #101828;
+  background: #ffffff;
+  outline: none;
+  box-shadow: none;
+}
+
+.lcw-waitlist-form .lcw-input:focus {
+  border-color: #00744b;
+  box-shadow: 0 0 0 3px rgba(0, 116, 75, 0.15);
+}
+
+.lcw-waitlist-form .lcw-btn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: #00744b;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.lcw-waitlist-form .lcw-btn:hover {
+  background: #00613f;
+}
+
+.lcw-waitlist-form .lcw-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.lcw-waitlist-wrap .lcw-msg {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .lcw-waitlist-form {
+    flex-direction: column;
+  }
+
+  .lcw-waitlist-form .lcw-btn {
+    width: 100%;
+  }
+}

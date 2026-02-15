@@ -37,12 +37,12 @@
           ?>
 
 
-          <div class="py-8">
+          <div class="py-8" id="lc-course-results">
             <?php global $wp_query; ?>
 
             <?php if (have_posts()) : ?>
 
-              <div class="grid lg:grid-cols-2 grid-cols-1 sm:gap-6 gap-4" id="main"> 
+              <div class="grid lg:grid-cols-2 grid-cols-1 sm:gap-6 gap-4" id="lc-course-grid"> 
                 <?php while (have_posts()) : the_post(); ?>
                   <?php get_template_part('template-parts/archive/course-card'); ?>
                 <?php endwhile; ?>
