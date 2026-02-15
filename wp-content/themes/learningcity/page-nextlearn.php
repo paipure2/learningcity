@@ -680,13 +680,10 @@
                 <div class="icon-calendar sm:w-5 w-4"></div>
                 <span class="text-fs14 truncate block max-w-[90px]" title="${esc(durationText)}">${esc(durationText)}</span>
               </div>
-              <div class="flex items-center sm:gap-1.5 gap-1">
-                <div class="icon-chartbar sm:w-5 w-4"></div>
-                <span class="text-fs14 truncate block max-w-[90px]" title="${esc(levelText)}">${esc(levelText)}</span>
-              </div>
+            
               <div class="flex items-center sm:gap-1.5 gap-1 flex-1 min-w-0">
                 <div class="icon-person sm:w-5 w-4 shrink-0"></div>
-                <span class="text-fs14 truncate block max-w-[100px]" title="${esc(audienceText)}">${esc(audienceText)}</span>
+                <span class="text-fs14 truncate block max-w-[200px]" title="${esc(audienceText)}">${esc(audienceText)}</span>
               </div>
             </div>
             <div class="text-fs16 font-semibold text-primary">${esc(distanceText(c.distance_km))}</div>

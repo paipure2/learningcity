@@ -112,13 +112,13 @@ $thumb = get_the_post_thumbnail_url($post_id, 'medium') ?: THEME_URI . '/assets/
                 <div class="icon-calendar sm:w-5 w-4"></div>
                 <span class="text-fs14"><?php echo esc_html($duration_text); ?></span>
             </div>
-            <div class="flex items-center sm:gap-1.5 gap-1">
+            <!-- <div class="flex items-center sm:gap-1.5 gap-1">
                 <div class="icon-chartbar sm:w-5 w-4"></div>
                 <span class="text-fs14"><?php echo esc_html($level_text); ?></span>
-            </div>
+            </div> -->
             <div class="flex items-center sm:gap-1.5 gap-1 flex-1 min-w-0">
                 <div class="icon-person sm:w-5 w-4 shrink-0"></div>
-                <span class="text-fs14 truncate block max-w-[100px]" title="<?php echo esc_attr($audience_text); ?>">
+                <span class="text-fs14 truncate block max-w-[200px]" title="<?php echo esc_attr($audience_text); ?>">
                     <?php echo esc_html($audience_text); ?>
                 </span>
             </div>

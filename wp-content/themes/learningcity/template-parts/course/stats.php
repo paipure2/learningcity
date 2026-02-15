@@ -4,7 +4,7 @@ if (empty($ctx) || !is_array($ctx)) { echo '<!-- stats: missing ctx -->'; return
 ?>
 
 <div class="bg-white flex sm:flex-row flex-col items-center rounded-xl overflow-hidden shadow-md sm:divide-x max-sm:divide-y divide-[#e1e1e1] mt-8">
-  <div class="py-3 flex items-center justify-evenly flex-1 w-full">
+  <div class="py-3 px-4 flex items-center justify-around flex-1 w-full">
 
     <div class="text-center flex-1">
       <i class="icon-calendar w-5 mx-auto block">
@@ -13,10 +13,10 @@ if (empty($ctx) || !is_array($ctx)) { echo '<!-- stats: missing ctx -->'; return
         </svg>
       </i>
       <div class="sm:text-fs12 text-fs10 mt-1">ชั่วโมงเรียน</div>
-      <div class="sm:text-fs18 text-fs14 font-semibold"><?php echo esc_html($ctx['duration_text']); ?></div>
+      <div class="sm:text-fs16 text-fs14 font-semibold"><?php echo esc_html($ctx['duration_text']); ?></div>
     </div>
 
-    <div class="text-center flex-1">
+    <!-- <div class="text-center flex-1">
       <i class="icon-chartbar w-5 mx-auto block">
           <svg class="w-full h-full" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M16.8799 2C17.2596 2 17.5672 2.28767 17.5674 2.64258V16.3574C17.5672 16.7123 17.2596 17 16.8799 17C16.8684 17 16.8571 16.9966 16.8457 16.9961C16.8346 16.9966 16.8237 17 16.8125 17H3.6875C3.49777 16.9999 3.32556 16.9287 3.20117 16.8125C3.13881 16.7542 3.08854 16.6845 3.05371 16.6074C3.03641 16.5691 3.02281 16.5289 3.01367 16.4873C3.00448 16.4454 3 16.4019 3 16.3574V10.4795C3.00016 10.1247 3.30788 9.83705 3.6875 9.83691H7.49902V6.56152C7.49902 6.20657 7.80681 5.91909 8.18652 5.91895H12V2.64258C12.0002 2.28775 12.3079 2.00014 12.6875 2H16.8799ZM13.376 15.7148H16.1924V3.28613H13.376V15.7148ZM8.875 7.2041V15.7148H12V7.2041H8.875ZM4.37598 15.7148H7.49902V11.123H4.37598V15.7148Z" fill="#979797"/>
@@ -24,7 +24,7 @@ if (empty($ctx) || !is_array($ctx)) { echo '<!-- stats: missing ctx -->'; return
       </i>
       <div class="sm:text-fs12 text-fs10 mt-1">ระดับความยาก</div>
       <div class="sm:text-fs18 text-fs14 font-semibold"><?php echo esc_html($ctx['level_text']); ?></div>
-    </div>
+    </div> -->
 
     <div class="text-center flex-1">
       <i class="icon-certificate w-5 mx-auto block">
@@ -37,7 +37,7 @@ if (empty($ctx) || !is_array($ctx)) { echo '<!-- stats: missing ctx -->'; return
         </svg>
       </i>
       <div class="sm:text-fs12 text-fs10 mt-1">หลักฐาน</div>
-      <div class="sm:text-fs18 text-fs14 font-semibold">
+      <div class="sm:text-fs16 text-fs14 font-semibold">
         <?php echo $ctx['has_cert'] ? 'มีใบรับรอง' : 'ไม่มีใบรับรอง'; ?>
       </div>
     </div>
@@ -49,7 +49,7 @@ if (empty($ctx) || !is_array($ctx)) { echo '<!-- stats: missing ctx -->'; return
         </svg>
       </i>
       <div class="sm:text-fs12 text-fs10 mt-1">เหมาะสำหรับ</div>
-      <div class="sm:text-fs18 text-fs14 font-semibold"><?php echo esc_html($ctx['audience_text']); ?></div>
+      <div class="sm:text-fs16 text-fs14 font-semibold"><?php echo esc_html($ctx['audience_text']); ?></div>
     </div>
 
   </div>
