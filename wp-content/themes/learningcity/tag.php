@@ -15,7 +15,7 @@
             <div class="layout-sidebar">
                 <?php get_template_part('template-parts/components/aside'); ?>
                 
-                <section class="min-w-px">
+                <section class="min-w-px" id="lc-course-main-content">
 
                     <?php 
                     /**
@@ -38,10 +38,9 @@
                     get_template_part('template-parts/archive/filter'); 
                     ?>
 
-
-                        <div class="py-8">
+                        <div class="py-8" id="lc-course-results">
                         <?php if (have_posts()) : ?>
-                            <div class="grid lg:grid-cols-2 grid-cols-1 sm:gap-6 gap-4">
+                            <div class="grid lg:grid-cols-2 grid-cols-1 sm:gap-6 gap-4" id="lc-course-grid">
 
                             <?php while (have_posts()) : the_post(); ?>
                                 <?php get_template_part('template-parts/archive/course-card'); ?>

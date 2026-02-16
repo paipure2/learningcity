@@ -353,6 +353,8 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   border-radius: 1rem;
   background: #fcfcfd;
   border-bottom: 1px solid #e5e7eb;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .lc-archive-filters__head {
@@ -397,6 +399,7 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .lc-filter-field span {
@@ -421,7 +424,7 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   user-select: none;
 }
 
-.lc-status-toggle input {
+.lc-status-toggle__input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -498,7 +501,7 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   padding-right: 2rem;
 }
 
-.lc-filter-field input {
+.lc-filter-field input[type=text] {
   border: 1px solid #d1d5db;
   border-radius: 0.8rem;
   background: #ffffff;
@@ -518,6 +521,7 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   font-size: 0.9rem;
   font-weight: 600;
   color: #ffffff;
+  width: 100%;
 }
 
 .lc-filter-reset:hover {
@@ -527,6 +531,7 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
 .lc-filter-loading {
   font-size: 0.85rem;
   color: #00744b;
+  grid-column: 1/-1;
 }
 
 #lc-course-results.is-loading {
@@ -534,9 +539,39 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   transition: opacity 0.18s ease;
 }
 
+#lc-course-main-content.is-loading {
+  opacity: 0.65;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.lc-subcat-scroll {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  padding-bottom: 0.15rem;
+}
+
+.lc-subcat-item {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+
+.lc-subcat-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 1280px) {
+  .lc-archive-filters__controls {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+}
 @media (max-width: 1024px) {
   .lc-archive-filters__controls {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 }
 @media (max-width: 640px) {

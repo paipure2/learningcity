@@ -1,7 +1,7 @@
 <?php
 global $wp_query;
 
-$allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
+$allowed_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
 $queried            = get_queried_object();
 
 $context_taxonomy = '';
@@ -70,14 +70,14 @@ $facet_options = function_exists('lc_course_filter_get_facet_options')
     </div>
 
     <div class="lc-archive-filters__controls" id="lc-filter-controls">
-        <label class="lc-filter-field lc-filter-field--status">
+        <div class="lc-filter-field lc-filter-field--status">
             <span>สถานะคอร์ส</span>
             <label class="lc-status-toggle" for="lc-open-only-toggle">
-                <input type="checkbox" id="lc-open-only-toggle" <?php checked($open_only); ?>>
+                <input class="lc-status-toggle__input" type="checkbox" id="lc-open-only-toggle" <?php checked($open_only); ?>>
                 <span class="lc-status-toggle__switch" aria-hidden="true"></span>
                 <span class="lc-status-toggle__text" id="lc-open-only-text"><?php echo $open_only ? 'รับสมัครอยู่' : 'ทั้งหมด'; ?></span>
             </label>
-        </label>
+        </div>
 
         <label class="lc-filter-field">
             <span>ค้นหาคอร์ส</span>

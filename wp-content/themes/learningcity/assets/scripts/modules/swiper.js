@@ -1,8 +1,16 @@
+function recreateSwiper(element, options) {
+  if (!element) return null;
+  if (element.swiper) {
+    element.swiper.destroy(true, true);
+  }
+  return new Swiper(element, options);
+}
+
 function swiperHighlight() {
   const element = document.querySelector(".sec-highlight .swiper");
   if (!element) return;
 
-  new Swiper(element, {
+  recreateSwiper(element, {
     slidesPerView: 1.3,
     spaceBetween: 20,
     speed: 500,
@@ -29,7 +37,7 @@ function swiperCategory() {
   const element = document.querySelector(".sec-category .swiper");
   if (!element) return;
 
-  new Swiper(element, {
+  recreateSwiper(element, {
     observer: true,
     observeParents: true,
     slidesPerView: 3.5,
@@ -66,25 +74,27 @@ function swiperCategory() {
 }
 
 function swiperCategoryHighlight() {
-  const element = document.querySelector(".sec-category-highlight .swiper");
-  if (!element) return;
+  const elements = document.querySelectorAll(".sec-category-highlight .swiper");
+  if (!elements.length) return;
 
-  new Swiper(element, {
-    observer: true,
-    observeParents: true,
-    slidesPerView: 3.5,
-    spaceBetween: 5,
-    speed: 500,
-    breakpoints: {
-      768: {
-        slidesPerView: 4.15,
-        spaceBetween: 5,
+  elements.forEach((element) => {
+    recreateSwiper(element, {
+      observer: true,
+      observeParents: true,
+      slidesPerView: 3.5,
+      spaceBetween: 5,
+      speed: 500,
+      breakpoints: {
+        768: {
+          slidesPerView: 4.15,
+          spaceBetween: 5,
+        },
+        1024: {
+          slidesPerView: 6,
+          spaceBetween: 5,
+        },
       },
-      1024: {
-        slidesPerView: 6,
-        spaceBetween: 5,
-      },
-    },
+    });
   });
 }
 
@@ -98,7 +108,7 @@ function swiperCategoryOther() {
     const nextEl = section.querySelector(".swiper-button-next");
     const prevEl = section.querySelector(".swiper-button-prev");
 
-    new Swiper(element, {
+    recreateSwiper(element, {
       observer: true,
       observeParents: true,
       slidesPerView: 2.45,
@@ -128,7 +138,7 @@ function swiperPartner() {
   const element = document.querySelector(".sec-partner .swiper");
   if (!element) return;
 
-  new Swiper(element, {
+  recreateSwiper(element, {
     observer: true,
     observeParents: true,
     slidesPerView: 2.45,
@@ -163,7 +173,7 @@ function swiperCourse() {
   const element = document.querySelector(".sec-course .swiper");
   if (!element) return;
 
-  new Swiper(element, {
+  recreateSwiper(element, {
     observer: true,
     observeParents: true,
     slidesPerView: 1.05,
@@ -210,7 +220,7 @@ function swiperGalleryVibe() {
   const element = document.querySelector(".swiper-gallery-vibe");
   if (!element) return;
 
-  new Swiper(element, {
+  recreateSwiper(element, {
     observer: true,
     observeParents: true,
     slidesPerView: 2.5,
@@ -233,19 +243,21 @@ function swiperLogoLoop() {
   const element = document.querySelector(".swiper-logo-loop");
   if (!element) return;
   const wrapper = element.querySelector(".swiper-wrapper");
+  if (!wrapper) return;
   const slides = Array.from(wrapper.children);
   const times = 2;
 
-  if (slides.length < 15) {
+  if (slides.length < 15 && element.dataset.loopCloned !== "1") {
     for (let i = 0; i < times; i++) {
       slides.forEach((slide) => {
         wrapper.appendChild(slide.cloneNode(true));
       });
     }
+    element.dataset.loopCloned = "1";
   }
 
   requestAnimationFrame(() => {
-    new Swiper(element, {
+    recreateSwiper(element, {
       observer: true,
       observeParents: true,
       slidesPerView: "auto",
@@ -270,7 +282,7 @@ function swiperCategoryIndex() {
   const element = document.querySelector(".swiper-category-index");
   if (!element) return;
 
-  new Swiper(element, {
+  recreateSwiper(element, {
     observer: true,
     observeParents: true,
     slidesPerView: "auto",
@@ -304,20 +316,22 @@ function swiperTestimonial(selector, duration, reverse) {
   if (!el) return;
 
   const wrapper = el.querySelector(".swiper-wrapper");
+  if (!wrapper) return;
   const slides = Array.from(wrapper.children);
   const times = 2;
   const speed = duration * 1000;
 
-  if (slides.length < 10) {
+  if (slides.length < 10 && el.dataset.loopCloned !== "1") {
     for (let i = 0; i < times; i++) {
       slides.forEach((slide) => {
         wrapper.appendChild(slide.cloneNode(true));
       });
     }
+    el.dataset.loopCloned = "1";
   }
 
   requestAnimationFrame(() => {
-    new Swiper(el, {
+    recreateSwiper(el, {
       observer: true,
       observeParents: true,
       slidesPerView: "auto",
@@ -342,7 +356,7 @@ function swiperActivity(element) {
   const el = document.querySelector(element);
   if (!el) return;
 
-  new Swiper(el, {
+  recreateSwiper(el, {
     observer: true,
     observeParents: true,
     slidesPerView: 2.05,
@@ -362,17 +376,27 @@ function swiperActivity(element) {
 }
 
 export function initSwipers() {
-  swiperHighlight();
-  swiperCategory();
-  swiperCategoryOther();
-  swiperCategoryHighlight();
-  swiperPartner();
-  swiperCourse();
-  swiperGalleryVibe();
-  swiperLogoLoop();
-  swiperCategoryIndex();
-  swiperTestimonial(".swiper-testimonial.top", 10, true);
-  swiperTestimonial(".swiper-testimonial.bottom", 12, false);
-  swiperActivity(".swiper-activity-head");
-  swiperActivity(".swiper-activity-body");
+  const tasks = [
+    () => swiperHighlight(),
+    () => swiperCategory(),
+    () => swiperCategoryOther(),
+    () => swiperCategoryHighlight(),
+    () => swiperPartner(),
+    () => swiperCourse(),
+    () => swiperGalleryVibe(),
+    () => swiperLogoLoop(),
+    () => swiperCategoryIndex(),
+    () => swiperTestimonial(".swiper-testimonial.top", 10, true),
+    () => swiperTestimonial(".swiper-testimonial.bottom", 12, false),
+    () => swiperActivity(".swiper-activity-head"),
+    () => swiperActivity(".swiper-activity-body"),
+  ];
+
+  tasks.forEach((run) => {
+    try {
+      run();
+    } catch (err) {
+      console.error("[swiper:init]", err);
+    }
+  });
 }

@@ -224,39 +224,40 @@
     }
   }
 
+  async function onCourseCardClick(a, e) {
+    if (!a) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const courseId = a.getAttribute('data-course-id');
+    const fallbackUrl = a.getAttribute('data-course-url') || a.getAttribute('href') || '';
+    if (!courseId) return;
+
+    openCourseModal();
+
+    const shareUrl = buildModalUrl(courseId);
+    try {
+      history.pushState({ courseId }, '', shareUrl);
+    } catch (_) {}
+
+    setTimeout(() => {
+      try {
+        history.replaceState({ courseId }, '', shareUrl);
+      } catch (_) {}
+    }, 0);
+
+    await loadIntoModal(courseId, fallbackUrl);
+  }
+
   function bindCards() {
-    document.querySelectorAll('.card-course[data-modal-id="modal-course"][data-course-id]').forEach((a) => {
-      if (a.__bound) return;
-      a.__bound = true;
+    if (document.__lcCourseModalDelegatedBound) return;
+    document.__lcCourseModalDelegatedBound = true;
 
-      a.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const courseId = a.getAttribute('data-course-id');
-        const fallbackUrl = a.getAttribute('data-course-url') || a.getAttribute('href') || '';
-        if (!courseId) return;
-
-        // เปิด modal ได้แม้การ์ดถูก inject มาจาก AJAX รอบหลัง
-        openCourseModal();
-
-        // ✅ URL bar เป็นลิงก์แชร์แบบเปิด modal
-        const shareUrl = buildModalUrl(courseId);
-        try {
-          history.pushState({ courseId }, '', shareUrl);
-        } catch (_) {}
-
-        // ✅ modal.js จะ replaceState เป็น pathname#modal-course
-        // เลย replace กลับให้เป็น shareUrl หลังมันทำงาน
-        setTimeout(() => {
-          try {
-            history.replaceState({ courseId }, '', shareUrl);
-          } catch (_) {}
-        }, 0);
-
-        await loadIntoModal(courseId, fallbackUrl);
-      }, { passive: false });
-    });
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('.card-course[data-modal-id="modal-course"][data-course-id]');
+      if (!a) return;
+      onCourseCardClick(a, e);
+    }, { passive: false });
   }
 
   function bindModalCloseUrlCleanup() {
@@ -292,18 +293,32 @@
     bindModalCloseUrlCleanup();
   }
 
-  window.CourseModalAjax = { rebind: bindCards };
+  window.CourseModalAjax = {
+    rebind: bindCards,
+    openFromCard: (cardEl, event) => {
+      if (!cardEl) return;
+      const e = event || {
+        preventDefault() {},
+        stopPropagation() {},
+      };
+      onCourseCardClick(cardEl, e);
+    },
+  };
 
   // deep link load
   const deepId = getCourseIdFromUrl();
   if (deepId) {
+    openCourseModal();
     loadIntoModal(deepId, ''); // single permalink จะมาจาก AJAX เอง
   }
 
   // back/forward
   window.addEventListener('popstate', () => {
     const id = getCourseIdFromUrl();
-    if (id) loadIntoModal(id, '');
+    if (id) {
+      openCourseModal();
+      loadIntoModal(id, '');
+    }
   });
 })();
 

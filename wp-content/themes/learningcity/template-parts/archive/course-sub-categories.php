@@ -18,10 +18,10 @@ if (!is_wp_error($sub_terms) && !empty($sub_terms)) :
     $parent_term = get_term($parent_id, $term->taxonomy);
     $term_color  = $parent_term ? get_term_acf_inherit($parent_term, 'color') : '';
     $pill_bg     = !empty($term_color) ? hex_to_rgba($term_color, 0.18) : '#D6EBE0';
+    $pill_solid  = !empty($term_color) ? $term_color : '#00744B';
 ?>
 <div class="xl:py-3 py-3 sec-category-highlight">
-    <div class="swiper xl:overflow-hidden! overflow-visible!">
-        <div class="swiper-wrapper">
+    <div class="lc-subcat-scroll" role="navigation" aria-label="หมวดย่อยของคอร์ส">
             <?php foreach ($sub_terms as $sub) :
                 $sub_link = get_term_link($sub);
                 if (is_wp_error($sub_link)) continue;
@@ -29,15 +29,14 @@ if (!is_wp_error($sub_terms) && !empty($sub_terms)) :
                 // (optional) ทำ active state ให้ตัวที่เป็นหน้าปัจจุบัน
                 $is_active = ((int)$sub->term_id === (int)$term->term_id);
             ?>
-                <div class="swiper-slide !w-auto">
+                <div class="lc-subcat-item">
                     <a href="<?php echo esc_url($sub_link); ?>"
-                       class="inline-flex items-center justify-center sm:px-6 px-3 sm:py-4 py-2 rounded-full font-semibold sm:text-fs16 text-fs14 whitespace-nowrap transition-all hover:-translate-y-[1px] hover:shadow-md <?php echo $is_active ? 'text-black ring-2 ring-black/20' : 'text-black'; ?>"
-                       style="background-color: <?php echo esc_attr($pill_bg); ?>;">
+                       class="inline-flex items-center justify-center sm:px-6 px-3 sm:py-4 py-2 rounded-full font-semibold sm:text-fs16 text-fs14 whitespace-nowrap transition-all hover:-translate-y-[1px] hover:shadow-md <?php echo $is_active ? 'text-white' : 'text-black'; ?>"
+                       style="background-color: <?php echo esc_attr($is_active ? $pill_solid : $pill_bg); ?>;">
                         <?php echo esc_html($sub->name); ?>
                     </a>
                 </div>
             <?php endforeach; ?>
-        </div>
     </div>
 </div>
 <?php endif; ?>

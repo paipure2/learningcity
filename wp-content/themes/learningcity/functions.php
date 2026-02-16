@@ -217,6 +217,168 @@ add_action('wp_enqueue_scripts', function () {
   );
 }, 20);
 
+/* =========================================================
+ * [ADMIN] BMA Training Sync status
+ * ========================================================= */
+if (!function_exists('lc_bma_parse_utc_to_ts')) {
+    function lc_bma_parse_utc_to_ts($utc_datetime) {
+        if (!is_string($utc_datetime) || $utc_datetime === '') return 0;
+        $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $utc_datetime, new DateTimeZone('UTC'));
+        return $dt ? (int) $dt->getTimestamp() : 0;
+    }
+}
+
+if (!function_exists('lc_bma_format_local_datetime')) {
+    function lc_bma_format_local_datetime($utc_datetime) {
+        $ts = lc_bma_parse_utc_to_ts($utc_datetime);
+        return $ts ? wp_date('Y-m-d H:i:s', $ts) : '-';
+    }
+}
+
+if (!function_exists('lc_bma_get_sync_status')) {
+    function lc_bma_get_sync_status() {
+        $status = get_option('lc_bmatraining_last_sync', []);
+        return is_array($status) ? $status : [];
+    }
+}
+
+add_action('admin_menu', function () {
+    add_submenu_page(
+        'edit.php?post_type=course',
+        'BMA Sync Status',
+        'BMA Sync',
+        'edit_posts',
+        'lc-bma-sync-status',
+        'lc_render_bma_sync_status_page'
+    );
+}, 20);
+
+if (!function_exists('lc_render_bma_sync_status_page')) {
+    function lc_render_bma_sync_status_page() {
+        if (!current_user_can('edit_posts')) return;
+
+        $sync_notice = null;
+        $sync_output = '';
+
+        if (
+            isset($_POST['lc_bma_action'])
+            && in_array($_POST['lc_bma_action'], ['sync_now', 'dry_run'], true)
+            && check_admin_referer('lc_bma_sync_now_action')
+        ) {
+            $action = sanitize_text_field((string) $_POST['lc_bma_action']);
+            $script_path = get_template_directory() . '/cronjobs/fetch-bmatraining-data.php';
+
+            if (!file_exists($script_path)) {
+                $sync_notice = [
+                    'type' => 'error',
+                    'message' => 'ไม่พบไฟล์ sync script',
+                ];
+            } else {
+                if (!defined('LC_BMA_SYNC_DISABLE_AUTO_RUN')) {
+                    define('LC_BMA_SYNC_DISABLE_AUTO_RUN', true);
+                }
+
+                require_once $script_path;
+
+                if ($action === 'sync_now' && function_exists('lc_bma_run_sync')) {
+                    ob_start();
+                    $result = lc_bma_run_sync(true);
+                    $sync_output = trim((string) ob_get_clean());
+
+                    $sync_notice = [
+                        'type' => !empty($result['ok']) ? 'success' : 'error',
+                        'message' => !empty($result['ok'])
+                            ? 'Sync สำเร็จ'
+                            : ('Sync ไม่สำเร็จ: ' . ($result['message'] ?? 'unknown error')),
+                    ];
+                } elseif ($action === 'dry_run' && function_exists('lc_bma_run_dry_run')) {
+                    ob_start();
+                    $result = lc_bma_run_dry_run(true);
+                    $sync_output = trim((string) ob_get_clean());
+
+                    $sync_notice = [
+                        'type' => !empty($result['ok']) ? 'success' : 'error',
+                        'message' => !empty($result['ok'])
+                            ? 'Dry Run สำเร็จ (ไม่มีการเขียนข้อมูล)'
+                            : ('Dry Run ไม่สำเร็จ: ' . ($result['message'] ?? 'unknown error')),
+                    ];
+                } else {
+                    $sync_notice = [
+                        'type' => 'error',
+                        'message' => 'ไม่พบฟังก์ชันที่ต้องใช้สำหรับ action นี้',
+                    ];
+                }
+            }
+        }
+
+        $status = lc_bma_get_sync_status();
+        $started_at = $status['started_at_utc'] ?? '';
+        $finished_at = $status['finished_at_utc'] ?? '';
+        $state = (string) ($status['status'] ?? 'never');
+
+        $started_ts = lc_bma_parse_utc_to_ts($started_at);
+        $finished_ts = lc_bma_parse_utc_to_ts($finished_at);
+        $duration = ($started_ts && $finished_ts && $finished_ts >= $started_ts)
+            ? ($finished_ts - $started_ts) . ' วินาที'
+            : '-';
+
+        $last_sync_age = $finished_ts ? human_time_diff($finished_ts, time()) . ' ที่แล้ว' : '-';
+
+        $status_label = [
+            'success' => 'สำเร็จ',
+            'failed' => 'ล้มเหลว',
+            'running' => 'กำลังรัน',
+            'never' => 'ยังไม่เคยรัน',
+        ];
+        $status_text = $status_label[$state] ?? $state;
+
+        echo '<div class="wrap">';
+        echo '<h1>BMA Training Sync Status</h1>';
+        echo '<p>อัปเดตหน้านี้เพื่อดูสถานะล่าสุดของการดึงข้อมูลจาก API</p>';
+        echo '<p style="display:flex;gap:8px;align-items:center;">';
+        echo '<a href="' . esc_url(admin_url('edit.php?post_type=course&page=lc-bma-sync-status')) . '" class="button">Refresh</a>';
+        echo '<form method="post" style="display:inline-block;margin:0;">';
+        wp_nonce_field('lc_bma_sync_now_action');
+        echo '<input type="hidden" name="lc_bma_action" value="sync_now">';
+        echo '<button type="submit" class="button button-primary" onclick="return confirm(\'ยืนยันการ Sync ข้อมูล BMA ตอนนี้?\');">Sync Now</button>';
+        echo '</form>';
+        echo '<form method="post" style="display:inline-block;margin:0 0 0 8px;">';
+        wp_nonce_field('lc_bma_sync_now_action');
+        echo '<input type="hidden" name="lc_bma_action" value="dry_run">';
+        echo '<button type="submit" class="button">Sync Dry Run</button>';
+        echo '</form>';
+        echo '</p>';
+
+        if (is_array($sync_notice)) {
+            $notice_class = $sync_notice['type'] === 'success' ? 'notice notice-success' : 'notice notice-error';
+            echo '<div class="' . esc_attr($notice_class) . '"><p>' . esc_html($sync_notice['message']) . '</p></div>';
+        }
+
+        if ($sync_output !== '') {
+            echo '<h2 style="margin-top:20px;">Sync Log</h2>';
+            echo '<pre style="max-width:900px;white-space:pre-wrap;">' . esc_html($sync_output) . '</pre>';
+        }
+
+        echo '<table class="widefat striped" style="margin-top:16px;max-width:900px">';
+        echo '<tbody>';
+        echo '<tr><th style="width:260px">สถานะล่าสุด</th><td>' . esc_html($status_text) . '</td></tr>';
+        echo '<tr><th>เริ่มรันล่าสุด</th><td>' . esc_html(lc_bma_format_local_datetime($started_at)) . '</td></tr>';
+        echo '<tr><th>จบรันล่าสุด</th><td>' . esc_html(lc_bma_format_local_datetime($finished_at)) . '</td></tr>';
+        echo '<tr><th>เวลาที่ใช้</th><td>' . esc_html($duration) . '</td></tr>';
+        echo '<tr><th>เวลาผ่านไปจากการ sync ล่าสุด</th><td>' . esc_html($last_sync_age) . '</td></tr>';
+        echo '<tr><th>จำนวนคอร์สจาก API</th><td>' . esc_html((string) ($status['api_course_count'] ?? '-')) . '</td></tr>';
+        echo '<tr><th>คอร์สที่เปลี่ยน / ไม่เปลี่ยน (API เทียบ DB)</th><td>' . esc_html((string) ($status['api_changed_courses'] ?? '-')) . ' / ' . esc_html((string) ($status['api_unchanged_courses'] ?? '-')) . '</td></tr>';
+        echo '<tr><th>คอร์สเพิ่มใหม่ / อัปเดต</th><td>' . esc_html((string) ($status['courses_new'] ?? '-')) . ' / ' . esc_html((string) ($status['courses_updated'] ?? '-')) . '</td></tr>';
+        echo '<tr><th>รอบเรียนเพิ่มใหม่ / อัปเดต</th><td>' . esc_html((string) ($status['sessions_new'] ?? '-')) . ' / ' . esc_html((string) ($status['sessions_updated'] ?? '-')) . '</td></tr>';
+        echo '<tr><th>สถานที่เพิ่มใหม่</th><td>' . esc_html((string) ($status['locations_new'] ?? '-')) . '</td></tr>';
+        echo '<tr><th>API hash ล่าสุด</th><td><code>' . esc_html((string) ($status['api_hash'] ?? '-')) . '</code></td></tr>';
+        echo '<tr><th>Error ล่าสุด</th><td>' . esc_html((string) ($status['error'] ?? '-')) . '</td></tr>';
+        echo '</tbody>';
+        echo '</table>';
+        echo '</div>';
+    }
+}
+
 
 /* =========================================================
  * [LOCATION REPORTS] Report incorrect info (front + admin)
@@ -1342,6 +1504,7 @@ function lc_recalc_course_flags($course_id) {
   }
   update_post_meta($course_id, '_lc_open_reg', $open_reg);
   update_post_meta($course_id, '_lc_reg_missing', $has_missing_reg_info);
+  delete_transient('lc_open_course_ids_runtime_v2');
 }
 
 // save session -> recalc its course
@@ -1396,6 +1559,61 @@ add_action('lc_refresh_course_open_reg_daily', function () {
   }
 });
 
+/* =========================================================
+ * [CRON] BMA training sync every 30 minutes
+ * ========================================================= */
+add_filter('cron_schedules', function ($schedules) {
+  if (!isset($schedules['lc_every_30_minutes'])) {
+    $schedules['lc_every_30_minutes'] = [
+      'interval' => 30 * MINUTE_IN_SECONDS,
+      'display' => 'Every 30 Minutes (LearningCity)',
+    ];
+  }
+  return $schedules;
+});
+
+add_action('init', function () {
+  $hook = 'lc_bma_sync_every_30_minutes';
+  $event = wp_get_scheduled_event($hook);
+
+  if (!$event) {
+    wp_schedule_event(time() + 120, 'lc_every_30_minutes', $hook);
+    return;
+  }
+
+  if (!isset($event->schedule) || $event->schedule !== 'lc_every_30_minutes') {
+    wp_unschedule_event($event->timestamp, $hook, $event->args);
+    wp_schedule_event(time() + 120, 'lc_every_30_minutes', $hook);
+  }
+});
+
+add_action('lc_bma_sync_every_30_minutes', function () {
+  $lock_key = 'lc_bma_sync_cron_lock';
+  if (get_transient($lock_key)) {
+    return;
+  }
+
+  set_transient($lock_key, 1, 25 * MINUTE_IN_SECONDS);
+
+  try {
+    $script_path = get_template_directory() . '/cronjobs/fetch-bmatraining-data.php';
+    if (!file_exists($script_path)) return;
+
+    if (!defined('LC_BMA_SYNC_DISABLE_AUTO_RUN')) {
+      define('LC_BMA_SYNC_DISABLE_AUTO_RUN', true);
+    }
+
+    require_once $script_path;
+    if (function_exists('lc_bma_run_sync')) {
+      lc_bma_run_sync(false);
+    }
+  } catch (Throwable $e) {
+    error_log('LC BMA cron sync error: ' . $e->getMessage());
+  } finally {
+    delete_transient($lock_key);
+  }
+});
+
 // Default filter on archives
 add_action('pre_get_posts', function ($q) {
   if (is_admin() || !$q->is_main_query()) return;
@@ -1416,44 +1634,8 @@ add_action('pre_get_posts', function ($q) {
   if (isset($_GET['q']) && $_GET['q'] !== '') {
     $q->set('s', sanitize_text_field(wp_unslash($_GET['q'])));
   }
-
-  $existing_mq = $q->get('meta_query');
-  if (!is_array($existing_mq)) $existing_mq = [];
-
-  // Show courses that are:
-  // - open for registration, or
-  // - sessions missing reg fields, or
-  // - online courses with learning_link (no session needed).
-  $open_filter = [
-    'relation' => 'OR',
-    [
-      'key'     => '_lc_open_reg',
-      'value'   => 1,
-      'compare' => '=',
-      'type'    => 'NUMERIC',
-    ],
-    [
-      'key'     => '_lc_reg_missing',
-      'value'   => 1,
-      'compare' => '=',
-      'type'    => 'NUMERIC',
-    ],
-    [
-      'key'     => 'learning_link',
-      'value'   => '',
-      'compare' => '!=',
-    ],
-  ];
-
-  if (!empty($existing_mq)) {
-    $q->set('meta_query', [
-      'relation' => 'AND',
-      $existing_mq,
-      $open_filter,
-    ]);
-  } else {
-    $q->set('meta_query', $open_filter);
-  }
+  $open_ids = lc_get_open_course_ids_runtime();
+  $q->set('post__in', empty($open_ids) ? [0] : $open_ids);
 }, 20);
 
 function lc_is_course_archive_context() {
@@ -1461,42 +1643,98 @@ function lc_is_course_archive_context() {
     is_post_type_archive('course') ||
     is_tax('course_category') ||
     is_tax('course_provider') ||
-    is_tax('audience')
+    is_tax('audience') ||
+    is_tax('skill-level') ||
+    is_tag()
   );
 }
 
-function lc_get_course_open_filter_meta_query() {
-  return [
-    'relation' => 'OR',
-    [
-      'key'     => '_lc_open_reg',
-      'value'   => 1,
-      'compare' => '=',
-      'type'    => 'NUMERIC',
+function lc_get_open_course_ids_runtime() {
+  $cache_key = 'lc_open_course_ids_runtime_v2';
+  $cached = get_transient($cache_key);
+  if (is_array($cached)) return $cached;
+
+  $extract_related_id = static function ($raw) {
+    if (is_object($raw) && isset($raw->ID)) return (int) $raw->ID;
+    if (is_numeric($raw)) return (int) $raw;
+    if (is_array($raw) && !empty($raw[0])) {
+      $first = $raw[0];
+      if (is_object($first) && isset($first->ID)) return (int) $first->ID;
+      if (is_numeric($first)) return (int) $first;
+    }
+    return 0;
+  };
+
+  $open_ids = [];
+  $today_ts = strtotime(current_time('Y-m-d'));
+
+  $session_ids = get_posts([
+    'post_type'      => 'session',
+    'post_status'    => 'publish',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+    'no_found_rows'  => true,
+  ]);
+
+  foreach ($session_ids as $sid) {
+    $course_raw = get_post_meta($sid, 'course', true);
+    $course_id = $extract_related_id($course_raw);
+    if ($course_id <= 0 || get_post_status($course_id) !== 'publish') continue;
+
+    $reg_start = trim((string) get_post_meta($sid, 'reg_start', true));
+    $reg_end   = trim((string) get_post_meta($sid, 'reg_end', true));
+
+    if ($reg_start === '' && $reg_end === '') {
+      $open_ids[$course_id] = true;
+      continue;
+    }
+
+    $start_ts = lc_date_to_ts($reg_start);
+    $end_ts   = lc_date_to_ts($reg_end);
+
+    $is_open = false;
+    if ($start_ts === 0 && $end_ts === 0) $is_open = true;
+    elseif ($start_ts > 0 && $end_ts === 0) $is_open = ($today_ts >= $start_ts);
+    elseif ($start_ts === 0 && $end_ts > 0) $is_open = ($today_ts <= $end_ts);
+    else $is_open = ($today_ts >= $start_ts && $today_ts <= $end_ts);
+
+    if ($is_open) $open_ids[$course_id] = true;
+  }
+
+  // Include online courses with learning_link.
+  $online_ids = get_posts([
+    'post_type'      => 'course',
+    'post_status'    => 'publish',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+    'no_found_rows'  => true,
+    'meta_query'     => [
+      [
+        'key'     => 'learning_link',
+        'value'   => '',
+        'compare' => '!=',
+      ],
     ],
-    [
-      'key'     => '_lc_reg_missing',
-      'value'   => 1,
-      'compare' => '=',
-      'type'    => 'NUMERIC',
-    ],
-    [
-      'key'     => 'learning_link',
-      'value'   => '',
-      'compare' => '!=',
-    ],
-  ];
+  ]);
+  foreach ($online_ids as $cid) {
+    $open_ids[(int) $cid] = true;
+  }
+
+  $ids = array_map('intval', array_keys($open_ids));
+  set_transient($cache_key, $ids, 5 * MINUTE_IN_SECONDS);
+  return $ids;
 }
 
 function lc_course_filter_build_query_args($payload = []) {
   $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
+  $allowed_context_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
 
   $page      = isset($payload['page']) ? max(1, (int) $payload['page']) : 1;
   $open_only = !isset($payload['open_only']) || (int) $payload['open_only'] !== 0;
 
   $context_taxonomy = isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '';
   $context_term     = isset($payload['context_term']) ? sanitize_title($payload['context_term']) : '';
-  if (!in_array($context_taxonomy, $allowed_taxonomies, true)) {
+  if (!in_array($context_taxonomy, $allowed_context_taxonomies, true)) {
     $context_taxonomy = '';
     $context_term = '';
   }
@@ -1524,6 +1762,15 @@ function lc_course_filter_build_query_args($payload = []) {
     }
   }
 
+  // Keep taxonomy context for pages like tag.php / skill-level archive.
+  if ($context_taxonomy && $context_term && !in_array($context_taxonomy, $allowed_taxonomies, true)) {
+    $tax_query[] = [
+      'taxonomy' => $context_taxonomy,
+      'field'    => 'slug',
+      'terms'    => [$context_term],
+    ];
+  }
+
   $args = [
     'post_type'      => 'course',
     'post_status'    => 'publish',
@@ -1538,7 +1785,8 @@ function lc_course_filter_build_query_args($payload = []) {
   }
 
   if ($open_only) {
-    $args['meta_query'] = lc_get_course_open_filter_meta_query();
+    $open_ids = lc_get_open_course_ids_runtime();
+    $args['post__in'] = empty($open_ids) ? [0] : $open_ids;
   }
   if ($keyword !== '') {
     $args['s'] = $keyword;
@@ -1549,9 +1797,10 @@ function lc_course_filter_build_query_args($payload = []) {
 
 function lc_course_filter_get_facet_options($payload = []) {
   $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
+  $allowed_context_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
 
   $context_taxonomy = isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '';
-  if (!in_array($context_taxonomy, $allowed_taxonomies, true)) {
+  if (!in_array($context_taxonomy, $allowed_context_taxonomies, true)) {
     $context_taxonomy = '';
   }
 

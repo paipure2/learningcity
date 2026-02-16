@@ -87,20 +87,23 @@ export function initModals() {
 
     // Re-attach event listeners for modal buttons
     document.querySelectorAll("[data-modal-id]").forEach((button) => {
-      // Course cards are handled by course-modal-ajax.js to avoid open/close race conditions.
-      if (
-        button.classList?.contains("card-course") &&
-        button.hasAttribute("data-course-id") &&
-        button.getAttribute("data-modal-id") === "modal-course"
-      ) {
-        return;
-      }
-
       // Remove existing event listeners (if any)
       button.removeEventListener("click", button.modalClickHandler);
 
       // Create new click handler
-      button.modalClickHandler = () => {
+      button.modalClickHandler = (event) => {
+        // Let AJAX modal handler own course cards if available.
+        if (
+          button.classList?.contains("card-course") &&
+          button.hasAttribute("data-course-id") &&
+          button.getAttribute("data-modal-id") === "modal-course" &&
+          window.CourseModalAjax &&
+          typeof window.CourseModalAjax.openFromCard === "function"
+        ) {
+          window.CourseModalAjax.openFromCard(button, event);
+          return;
+        }
+
         const content = button.getAttribute("data-modal-id");
         const modalWrap = document.querySelector(
           `[data-modal-content="${content}"]`

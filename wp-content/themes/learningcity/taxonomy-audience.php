@@ -16,7 +16,7 @@
             <div class="layout-sidebar">
                 <?php get_template_part('template-parts/components/aside'); ?>
                 
-                <section class="min-w-px">
+                <section class="min-w-px" id="lc-course-main-content">
 
                     <?php 
                     /**

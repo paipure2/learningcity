@@ -68,6 +68,8 @@ function initCourseArchiveFilter() {
   const root = document.getElementById("lc-archive-filters");
   const results = document.getElementById("lc-course-results");
   if (!root || !results || !window.LC_COURSE_FILTER) return;
+  if (root.dataset.lcFilterBound === "1") return;
+  root.dataset.lcFilterBound = "1";
 
   const ajaxUrl = window.LC_COURSE_FILTER.ajax_url;
   const nonce = window.LC_COURSE_FILTER.nonce;
@@ -209,6 +211,9 @@ function initCourseArchiveFilter() {
       if (window.initSvgInjections) {
         window.initSvgInjections();
       }
+      if (window.initSwipers) {
+        requestAnimationFrame(() => window.initSwipers());
+      }
       if (window.CourseModalAjax?.rebind) {
         window.CourseModalAjax.rebind();
       }
@@ -325,4 +330,120 @@ function initCourseArchiveFilter() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", initCourseArchiveFilter);
+async function navigateCourseAsideAjax(url, pushState = true) {
+  const currentMain = document.getElementById("lc-course-main-content");
+  if (!currentMain) {
+    window.location.href = url;
+    return;
+  }
+
+  try {
+    currentMain.classList.add("is-loading");
+
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const nextMain = doc.getElementById("lc-course-main-content");
+    if (!nextMain) {
+      window.location.href = url;
+      return;
+    }
+
+    currentMain.innerHTML = nextMain.innerHTML;
+    document.title = doc.title || document.title;
+    if (pushState) {
+      window.history.pushState({ lcCourseAjax: true }, "", url);
+    }
+
+    if (window.initSvgInjections) window.initSvgInjections();
+    if (window.initSwipers) requestAnimationFrame(() => window.initSwipers());
+    if (window.CourseModalAjax?.rebind) window.CourseModalAjax.rebind();
+    if (typeof window.initCourseArchiveFilter === "function") {
+      window.initCourseArchiveFilter();
+    } else {
+      initCourseArchiveFilter();
+    }
+
+    const top = currentMain.getBoundingClientRect().top + window.scrollY - 20;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  } catch (error) {
+    console.error("[lc-aside-ajax]", error);
+    window.location.href = url;
+  } finally {
+    const main = document.getElementById("lc-course-main-content");
+    if (main) main.classList.remove("is-loading");
+  }
+}
+
+function initCourseAsideAjaxNav() {
+  if (window.__LC_ASIDE_AJAX_BOUND) return;
+  window.__LC_ASIDE_AJAX_BOUND = true;
+
+  const closeModalCategoryIfOpen = () => {
+    const modal = document.querySelector('[data-modal-content="modal-category"]');
+    if (!modal) return;
+    modal.classList.remove("modal-active");
+
+    const hasActiveModal = !!document.querySelector(".modal.modal-active");
+    if (!hasActiveModal) {
+      document.body.removeAttribute("data-scroll");
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
+    }
+  };
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest(
+      ".aside a[href], .lc-subcat-scroll a[href], [data-modal-content='modal-category'] a[href]"
+    );
+    if (!link) return;
+    if (link.hasAttribute("target") || link.hasAttribute("download")) return;
+    if (link.closest("[data-modal-id]")) return;
+
+    let url;
+    try {
+      url = new URL(link.href, window.location.origin);
+    } catch (_) {
+      return;
+    }
+    if (url.origin !== window.location.origin) return;
+
+    // intercept only course archive/tax links from sidebar
+    const path = url.pathname.toLowerCase();
+    const isCoursePath =
+      path === "/course" ||
+      path === "/course/" ||
+      path.includes("/course/") ||
+      path.includes("/course_category/") ||
+      path.includes("/course_provider/") ||
+      path.includes("/audience/");
+    if (!isCoursePath) return;
+
+    event.preventDefault();
+    if (link.closest("[data-modal-content='modal-category']")) {
+      closeModalCategoryIfOpen();
+    }
+    navigateCourseAsideAjax(url.toString(), true);
+  });
+
+  window.addEventListener("popstate", () => {
+    const current = window.location.href;
+    navigateCourseAsideAjax(current, false);
+  });
+}
+
+window.initCourseArchiveFilter = initCourseArchiveFilter;
+
+document.addEventListener("DOMContentLoaded", () => {
+  initCourseArchiveFilter();
+  initCourseAsideAjaxNav();
+});
