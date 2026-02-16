@@ -98,6 +98,11 @@ function initCourseArchiveFilter() {
   let controller = null;
   let requestSeq = 0;
 
+  function scrollToResultsTop() {
+    const top = results.getBoundingClientRect().top + window.scrollY - 20;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }
+
   function readFilterState() {
     return {
       page: 1,
@@ -166,7 +171,7 @@ function initCourseArchiveFilter() {
     });
   }
 
-  async function fetchCourses(page = 1, shouldPushState = true) {
+  async function fetchCourses(page = 1, shouldPushState = true, scrollAfterLoad = false) {
     const state = readFilterState();
     state.page = page;
     const currentSeq = ++requestSeq;
@@ -230,6 +235,10 @@ function initCourseArchiveFilter() {
           page: state.page,
         });
         window.history.replaceState({}, "", nextUrl);
+      }
+
+      if (scrollAfterLoad) {
+        requestAnimationFrame(scrollToResultsTop);
       }
     } catch (error) {
       if (error?.name === "AbortError") return;
@@ -295,7 +304,7 @@ function initCourseArchiveFilter() {
 
     event.preventDefault();
     const page = getPageFromUrl(link.getAttribute("href") || "");
-    fetchCourses(page, true);
+    fetchCourses(page, true, true);
   });
 
   const hasPresetFilters = Object.values(selectors).some((el) => !!(el && el.value))

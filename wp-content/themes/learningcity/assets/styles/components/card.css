@@ -61,6 +61,7 @@
   }
 
   .card-course {
+    --course-accent-rgb: 0, 116, 75;
     display: block;
     width: 100%;
     max-width: 800px;
@@ -72,6 +73,7 @@
 
     &:hover {
       scale: 1.025;
+      background: rgba(var(--course-accent-rgb), 0.12);
     }
 
     .card-content {

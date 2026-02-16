@@ -40,7 +40,7 @@ $ctx = [
   'level_text' => function_exists('course_get_level_text') ? course_get_level_text($course_id) : 'ไม่ระบุ',
   'audience_text' => function_exists('course_get_audience_text') ? course_get_audience_text($course_id) : 'ทุกวัย',
   'has_cert' => (bool) get_field('has_certificate', $course_id),
-  'price_text' => function_exists('course_get_price_text') ? course_get_price_text($course_id) : 'ดูรอบเรียน',
+  'price_text' => function_exists('course_get_price_text') ? course_get_price_text($course_id) : 'ฟรี',
 
   'desc' => get_field('course_description', $course_id),
   'learning_link' => get_field('learning_link', $course_id),

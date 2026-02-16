@@ -28,6 +28,20 @@ if (!empty($cat_terms) && !is_wp_error($cat_terms)) {
     }
 }
 
+$course_hover_rgb = '0, 116, 75';
+$hex_color = ltrim(trim((string) $final_color), '#');
+if (preg_match('/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/', $hex_color)) {
+    if (strlen($hex_color) === 3) {
+        $hex_color = $hex_color[0] . $hex_color[0] . $hex_color[1] . $hex_color[1] . $hex_color[2] . $hex_color[2];
+    }
+
+    $course_hover_rgb = implode(', ', [
+        hexdec(substr($hex_color, 0, 2)),
+        hexdec(substr($hex_color, 2, 2)),
+        hexdec(substr($hex_color, 4, 2)),
+    ]);
+}
+
 // 2. ข้อมูลผู้จัดสอน (Provider)
 $provider_name = '';
 $provider_logo_url = 'https://dummyimage.com/100x100/ddd/aaa'; // Placeholder
@@ -72,14 +86,15 @@ $price = get_field('price', $post_id);
 if ($price !== null && $price !== '') {
     $price_text = ((float)$price == 0) ? 'ฟรี' : number_format((float)$price) . ' บาท';
 } else {
-    $price_text = 'ดูรอบเรียน';
+    $price_text = 'ฟรี';
 }
 
 // 7. รูป Thumbnail
 $thumb = get_the_post_thumbnail_url($post_id, 'medium') ?: THEME_URI . '/assets/images/placeholder-gray.png';
 ?>
 
-<a class="card-course flex flex-col h-full" 
+<a class="card-course flex flex-col h-full"
+   style="--course-accent-color: <?php echo esc_attr($final_color); ?>; --course-accent-rgb: <?php echo esc_attr($course_hover_rgb); ?>;"
    href="<?php the_permalink(); ?>" 
    data-modal-id="modal-course" 
    data-course-id="<?php echo esc_attr($post_id); ?>">

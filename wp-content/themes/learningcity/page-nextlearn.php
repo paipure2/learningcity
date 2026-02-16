@@ -600,6 +600,16 @@
     return `${n.toFixed(n < 10 ? 1 : 0)} กม.`;
   }
 
+  function hexToRgbCsv(hex, fallback = '0, 116, 75') {
+    const raw = String(hex == null ? '' : hex).trim().replace(/^#/, '');
+    if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(raw)) return fallback;
+    const full = raw.length === 3 ? raw.split('').map((ch) => ch + ch).join('') : raw;
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    return `${r}, ${g}, ${b}`;
+  }
+
   function renderSkeleton(count = 6) {
     const cards = Array.from({ length: count }, () => `
       <div class="card-course flex flex-col h-full pointer-events-none lc-skeleton" aria-hidden="true">
@@ -634,12 +644,14 @@
       const providerLogo = c.provider_logo_url || providerPlaceholder;
       const categoryName = c.primary_term_name || '';
       const finalColor = c.final_color || '#00744B';
+      const hoverRgb = hexToRgbCsv(finalColor);
       const providerName = c.provider_name || '';
       const audienceText = c.audience_text || 'ทุกวัย';
       const durationText = c.duration_text || 'ตามรอบเรียน';
       const courseTitle = decodeHtmlEntities(c.title || '');
       return `
         <a class="card-course flex flex-col h-full"
+           style="--course-accent-rgb:${esc(hoverRgb)};"
            href="${esc(c.permalink || '#')}"
            data-modal-id="modal-course"
            data-course-id="${esc(c.id || '')}"

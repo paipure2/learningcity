@@ -107,7 +107,7 @@ function course_get_audience_text($post_id) {
 
 function course_get_price_text($post_id) {
   $price = get_field('price', $post_id);
-  if ($price === null || $price === '') return 'ดูรอบเรียน';
+  if ($price === null || $price === '') return 'ฟรี';
   if ((float)$price == 0) return 'ฟรี';
   return number_format((float)$price) . ' บาท';
 }
