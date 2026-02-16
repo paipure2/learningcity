@@ -218,6 +218,515 @@ add_action('wp_enqueue_scripts', function () {
 }, 20);
 
 /* =========================================================
+ * [ADMIN COURSE] Bulk set / auto-detect course category
+ * ========================================================= */
+if (!function_exists('lc_normalize_text_for_match')) {
+  function lc_normalize_text_for_match($text) {
+    $text = trim((string) $text);
+    if ($text === '') return '';
+    if (function_exists('mb_strtolower')) {
+      return mb_strtolower($text, 'UTF-8');
+    }
+    return strtolower($text);
+  }
+}
+
+if (!function_exists('lc_text_contains')) {
+  function lc_text_contains($haystack, $needle) {
+    $haystack = (string) $haystack;
+    $needle = (string) $needle;
+    if ($needle === '') return false;
+
+    if (function_exists('mb_strpos')) {
+      return mb_strpos($haystack, $needle) !== false;
+    }
+    return strpos($haystack, $needle) !== false;
+  }
+}
+
+if (!function_exists('lc_detect_course_category_term_id_by_title')) {
+  function lc_detect_course_category_term_id_by_title($course_title) {
+    $title = lc_normalize_text_for_match($course_title);
+    if ($title === '') return 0;
+
+    $terms = get_terms([
+      'taxonomy'   => 'course_category',
+      'hide_empty' => false,
+      'orderby'    => 'name',
+      'order'      => 'ASC',
+    ]);
+    if (is_wp_error($terms) || empty($terms)) return 0;
+
+    $best_term_id = 0;
+    $best_score = 0;
+
+    // 1) Prefer direct term-name containment with longest-name priority.
+    foreach ($terms as $term) {
+      $term_name = lc_normalize_text_for_match($term->name ?? '');
+      $term_slug = lc_normalize_text_for_match(str_replace('-', '', (string) ($term->slug ?? '')));
+      if ($term_name === '') continue;
+      if (lc_text_contains($title, $term_name)) {
+        $score = 1000 + strlen($term_name);
+        if ($score > $best_score) {
+          $best_score = $score;
+          $best_term_id = (int) $term->term_id;
+        }
+      }
+      if ($term_slug !== '' && lc_text_contains($title, $term_slug)) {
+        $score = 800 + strlen($term_slug);
+        if ($score > $best_score) {
+          $best_score = $score;
+          $best_term_id = (int) $term->term_id;
+        }
+      }
+    }
+    if ($best_term_id > 0) return $best_term_id;
+
+    // 2) Fallback by keyword -> first matching category name.
+    $keywords = apply_filters('lc_course_auto_category_keywords', [
+      'ภาษา', 'ดิจิทัล', 'คอม', 'ออนไลน์', 'อาหาร', 'เบเกอรี่', 'ขนม',
+      'ช่าง', 'ซ่อม', 'ไฟฟ้า', 'เสริมสวย', 'นวด', 'ตัดผม', 'เย็บผ้า',
+      'ศิลปะ', 'ดนตรี', 'บัญชี', 'ธุรกิจ', 'การตลาด',
+    ]);
+
+    if (is_array($keywords)) {
+      foreach ($keywords as $kw) {
+        $kw = lc_normalize_text_for_match($kw);
+        if ($kw === '') continue;
+        if (!lc_text_contains($title, $kw)) continue;
+
+        foreach ($terms as $term) {
+          $term_name = lc_normalize_text_for_match($term->name ?? '');
+          if ($term_name === '') continue;
+          if (lc_text_contains($term_name, $kw) || lc_text_contains($kw, $term_name)) {
+            return (int) $term->term_id;
+          }
+        }
+      }
+    }
+
+    return 0;
+  }
+}
+
+if (!function_exists('lc_guess_default_course_category_term_id')) {
+  function lc_guess_default_course_category_term_id() {
+    $default_term_id = (int) apply_filters('lc_course_auto_category_default_term_id', 0);
+    if ($default_term_id > 0) return $default_term_id;
+
+    $terms = get_terms([
+      'taxonomy'   => 'course_category',
+      'hide_empty' => false,
+      'parent'     => 0,
+      'orderby'    => 'name',
+      'order'      => 'ASC',
+      'number'     => 1,
+    ]);
+    if (is_wp_error($terms) || empty($terms)) return 0;
+    return (int) $terms[0]->term_id;
+  }
+}
+
+add_filter('bulk_actions-edit-course', function ($actions) {
+  $actions['lc_auto_course_category'] = 'Auto Category (from title)';
+  return $actions;
+});
+
+if (!function_exists('lc_normalize_admin_course_return_url')) {
+  function lc_normalize_admin_course_return_url($url, $default = '') {
+    $default = $default !== '' ? (string) $default : admin_url('edit.php?post_type=course');
+    $url = is_string($url) ? trim($url) : '';
+    if ($url === '') return $default;
+
+    // WP may submit referer as a relative path in bulk form requests.
+    if (strpos($url, 'http://') !== 0 && strpos($url, 'https://') !== 0) {
+      if (strpos($url, '/') === 0) {
+        $url = home_url($url);
+      } else {
+        return $default;
+      }
+    }
+
+    $url = esc_url_raw($url);
+    $url = wp_validate_redirect($url, '');
+    if ($url === '') return $default;
+    if (strpos($url, admin_url()) !== 0) return $default;
+    if (strpos($url, 'post_type=course') === false) return $default;
+
+    return $url;
+  }
+}
+
+add_filter('handle_bulk_actions-edit-course', function ($redirect_to, $doaction, $post_ids) {
+  if ($doaction === 'lc_auto_course_category') {
+    $default_term_id = lc_guess_default_course_category_term_id();
+    $rows = [];
+    $raw_return_to = isset($_REQUEST['_wp_http_referer']) ? wp_unslash((string) $_REQUEST['_wp_http_referer']) : '';
+    if ($raw_return_to === '') {
+      $referer = wp_get_referer();
+      $raw_return_to = $referer ? (string) $referer : (string) $redirect_to;
+    }
+    $raw_return_to = remove_query_arg(['lc_bulk_cat_review', 'lc_bulk_cat_saved', 'lc_bulk_cat_skipped', 'lc_bulk_cat_review_expired'], $raw_return_to);
+    $return_to = lc_normalize_admin_course_return_url($raw_return_to, admin_url('edit.php?post_type=course'));
+
+    foreach ((array) $post_ids as $post_id) {
+      $post_id = (int) $post_id;
+      if ($post_id <= 0 || get_post_type($post_id) !== 'course') continue;
+      if (!current_user_can('edit_post', $post_id)) continue;
+
+      $title = get_the_title($post_id);
+      $term_id = lc_detect_course_category_term_id_by_title($title);
+      if ($term_id <= 0 && $default_term_id > 0) {
+        $term_id = $default_term_id;
+      }
+      $rows[] = [
+        'post_id' => $post_id,
+        'title' => $title,
+        'suggested_term_id' => (int) $term_id,
+      ];
+    }
+
+    if (empty($rows)) return $redirect_to;
+
+    $token = wp_generate_password(20, false, false);
+    $payload = [
+      'created_by' => get_current_user_id(),
+      'return_to' => $return_to,
+      'rows' => $rows,
+    ];
+    set_transient('lc_bulk_cat_review_' . $token, $payload, 30 * MINUTE_IN_SECONDS);
+
+    return add_query_arg(['lc_bulk_cat_review' => $token], $redirect_to);
+  }
+
+  return $redirect_to;
+}, 10, 3);
+
+add_action('admin_post_lc_bulk_cat_apply_review', function () {
+  if (!current_user_can('edit_posts')) {
+    wp_die('forbidden');
+  }
+  check_admin_referer('lc_bulk_cat_apply_review');
+
+  $token = isset($_POST['lc_bulk_cat_review_token']) ? sanitize_text_field((string) $_POST['lc_bulk_cat_review_token']) : '';
+  $raw_return_to = isset($_POST['lc_bulk_cat_return_to']) ? wp_unslash((string) $_POST['lc_bulk_cat_return_to']) : '';
+  $default_return = admin_url('edit.php?post_type=course');
+  $return_to = lc_normalize_admin_course_return_url($raw_return_to, $default_return);
+
+  if ($token === '') {
+    wp_safe_redirect($return_to);
+    exit;
+  }
+
+  $cache_key = 'lc_bulk_cat_review_' . $token;
+  $payload = get_transient($cache_key);
+  if (!is_array($payload) || (int) ($payload['created_by'] ?? 0) !== get_current_user_id()) {
+    wp_safe_redirect(add_query_arg(['lc_bulk_cat_review_expired' => 1], $return_to));
+    exit;
+  }
+
+  $rows = isset($payload['rows']) && is_array($payload['rows']) ? $payload['rows'] : [];
+  $selected = isset($_POST['lc_bulk_category']) && is_array($_POST['lc_bulk_category']) ? $_POST['lc_bulk_category'] : [];
+
+  $updated = 0;
+  $skipped = 0;
+  foreach ($rows as $row) {
+    $post_id = (int) ($row['post_id'] ?? 0);
+    if ($post_id <= 0 || get_post_type($post_id) !== 'course' || !current_user_can('edit_post', $post_id)) {
+      $skipped++;
+      continue;
+    }
+
+    $term_id = isset($selected[$post_id]) ? (int) $selected[$post_id] : 0;
+    if ($term_id <= 0) {
+      $skipped++;
+      continue;
+    }
+
+    $term = get_term($term_id, 'course_category');
+    if (!$term || is_wp_error($term)) {
+      $skipped++;
+      continue;
+    }
+
+    wp_set_object_terms($post_id, [$term_id], 'course_category', false);
+    $updated++;
+  }
+
+  delete_transient($cache_key);
+
+  wp_safe_redirect(add_query_arg([
+    'lc_bulk_cat_saved' => $updated,
+    'lc_bulk_cat_skipped' => $skipped,
+  ], $return_to));
+  exit;
+});
+
+add_action('admin_notices', function () {
+  $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+  if (!$screen || $screen->id !== 'edit-course') return;
+
+  if (isset($_GET['lc_bulk_cat_saved'])) {
+    $saved = (int) $_GET['lc_bulk_cat_saved'];
+    $skipped = isset($_GET['lc_bulk_cat_skipped']) ? (int) $_GET['lc_bulk_cat_skipped'] : 0;
+    echo '<div class="notice notice-success is-dismissible"><p>บันทึกหมวดหมู่แล้ว ' . esc_html((string) $saved) . ' คอร์ส, ข้าม ' . esc_html((string) $skipped) . ' คอร์ส</p></div>';
+  }
+
+  if (isset($_GET['lc_bulk_cat_review_expired'])) {
+    echo '<div class="notice notice-warning is-dismissible"><p>รายการรีวิวหมดอายุ กรุณาเลือกคอร์สแล้วรันใหม่อีกครั้ง</p></div>';
+  }
+});
+
+add_action('admin_footer-edit.php', function () {
+  $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+  if (!$screen || $screen->id !== 'edit-course') return;
+  if (!isset($_GET['lc_bulk_cat_review'])) return;
+
+  $token = sanitize_text_field((string) $_GET['lc_bulk_cat_review']);
+  if ($token === '') return;
+
+  $payload = get_transient('lc_bulk_cat_review_' . $token);
+  if (!is_array($payload) || (int) ($payload['created_by'] ?? 0) !== get_current_user_id()) return;
+  $rows = isset($payload['rows']) && is_array($payload['rows']) ? $payload['rows'] : [];
+  if (empty($rows)) return;
+
+  $terms = get_terms([
+    'taxonomy' => 'course_category',
+    'hide_empty' => false,
+    'orderby' => 'name',
+    'order' => 'ASC',
+  ]);
+  if (is_wp_error($terms) || empty($terms)) return;
+  ?>
+  <div id="lcBulkCatModal" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center;">
+    <div style="background:#fff;width:min(1100px,96vw);max-height:88vh;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:14px 18px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+        <strong>Auto Category (from title)</strong>
+        <button type="button" id="lcBulkCatClose" class="button">ปิด</button>
+      </div>
+      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;flex-direction:column;min-height:0;">
+        <?php wp_nonce_field('lc_bulk_cat_apply_review'); ?>
+        <input type="hidden" name="action" value="lc_bulk_cat_apply_review">
+        <input type="hidden" name="lc_bulk_cat_review_token" value="<?php echo esc_attr($token); ?>">
+        <input type="hidden" name="lc_bulk_cat_return_to" value="<?php echo esc_attr((string) ($payload['return_to'] ?? remove_query_arg('lc_bulk_cat_review'))); ?>">
+        <div style="padding:12px 18px;overflow:auto;">
+          <p style="margin:0 0 10px;">ตรวจสอบหมวดที่ระบบแนะนำก่อนบันทึก (แก้ไขได้ต่อแถว)</p>
+          <table class="widefat striped">
+            <thead><tr><th style="width:80px;">ID</th><th>คอร์ส</th><th style="width:360px;">Category</th></tr></thead>
+            <tbody>
+              <?php foreach ($rows as $row): $post_id = (int) ($row['post_id'] ?? 0); $title = (string) ($row['title'] ?? ''); $suggest = (int) ($row['suggested_term_id'] ?? 0); ?>
+                <tr>
+                  <td><?php echo esc_html((string) $post_id); ?></td>
+                  <td><?php echo esc_html($title); ?></td>
+                  <td>
+                    <div class="lc-cat-picker" style="position:relative;">
+                      <div style="display:flex;align-items:stretch;gap:8px;">
+                        <input
+                          type="search"
+                          class="lc-cat-picker-input"
+                          placeholder="ค้นหา category..."
+                          style="flex:1;"
+                        >
+                        <button type="button" class="button button-primary lc-cat-picker-apply" title="ยืนยัน">✓</button>
+                        <button type="button" class="button lc-cat-picker-clear" title="ล้างค่า">✕</button>
+                      </div>
+                      <div class="lc-cat-picker-menu" style="position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:220px;overflow:auto;background:#fff;border:1px solid #d1d5db;border-radius:8px;display:none;z-index:20;"></div>
+                      <select
+                        class="lc-cat-select"
+                        name="lc_bulk_category[<?php echo esc_attr((string) $post_id); ?>]"
+                        style="display:none;"
+                      >
+                        <option value="0">-- ไม่เปลี่ยน --</option>
+                        <?php foreach ($terms as $term): ?>
+                          <option
+                            value="<?php echo esc_attr((string) $term->term_id); ?>"
+                            data-label="<?php echo esc_attr(lc_normalize_text_for_match((string) $term->name)); ?>"
+                            <?php selected($suggest, (int) $term->term_id); ?>
+                          >
+                            <?php echo esc_html($term->name); ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding:12px 18px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" id="lcBulkCatCancel" class="button">ยกเลิก</button>
+          <button type="submit" id="lcBulkCatSaveAll" class="button button-primary">บันทึกทั้งหมด</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const modal = document.getElementById('lcBulkCatModal');
+      const closeBtn = document.getElementById('lcBulkCatClose');
+      const cancelBtn = document.getElementById('lcBulkCatCancel');
+      if (!modal) return;
+      function closeModal() {
+        modal.remove();
+        const url = new URL(window.location.href);
+        url.searchParams.delete('lc_bulk_cat_review');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+      });
+
+      function normalize(v) {
+        return (v || '').toString().trim().toLowerCase();
+      }
+
+      const pickers = Array.from(modal.querySelectorAll('.lc-cat-picker'));
+
+      pickers.forEach(function (picker) {
+        const input = picker.querySelector('.lc-cat-picker-input');
+        const menu = picker.querySelector('.lc-cat-picker-menu');
+        const select = picker.querySelector('.lc-cat-select');
+        const applyBtn = picker.querySelector('.lc-cat-picker-apply');
+        const clearBtn = picker.querySelector('.lc-cat-picker-clear');
+        if (!input || !menu || !select || !applyBtn || !clearBtn) return;
+
+        const options = Array.from(select.options)
+          .filter(function (opt) { return opt.value !== '0'; })
+          .map(function (opt) {
+            return {
+              value: opt.value,
+              label: (opt.textContent || '').trim(),
+              normalized: normalize(opt.dataset.label || opt.textContent || ''),
+            };
+          });
+
+        let pendingValue = select.value && select.value !== '0' ? String(select.value) : '';
+
+        function setInputFromValue(value) {
+          const found = options.find(function (o) { return String(o.value) === String(value); });
+          input.value = found ? found.label : '';
+        }
+
+        function openMenu() {
+          menu.style.display = 'block';
+        }
+
+        function closeMenu() {
+          menu.style.display = 'none';
+        }
+
+        function renderMenu() {
+          const q = normalize(input.value);
+          const filtered = options.filter(function (o) {
+            return q === '' || o.normalized.indexOf(q) !== -1;
+          });
+
+          if (!filtered.length) {
+            menu.innerHTML = '<div style="padding:8px 10px;color:#6b7280;">ไม่พบ category</div>';
+            openMenu();
+            return;
+          }
+
+          menu.innerHTML = filtered.map(function (o) {
+            const active = String(o.value) === String(pendingValue);
+            const bg = active ? 'background:#e5e7eb;' : '';
+            return '<button type="button" data-value="' + o.value + '" style="display:block;width:100%;text-align:left;padding:8px 10px;border:0;border-bottom:1px solid #f1f5f9;' + bg + '">' + o.label + '</button>';
+          }).join('');
+
+          menu.querySelectorAll('button[data-value]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              pendingValue = String(btn.getAttribute('data-value') || '');
+              const found = options.find(function (o) { return String(o.value) === pendingValue; });
+              if (found) input.value = found.label;
+              // Apply immediately so Save works even if user doesn't click ✓.
+              select.value = pendingValue || '0';
+              renderMenu();
+            });
+          });
+
+          openMenu();
+        }
+
+        function applySelection() {
+          const q = normalize(input.value);
+          if (!pendingValue && q !== '') {
+            const exact = options.find(function (o) { return o.normalized === q; });
+            if (exact) pendingValue = String(exact.value);
+          }
+          if (!pendingValue && q !== '') {
+            const first = options.find(function (o) { return o.normalized.indexOf(q) !== -1; });
+            if (first) pendingValue = String(first.value);
+          }
+
+          select.value = pendingValue || '0';
+          setInputFromValue(select.value);
+          closeMenu();
+        }
+
+        function clearSelection() {
+          pendingValue = '';
+          select.value = '0';
+          input.value = '';
+          renderMenu();
+        }
+
+        setInputFromValue(select.value);
+
+        input.addEventListener('focus', renderMenu);
+        input.addEventListener('input', function () {
+          pendingValue = '';
+          renderMenu();
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            applySelection();
+          }
+        });
+
+        applyBtn.addEventListener('click', applySelection);
+        clearBtn.addEventListener('click', clearSelection);
+
+        document.addEventListener('click', function (e) {
+          if (!picker.contains(e.target)) closeMenu();
+        });
+      });
+
+      const saveBtn = document.getElementById('lcBulkCatSaveAll');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', function () {
+          // Ensure all rows sync their text input -> select before submit.
+          pickers.forEach(function (picker) {
+            const input = picker.querySelector('.lc-cat-picker-input');
+            const select = picker.querySelector('.lc-cat-select');
+            if (!input || !select) return;
+            const q = normalize(input.value);
+            if (q === '') return;
+
+            const opts = Array.from(select.options).filter(function (o) { return o.value !== '0'; });
+            let match = opts.find(function (o) {
+              const label = normalize(o.dataset.label || o.textContent || '');
+              return label === q;
+            });
+            if (!match) {
+              match = opts.find(function (o) {
+                const label = normalize(o.dataset.label || o.textContent || '');
+                return label.indexOf(q) !== -1;
+              });
+            }
+            if (match) select.value = String(match.value);
+          });
+        });
+      }
+    })();
+  </script>
+  <?php
+});
+
+/* =========================================================
  * [ADMIN] BMA Training Sync status
  * ========================================================= */
 if (!function_exists('lc_bma_parse_utc_to_ts')) {
