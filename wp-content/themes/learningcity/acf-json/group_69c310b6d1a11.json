@@ -1,0 +1,481 @@
+{
+    "key": "group_69c310b6d1a11",
+    "title": "Widget Section",
+    "fields": [
+        {
+            "key": "field_hl_items",
+            "label": "รายการ Widget",
+            "name": "highlight_items",
+            "aria-label": "",
+            "type": "repeater",
+            "instructions": "สำหรับส่วน Widget",
+            "required": 0,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
+            },
+            "layout": "block",
+            "min": 0,
+            "max": 0,
+            "collapsed": "field_hl_item_seo_title",
+            "button_label": "เพิ่มการ์ด",
+            "rows_per_page": 20,
+            "acfe_repeater_stylised_button": 0,
+            "sub_fields": [
+                {
+                    "key": "field_hl_tab_content",
+                    "label": "ข้อมูลการ์ด",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "selected": 1,
+                    "no_preference": 0,
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_image",
+                    "label": "รูปภาพ",
+                    "name": "image",
+                    "aria-label": "",
+                    "type": "image",
+                    "instructions": "",
+                    "required": 1,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "uploader": "",
+                    "return_format": "array",
+                    "library": "all",
+                    "upload_folder": "",
+                    "acfe_thumbnail": 0,
+                    "min_width": "",
+                    "min_height": "",
+                    "min_size": "",
+                    "max_width": "",
+                    "max_height": "",
+                    "max_size": "",
+                    "mime_types": "",
+                    "allow_in_bindings": 0,
+                    "preview_size": "medium",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_seo_title",
+                    "label": "SEO Title (sr-only)",
+                    "name": "seo_title",
+                    "aria-label": "",
+                    "type": "text",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "default_value": "",
+                    "maxlength": "",
+                    "placeholder": "",
+                    "prepend": "",
+                    "append": "",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_display_pages",
+                    "label": "แสดงในหน้า",
+                    "name": "display_pages",
+                    "aria-label": "",
+                    "type": "checkbox",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "100",
+                        "class": "",
+                        "id": ""
+                    },
+                    "choices": {
+                        "homepage": "Homepage",
+                        "nextlearn": "Next Learn"
+                    },
+                    "default_value": [
+                        "homepage",
+                        "nextlearn"
+                    ],
+                    "return_format": "value",
+                    "allow_custom": 0,
+                    "layout": "horizontal",
+                    "toggle": 0,
+                    "save_custom": 0,
+                    "custom_choice_button_text": "Add new choice",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_tab_action",
+                    "label": "Action",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "selected": 0,
+                    "no_preference": 0,
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_action_type",
+                    "label": "รูปแบบการคลิก",
+                    "name": "action_type",
+                    "aria-label": "",
+                    "type": "radio",
+                    "instructions": "",
+                    "required": 1,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "choices": {
+                        "link": "ลิงก์",
+                        "popup": "Popup"
+                    },
+                    "default_value": "link",
+                    "return_format": "value",
+                    "allow_null": 0,
+                    "other_choice": 0,
+                    "save_other_choice": 0,
+                    "layout": "horizontal",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_link_url",
+                    "label": "ลิงก์ปลายทาง",
+                    "name": "link_url",
+                    "aria-label": "",
+                    "type": "url",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_action_type",
+                                "operator": "==",
+                                "value": "link"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "default_value": "",
+                    "placeholder": "",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_popup_title",
+                    "label": "หัวข้อ Popup",
+                    "name": "popup_title",
+                    "aria-label": "",
+                    "type": "text",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_action_type",
+                                "operator": "==",
+                                "value": "popup"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "default_value": "",
+                    "maxlength": "",
+                    "placeholder": "",
+                    "prepend": "",
+                    "append": "",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_popup_body",
+                    "label": "รายละเอียด Popup",
+                    "name": "popup_body",
+                    "aria-label": "",
+                    "type": "textarea",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_action_type",
+                                "operator": "==",
+                                "value": "popup"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "rows": 4,
+                    "new_lines": "",
+                    "default_value": "",
+                    "maxlength": "",
+                    "placeholder": "",
+                    "acfe_textarea_code": 0,
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_popup_image",
+                    "label": "ภาพใน Popup",
+                    "name": "popup_image",
+                    "aria-label": "",
+                    "type": "image",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_action_type",
+                                "operator": "==",
+                                "value": "popup"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "uploader": "",
+                    "return_format": "array",
+                    "library": "all",
+                    "upload_folder": "",
+                    "acfe_thumbnail": 0,
+                    "min_width": "",
+                    "min_height": "",
+                    "min_size": "",
+                    "max_width": "",
+                    "max_height": "",
+                    "max_size": "",
+                    "mime_types": "",
+                    "allow_in_bindings": 0,
+                    "preview_size": "medium",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_popup_cta_label",
+                    "label": "ปุ่มใน Popup (ข้อความ)",
+                    "name": "popup_cta_label",
+                    "aria-label": "",
+                    "type": "text",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_action_type",
+                                "operator": "==",
+                                "value": "popup"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "default_value": "",
+                    "maxlength": "",
+                    "placeholder": "",
+                    "prepend": "",
+                    "append": "",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_popup_cta_url",
+                    "label": "ปุ่มใน Popup (ลิงก์)",
+                    "name": "popup_cta_url",
+                    "aria-label": "",
+                    "type": "url",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_action_type",
+                                "operator": "==",
+                                "value": "popup"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "50",
+                        "class": "",
+                        "id": ""
+                    },
+                    "default_value": "",
+                    "placeholder": "",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_tab_schedule",
+                    "label": "Schedule",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "selected": 0,
+                    "no_preference": 0,
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_schedule_enabled",
+                    "label": "เปิดใช้เวลาเปิด-ปิด",
+                    "name": "schedule_enabled",
+                    "aria-label": "",
+                    "type": "true_false",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "100",
+                        "class": "",
+                        "id": ""
+                    },
+                    "message": "",
+                    "default_value": 0,
+                    "ui": 1,
+                    "ui_on_text": "เปิดใช้งาน",
+                    "ui_off_text": "ปิดใช้งาน",
+                    "style": "",
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_start_at",
+                    "label": "เริ่มแสดง",
+                    "name": "start_at",
+                    "aria-label": "",
+                    "type": "date_time_picker",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_schedule_enabled",
+                                "operator": "==",
+                                "value": "1"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "100",
+                        "class": "",
+                        "id": ""
+                    },
+                    "display_format": "d/m/Y H:i",
+                    "return_format": "Y-m-d H:i:s",
+                    "first_day": 1,
+                    "allow_null": 0,
+                    "parent_repeater": "field_hl_items"
+                },
+                {
+                    "key": "field_hl_item_end_at",
+                    "label": "หยุดแสดง",
+                    "name": "end_at",
+                    "aria-label": "",
+                    "type": "date_time_picker",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": [
+                        [
+                            {
+                                "field": "field_hl_item_schedule_enabled",
+                                "operator": "==",
+                                "value": "1"
+                            }
+                        ]
+                    ],
+                    "wrapper": {
+                        "width": "100",
+                        "class": "",
+                        "id": ""
+                    },
+                    "display_format": "d/m/Y H:i",
+                    "return_format": "Y-m-d H:i:s",
+                    "first_day": 1,
+                    "allow_null": 0,
+                    "parent_repeater": "field_hl_items"
+                }
+            ]
+        }
+    ],
+    "location": [
+        [
+            {
+                "param": "page_type",
+                "operator": "==",
+                "value": "front_page"
+            }
+        ]
+    ],
+    "menu_order": 1,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": [
+        "the_content"
+    ],
+    "active": true,
+    "description": "Widget: tabbed editor with page visibility and link/popup action",
+    "show_in_rest": 0,
+    "display_title": "",
+    "acfe_autosync": [
+        "json"
+    ],
+    "acfe_form": 0,
+    "acfe_meta": "",
+    "acfe_note": "",
+    "modified": 1771400600
+}

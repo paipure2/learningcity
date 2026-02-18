@@ -144,7 +144,6 @@ add_action('wp_enqueue_scripts', function () {
   $data = [
     'ajax_url'    => admin_url('admin-ajax.php'),
     'nonce'       => wp_create_nonce('course_modal_nonce'),
-    'report_nonce'=> wp_create_nonce('lc_report_course'),
     'archive_url' => get_post_type_archive_link('course'),
     'current_course_id' => is_singular('course') ? (int) get_queried_object_id() : 0,
   ];
@@ -886,831 +885,6 @@ if (!function_exists('lc_render_bma_sync_status_page')) {
         echo '</table>';
         echo '</div>';
     }
-}
-
-
-/* =========================================================
- * [LOCATION REPORTS] Report incorrect info (front + admin)
- * ========================================================= */
-add_action('acf/init', function () {
-  if (!function_exists('acf_add_local_field_group')) return;
-
-  acf_add_local_field_group([
-    'key' => 'group_lc_location_reports',
-    'title' => 'Location Reports',
-    'fields' => [
-      [
-        'key' => 'field_lc_reports',
-        'label' => 'Reports',
-        'name' => 'reports',
-        'type' => 'repeater',
-        'layout' => 'table',
-        'button_label' => 'Add Report',
-        'sub_fields' => [
-          [
-            'key' => 'field_lc_reported_at',
-            'label' => 'วันที่แจ้ง',
-            'name' => 'reported_at',
-            'type' => 'date_time_picker',
-            'display_format' => 'Y-m-d H:i',
-            'return_format' => 'Y-m-d H:i',
-            'wrapper' => ['width' => 30],
-          ],
-          [
-            'key' => 'field_lc_report_status',
-            'label' => 'สถานะ',
-            'name' => 'status',
-            'type' => 'select',
-            'choices' => [
-              'pending' => 'ยังไม่แก้ไข',
-              'reviewing' => 'กำลังตรวจสอบ',
-              'resolved' => 'แก้ไขแล้ว',
-            ],
-            'default_value' => 'pending',
-            'wrapper' => ['width' => 20],
-          ],
-          [
-            'key' => 'field_lc_report_details_group',
-            'label' => 'รายละเอียด',
-            'name' => 'report_details_group',
-            'type' => 'group',
-            'acfe_group_modal' => 1,
-            'acfe_group_modal_close' => 1,
-            'acfe_group_modal_button' => 'ดูรายละเอียด',
-            'acfe_group_modal_size' => 'large',
-            'sub_fields' => [
-              [
-                'key' => 'field_lc_report_topics',
-                'label' => 'Topics',
-                'name' => 'report_topics',
-                'type' => 'checkbox',
-                'choices' => [
-                  'address' => 'ที่อยู่',
-                  'phone' => 'เบอร์โทร',
-                  'hours' => 'เวลาทำการ',
-                  'images' => 'รูปภาพ',
-                  'links' => 'ลิงก์',
-                  'other' => 'อื่น ๆ',
-                ],
-              ],
-              [
-                'key' => 'field_lc_report_locations',
-                'label' => 'Related Locations',
-                'name' => 'report_locations',
-                'type' => 'textarea',
-                'rows' => 3,
-                'instructions' => 'สถานที่ที่ผู้แจ้งเลือกจากหน้าคอร์ส',
-              ],
-              [
-                'key' => 'field_lc_report_details',
-                'label' => 'Details',
-                'name' => 'report_details',
-                'type' => 'textarea',
-              ],
-              [
-                'key' => 'field_lc_reporter_name',
-                'label' => 'Reporter Name',
-                'name' => 'reporter_name',
-                'type' => 'text',
-              ],
-              [
-                'key' => 'field_lc_reporter_contact',
-                'label' => 'Reporter Contact',
-                'name' => 'reporter_contact',
-                'type' => 'text',
-              ],
-              [
-                'key' => 'field_lc_report_admin_note',
-                'label' => 'Admin Note',
-                'name' => 'admin_note',
-                'type' => 'textarea',
-              ],
-            ],
-          ],
-        ],
-      ],
-    ],
-    'location' => [
-      [
-        [
-          'param' => 'post_type',
-          'operator' => '==',
-          'value' => 'location',
-        ],
-      ],
-      [
-        [
-          'param' => 'post_type',
-          'operator' => '==',
-          'value' => 'course',
-        ],
-      ],
-    ],
-    'position' => 'normal',
-    'style' => 'default',
-    'label_placement' => 'top',
-    'instruction_placement' => 'label',
-  ]);
-});
-
-function lc_report_allowed_topics() {
-  return ['address', 'phone', 'hours', 'images', 'links', 'other'];
-}
-
-function lc_recalc_report_counts($post_id) {
-  $post_type = get_post_type($post_id);
-  if (!in_array($post_type, ['location', 'course'], true)) return;
-  if (!function_exists('get_field')) return;
-
-  $rows = get_field('field_lc_reports', $post_id);
-  $total = is_array($rows) ? count($rows) : 0;
-  $open = 0;
-  $pending = 0;
-  $reviewing = 0;
-  $resolved = 0;
-  $last_at = 0;
-  if (is_array($rows)) {
-    foreach ($rows as $r) {
-      $status = is_array($r) ? ($r['status'] ?? 'pending') : 'pending';
-      if ($status === 'pending') $pending++;
-      if ($status === 'reviewing') $reviewing++;
-      if ($status === 'resolved') $resolved++;
-      if ($status !== 'resolved') $open++;
-      $reported_at = is_array($r) ? ($r['reported_at'] ?? '') : '';
-      if ($reported_at) {
-        $ts = strtotime($reported_at);
-        if ($ts && $ts > $last_at) $last_at = $ts;
-      }
-    }
-  }
-  update_post_meta($post_id, '_lc_report_total_count', $total);
-  update_post_meta($post_id, '_lc_report_open_count', $open);
-  update_post_meta($post_id, '_lc_report_pending_count', $pending);
-  update_post_meta($post_id, '_lc_report_reviewing_count', $reviewing);
-  update_post_meta($post_id, '_lc_report_resolved_count', $resolved);
-  update_post_meta($post_id, '_lc_report_last_at', $last_at);
-}
-
-add_action('acf/save_post', function ($post_id) {
-  $post_type = get_post_type($post_id);
-  if (!in_array($post_type, ['location', 'course'], true)) return;
-  lc_recalc_report_counts($post_id);
-}, 20);
-
-add_action('wp_ajax_lc_report_location', 'lc_report_location');
-add_action('wp_ajax_nopriv_lc_report_location', 'lc_report_location');
-add_action('wp_ajax_lc_report_course', 'lc_report_course');
-add_action('wp_ajax_nopriv_lc_report_course', 'lc_report_course');
-
-function lc_report_location() {
-  check_ajax_referer('lc_report_location', 'nonce');
-
-  $post_id = isset($_POST['location_id']) ? intval($_POST['location_id']) : 0;
-  if (!$post_id || get_post_type($post_id) !== 'location' || get_post_status($post_id) !== 'publish') {
-    wp_send_json_error(['message' => 'invalid location'], 400);
-  }
-
-  // Honeypot (bots often fill hidden fields)
-  $website = isset($_POST['website']) ? trim((string) $_POST['website']) : '';
-  if ($website !== '') {
-    wp_send_json_success(['message' => 'ok']);
-  }
-
-  // Rate limit by IP (1 request per 60 seconds)
-  $ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : 'unknown';
-  $rate_key = 'lc_report_rl_' . md5($ip);
-  if (get_transient($rate_key)) {
-    wp_send_json_error(['message' => 'rate_limited'], 429);
-  }
-  set_transient($rate_key, 1, 60);
-
-  $topics = isset($_POST['topics']) ? (array) $_POST['topics'] : [];
-  $topics = array_values(array_intersect($topics, lc_report_allowed_topics()));
-  $details = isset($_POST['details']) ? sanitize_textarea_field($_POST['details']) : '';
-  $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
-  $contact = isset($_POST['contact']) ? sanitize_text_field($_POST['contact']) : '';
-
-  if (empty($topics) && mb_strlen($details) < 3) {
-    wp_send_json_error(['message' => 'missing details'], 400);
-  }
-
-  if (!function_exists('add_row')) {
-    wp_send_json_error(['message' => 'acf not available'], 500);
-  }
-
-  $row = [
-    'reported_at' => current_time('Y-m-d H:i'),
-    'status' => 'pending',
-    'report_details_group' => [
-      'report_topics' => $topics,
-      'report_details' => $details,
-      'reporter_name' => $name,
-      'reporter_contact' => $contact,
-      'admin_note' => '',
-    ],
-  ];
-
-  $added = add_row('field_lc_reports', $row, $post_id);
-  if (!$added) {
-    wp_send_json_error(['message' => 'failed to save'], 500);
-  }
-
-  lc_recalc_report_counts($post_id);
-
-  wp_send_json_success(['message' => 'ok']);
-}
-
-function lc_report_course() {
-  check_ajax_referer('lc_report_course', 'nonce');
-
-  $post_id = isset($_POST['course_id']) ? intval($_POST['course_id']) : 0;
-  if (!$post_id || get_post_type($post_id) !== 'course' || get_post_status($post_id) !== 'publish') {
-    wp_send_json_error(['message' => 'invalid course'], 400);
-  }
-
-  $website = isset($_POST['website']) ? trim((string) $_POST['website']) : '';
-  if ($website !== '') {
-    wp_send_json_success(['message' => 'ok']);
-  }
-
-  $ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : 'unknown';
-  $rate_key = 'lc_report_course_rl_' . md5($ip);
-  if (get_transient($rate_key)) {
-    wp_send_json_error(['message' => 'rate_limited'], 429);
-  }
-  set_transient($rate_key, 1, 60);
-
-  $topics = isset($_POST['topics']) ? (array) $_POST['topics'] : [];
-  $topics = array_values(array_intersect($topics, lc_report_allowed_topics()));
-  $location_ids = isset($_POST['location_ids']) ? (array) $_POST['location_ids'] : [];
-  $location_ids = array_values(array_unique(array_filter(array_map('intval', $location_ids))));
-  $details = isset($_POST['details']) ? sanitize_textarea_field($_POST['details']) : '';
-  $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
-  $contact = isset($_POST['contact']) ? sanitize_text_field($_POST['contact']) : '';
-
-  $allowed_location_ids = lc_get_course_location_ids_for_report($post_id);
-  if (!empty($allowed_location_ids) && !empty($location_ids)) {
-    $location_ids = array_values(array_intersect($location_ids, $allowed_location_ids));
-  } else {
-    $location_ids = [];
-  }
-
-  $location_titles = [];
-  foreach ($location_ids as $lid) {
-    $title = get_the_title($lid);
-    if ($title) $location_titles[] = $title;
-  }
-
-  if (empty($topics) && mb_strlen($details) < 3) {
-    wp_send_json_error(['message' => 'missing details'], 400);
-  }
-
-  if (!function_exists('add_row')) {
-    wp_send_json_error(['message' => 'acf not available'], 500);
-  }
-
-  $row = [
-    'reported_at' => current_time('Y-m-d H:i'),
-    'status' => 'pending',
-    'report_details_group' => [
-      'report_topics' => $topics,
-      'report_locations' => !empty($location_titles) ? implode("\n", $location_titles) : '',
-      'report_details' => $details,
-      'reporter_name' => $name,
-      'reporter_contact' => $contact,
-      'admin_note' => '',
-    ],
-  ];
-
-  $added = add_row('field_lc_reports', $row, $post_id);
-  if (!$added) {
-    wp_send_json_error(['message' => 'failed to save'], 500);
-  }
-
-  lc_recalc_report_counts($post_id);
-  wp_send_json_success(['message' => 'ok']);
-}
-
-function lc_get_course_location_ids_for_report($course_id) {
-  $course_id = (int) $course_id;
-  if ($course_id <= 0) return [];
-
-  $session_ids = get_posts([
-    'post_type' => 'session',
-    'post_status' => 'publish',
-    'posts_per_page' => -1,
-    'fields' => 'ids',
-    'meta_query' => [
-      [
-        'key' => 'course',
-        'value' => $course_id,
-        'compare' => '=',
-      ],
-    ],
-  ]);
-
-  if (empty($session_ids)) return [];
-
-  $ids = [];
-  foreach ($session_ids as $sid) {
-    $location = function_exists('get_field') ? get_field('location', $sid) : get_post_meta($sid, 'location', true);
-    $location_id = 0;
-    if (is_object($location) && isset($location->ID)) {
-      $location_id = (int) $location->ID;
-    } elseif (is_numeric($location)) {
-      $location_id = (int) $location;
-    }
-
-    if ($location_id > 0 && get_post_type($location_id) === 'location') {
-      $ids[] = $location_id;
-    }
-  }
-
-  return array_values(array_unique($ids));
-}
-
-
-
-/* =========================================================
- * [ADMIN] Location Reports page
- * ========================================================= */
-add_action('admin_menu', function () {
-  $counts = lc_reports_tab_counts();
-  $pending = intval($counts['pending'] ?? 0);
-  $badge = $pending > 0
-    ? ' <span class="update-plugins count-' . $pending . '"><span class="update-count">' . $pending . '</span></span>'
-    : '';
-
-  add_submenu_page(
-    'edit.php?post_type=location',
-    'Location Reports',
-    'แจ้งแก้ไข' . $badge,
-    'edit_posts',
-    'lc-location-reports',
-    'lc_render_location_reports_page'
-  );
-}, 10);
-
-add_action('admin_menu', function () {
-  global $submenu;
-  $parent = 'edit.php?post_type=location';
-  if (empty($submenu[$parent]) || !is_array($submenu[$parent])) return;
-
-  $items = $submenu[$parent];
-  $target = null;
-  foreach ($items as $i => $item) {
-    if (!empty($item[2]) && $item[2] === 'lc-location-reports') {
-      $target = $item;
-      unset($items[$i]);
-      break;
-    }
-  }
-  if (!$target) return;
-
-  $new = [];
-  $inserted = false;
-  foreach ($items as $item) {
-    $new[] = $item;
-    if (!empty($item[2]) && $item[2] === 'edit.php?post_type=location') {
-      $new[] = $target;
-      $inserted = true;
-    }
-  }
-  if (!$inserted) $new[] = $target;
-
-  $submenu[$parent] = $new;
-}, 999);
-
-function lc_reports_tab_counts() {
-  $counts = [
-    'pending' => 0,
-    'reviewing' => 0,
-    'resolved' => 0,
-    'all' => 0,
-  ];
-
-  $q_all = new WP_Query([
-    'post_type' => 'location',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_total_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['all'] = (int) $q_all->found_posts;
-
-  $q_pending = new WP_Query([
-    'post_type' => 'location',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_pending_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['pending'] = (int) $q_pending->found_posts;
-
-  $q_review = new WP_Query([
-    'post_type' => 'location',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_reviewing_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['reviewing'] = (int) $q_review->found_posts;
-
-  $q_resolved = new WP_Query([
-    'post_type' => 'location',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_total_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-      [
-        'key' => '_lc_report_open_count',
-        'value' => 0,
-        'compare' => '=',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['resolved'] = (int) $q_resolved->found_posts;
-
-  return $counts;
-}
-
-function lc_render_location_reports_page() {
-  if (!current_user_can('edit_posts')) return;
-
-  $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'pending';
-  if (!in_array($tab, ['pending', 'reviewing', 'resolved', 'all'], true)) $tab = 'pending';
-
-  $counts = lc_reports_tab_counts();
-
-  $meta_query = [];
-  if ($tab === 'pending') {
-    $meta_query[] = [
-      'key' => '_lc_report_pending_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-  } elseif ($tab === 'reviewing') {
-    $meta_query[] = [
-      'key' => '_lc_report_reviewing_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-  } elseif ($tab === 'resolved') {
-    $meta_query[] = [
-      'key' => '_lc_report_total_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-    $meta_query[] = [
-      'key' => '_lc_report_open_count',
-      'value' => 0,
-      'compare' => '=',
-      'type' => 'NUMERIC',
-    ];
-  } else {
-    $meta_query[] = [
-      'key' => '_lc_report_total_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-  }
-
-  $q = new WP_Query([
-    'post_type' => 'location',
-    'post_status' => 'publish',
-    'posts_per_page' => 50,
-    'orderby' => 'meta_value_num',
-    'meta_key' => '_lc_report_last_at',
-    'order' => 'DESC',
-    'meta_query' => $meta_query,
-  ]);
-
-  echo '<div class="wrap">';
-  echo '<h1>แจ้งแก้ไข</h1>';
-
-  $base_url = admin_url('edit.php?post_type=location&page=lc-location-reports');
-  echo '<h2 class="nav-tab-wrapper">';
-  $tabs = [
-    'pending' => 'ยังไม่แก้ไข',
-    'reviewing' => 'กำลังตรวจสอบ',
-    'resolved' => 'แก้ไขแล้ว',
-    'all' => 'ทั้งหมด',
-  ];
-  foreach ($tabs as $key => $label) {
-    $url = esc_url(add_query_arg('tab', $key, $base_url));
-    $class = $tab === $key ? 'nav-tab nav-tab-active' : 'nav-tab';
-    $count = intval($counts[$key] ?? 0);
-    echo '<a class="' . esc_attr($class) . '" href="' . $url . '">' . esc_html($label) . ' <span class="count">(' . $count . ')</span></a>';
-  }
-  echo '</h2>';
-
-  echo '<table class="wp-list-table widefat fixed striped">';
-  echo '<thead><tr>';
-  echo '<th>ชื่อสถานที่</th>';
-  echo '<th style="width:140px">จำนวนรายงานค้าง</th>';
-  echo '<th style="width:180px">วันที่รายงานล่าสุด</th>';
-  echo '</tr></thead>';
-  echo '<tbody>';
-
-  if ($q->have_posts()) {
-    while ($q->have_posts()) {
-      $q->the_post();
-      $post_id = get_the_ID();
-      $open = (int) get_post_meta($post_id, '_lc_report_open_count', true);
-      $last_at = (int) get_post_meta($post_id, '_lc_report_last_at', true);
-      $last_text = $last_at ? date_i18n('Y-m-d H:i', $last_at) : '-';
-      $edit_link = get_edit_post_link($post_id);
-
-      echo '<tr>';
-      echo '<td><a href="' . esc_url($edit_link) . '"><strong>' . esc_html(get_the_title()) . '</strong></a></td>';
-      echo '<td>' . esc_html($open) . '</td>';
-      echo '<td>' . esc_html($last_text) . '</td>';
-      echo '</tr>';
-    }
-    wp_reset_postdata();
-  } else {
-    echo '<tr><td colspan="3">ไม่มีรายการ</td></tr>';
-  }
-
-  echo '</tbody></table>';
-  echo '</div>';
-}
-
-/* =========================================================
- * [ADMIN] Course Reports page
- * ========================================================= */
-add_action('admin_menu', function () {
-  $counts = lc_course_reports_tab_counts();
-  $pending = intval($counts['pending'] ?? 0);
-  $badge = $pending > 0
-    ? ' <span class="update-plugins count-' . $pending . '"><span class="update-count">' . $pending . '</span></span>'
-    : '';
-
-  add_submenu_page(
-    'edit.php?post_type=course',
-    'Course Reports',
-    'แจ้งแก้ไข' . $badge,
-    'edit_posts',
-    'lc-course-reports',
-    'lc_render_course_reports_page'
-  );
-}, 10);
-
-add_action('admin_menu', function () {
-  global $submenu;
-  $parent = 'edit.php?post_type=course';
-  if (empty($submenu[$parent]) || !is_array($submenu[$parent])) return;
-
-  $items = $submenu[$parent];
-  $target = null;
-  foreach ($items as $i => $item) {
-    if (!empty($item[2]) && $item[2] === 'lc-course-reports') {
-      $target = $item;
-      unset($items[$i]);
-      break;
-    }
-  }
-  if (!$target) return;
-
-  $new = [];
-  $inserted = false;
-  foreach ($items as $item) {
-    $new[] = $item;
-    if (!empty($item[2]) && $item[2] === 'edit.php?post_type=course') {
-      $new[] = $target;
-      $inserted = true;
-    }
-  }
-  if (!$inserted) $new[] = $target;
-
-  $submenu[$parent] = $new;
-}, 999);
-
-function lc_course_reports_tab_counts() {
-  $counts = [
-    'pending' => 0,
-    'reviewing' => 0,
-    'resolved' => 0,
-    'all' => 0,
-  ];
-
-  $q_all = new WP_Query([
-    'post_type' => 'course',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_total_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['all'] = (int) $q_all->found_posts;
-
-  $q_pending = new WP_Query([
-    'post_type' => 'course',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_pending_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['pending'] = (int) $q_pending->found_posts;
-
-  $q_review = new WP_Query([
-    'post_type' => 'course',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_reviewing_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['reviewing'] = (int) $q_review->found_posts;
-
-  $q_resolved = new WP_Query([
-    'post_type' => 'course',
-    'post_status' => 'publish',
-    'fields' => 'ids',
-    'posts_per_page' => -1,
-    'no_found_rows' => false,
-    'meta_query' => [
-      [
-        'key' => '_lc_report_total_count',
-        'value' => 0,
-        'compare' => '>',
-        'type' => 'NUMERIC',
-      ],
-      [
-        'key' => '_lc_report_open_count',
-        'value' => 0,
-        'compare' => '=',
-        'type' => 'NUMERIC',
-      ],
-    ],
-  ]);
-  $counts['resolved'] = (int) $q_resolved->found_posts;
-
-  return $counts;
-}
-
-function lc_render_course_reports_page() {
-  if (!current_user_can('edit_posts')) return;
-
-  $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'pending';
-  if (!in_array($tab, ['pending', 'reviewing', 'resolved', 'all'], true)) $tab = 'pending';
-
-  $counts = lc_course_reports_tab_counts();
-
-  $meta_query = [];
-  if ($tab === 'pending') {
-    $meta_query[] = [
-      'key' => '_lc_report_pending_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-  } elseif ($tab === 'reviewing') {
-    $meta_query[] = [
-      'key' => '_lc_report_reviewing_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-  } elseif ($tab === 'resolved') {
-    $meta_query[] = [
-      'key' => '_lc_report_total_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-    $meta_query[] = [
-      'key' => '_lc_report_open_count',
-      'value' => 0,
-      'compare' => '=',
-      'type' => 'NUMERIC',
-    ];
-  } else {
-    $meta_query[] = [
-      'key' => '_lc_report_total_count',
-      'value' => 0,
-      'compare' => '>',
-      'type' => 'NUMERIC',
-    ];
-  }
-
-  $q = new WP_Query([
-    'post_type' => 'course',
-    'post_status' => 'publish',
-    'posts_per_page' => 50,
-    'orderby' => 'meta_value_num',
-    'meta_key' => '_lc_report_last_at',
-    'order' => 'DESC',
-    'meta_query' => $meta_query,
-  ]);
-
-  echo '<div class="wrap">';
-  echo '<h1>แจ้งแก้ไข</h1>';
-
-  $base_url = admin_url('edit.php?post_type=course&page=lc-course-reports');
-  echo '<h2 class="nav-tab-wrapper">';
-  $tabs = [
-    'pending' => 'ยังไม่แก้ไข',
-    'reviewing' => 'กำลังตรวจสอบ',
-    'resolved' => 'แก้ไขแล้ว',
-    'all' => 'ทั้งหมด',
-  ];
-  foreach ($tabs as $key => $label) {
-    $url = esc_url(add_query_arg('tab', $key, $base_url));
-    $class = $tab === $key ? 'nav-tab nav-tab-active' : 'nav-tab';
-    $count = intval($counts[$key] ?? 0);
-    echo '<a class="' . esc_attr($class) . '" href="' . $url . '">' . esc_html($label) . ' <span class="count">(' . $count . ')</span></a>';
-  }
-  echo '</h2>';
-
-  echo '<table class="wp-list-table widefat fixed striped">';
-  echo '<thead><tr>';
-  echo '<th>ชื่อคอร์ส</th>';
-  echo '<th style="width:140px">จำนวนรายงานค้าง</th>';
-  echo '<th style="width:180px">วันที่รายงานล่าสุด</th>';
-  echo '</tr></thead>';
-  echo '<tbody>';
-
-  if ($q->have_posts()) {
-    while ($q->have_posts()) {
-      $q->the_post();
-      $post_id = get_the_ID();
-      $open = (int) get_post_meta($post_id, '_lc_report_open_count', true);
-      $last_at = (int) get_post_meta($post_id, '_lc_report_last_at', true);
-      $last_text = $last_at ? date_i18n('Y-m-d H:i', $last_at) : '-';
-      $edit_link = get_edit_post_link($post_id);
-
-      echo '<tr>';
-      echo '<td><a href="' . esc_url($edit_link) . '"><strong>' . esc_html(get_the_title()) . '</strong></a></td>';
-      echo '<td>' . esc_html($open) . '</td>';
-      echo '<td>' . esc_html($last_text) . '</td>';
-      echo '</tr>';
-    }
-    wp_reset_postdata();
-  } else {
-    echo '<tr><td colspan="3">ไม่มีรายการ</td></tr>';
-  }
-
-  echo '</tbody></table>';
-  echo '</div>';
 }
 
 
@@ -2590,6 +1764,218 @@ add_action('admin_enqueue_scripts', function ($hook) {
         'ajaxurl' => admin_url('admin-ajax.php'),
         'nonce'   => wp_create_nonce('scp_nonce'),
     ]);
+});
+
+/* =========================================================
+ * [ADMIN MENU] Top-level quick links to Homepage ACF tabs
+ * ========================================================= */
+if (!function_exists('lc_admin_redirect_to_homepage_tab')) {
+    function lc_admin_redirect_to_homepage_tab($tab_slug) {
+        $front_page_id = (int) get_option('page_on_front');
+        if ($front_page_id <= 0) {
+            wp_die('Homepage is not configured.');
+        }
+
+        $url = admin_url('post.php?post=' . $front_page_id . '&action=edit&lc_acf_tab=' . rawurlencode($tab_slug));
+        wp_safe_redirect($url);
+        exit;
+    }
+}
+
+add_action('admin_menu', function () {
+    if (!is_admin()) return;
+
+    $capability = 'edit_pages';
+
+    $widget_hook = add_menu_page(
+        'Widget',
+        'Widget',
+        $capability,
+        'lc-home-widget',
+        '__return_null',
+        'dashicons-screenoptions',
+        25.1
+    );
+
+    $policy_hook = add_menu_page(
+        'Policy',
+        'Policy',
+        $capability,
+        'lc-home-policy',
+        '__return_null',
+        'dashicons-list-view',
+        25.2
+    );
+
+    $partners_hook = add_menu_page(
+        'Partners',
+        'Partners',
+        $capability,
+        'lc-home-partners',
+        '__return_null',
+        'dashicons-groups',
+        25.3
+    );
+
+    if ($widget_hook) {
+        add_action('load-' . $widget_hook, function () {
+            lc_admin_redirect_to_homepage_tab('widget-section');
+        });
+    }
+
+    if ($policy_hook) {
+        add_action('load-' . $policy_hook, function () {
+            lc_admin_redirect_to_homepage_tab('policy-section');
+        });
+    }
+
+    if ($partners_hook) {
+        add_action('load-' . $partners_hook, function () {
+            lc_admin_redirect_to_homepage_tab('partners');
+        });
+    }
+}, 99);
+
+/* =========================================================
+ * [ADMIN PAGE] Generic tabs for ACF field groups on Homepage
+ * - Keep field groups separated, but render as tabs in admin UI
+ * ========================================================= */
+add_action('admin_enqueue_scripts', function ($hook) {
+    if (!in_array($hook, ['post.php', 'post-new.php'], true)) return;
+
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->post_type !== 'page') return;
+
+    $post_id = 0;
+    if (isset($_GET['post'])) {
+        $post_id = (int) $_GET['post'];
+    } elseif (isset($_POST['post_ID'])) {
+        $post_id = (int) $_POST['post_ID'];
+    }
+    if ($post_id <= 0) return;
+
+    $front_page_id = (int) get_option('page_on_front');
+    if ($front_page_id <= 0 || $post_id !== $front_page_id) return;
+
+    wp_add_inline_script('jquery-core', <<<JS
+jQuery(function($){
+  var \$boxes = $('#normal-sortables .postbox[id^="acf-group_"]');
+  if (\$boxes.length < 2) return;
+
+  if (!document.getElementById('lc-acf-tabs-style')) {
+    var style = document.createElement('style');
+    style.id = 'lc-acf-tabs-style';
+    style.textContent = '.lc-acf-tabs-wrap{display:flex;gap:8px;margin:12px 0 16px;align-items:center}.lc-acf-tab-btn{padding:6px 14px;border:1px solid #2271b1;background:#fff;color:#2271b1;border-radius:4px;cursor:pointer}.lc-acf-tab-btn.is-active{background:#2271b1;color:#fff}.lc-acf-tab-btn:focus{outline:2px solid #72aee6;outline-offset:1px}';
+    document.head.appendChild(style);
+  }
+
+  var \$nav = $('<div class="lc-acf-tabs-wrap" role="tablist" aria-label="ACF Group Tabs"></div>');
+  var stateKey = 'lc_acf_admin_tab_' + String({$post_id});
+  var urlKey = 'lc_acf_tab';
+
+  function slugify(text) {
+    return String(text || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\\s-_]/g, '')
+      .replace(/[\\s_]+/g, '-')
+      .replace(/-+/g, '-');
+  }
+
+  function getLabel(\$box, idx) {
+    var \$h = \$box.find('> .postbox-header .hndle, > .hndle').first().clone();
+    \$h.find('*').remove();
+    var label = $.trim(\$h.text());
+    if (!label) {
+      label = $.trim(\$box.find('> .postbox-header .hndle, > .hndle').first().text());
+    }
+    if (!label) {
+      var raw = String(\$box.attr('id') || '').replace(/^acf-group_/, '');
+      label = raw ? raw.replace(/[_-]+/g, ' ') : '';
+    }
+    if (!label) label = 'Section ' + (idx + 1);
+    return label;
+  }
+
+  var preferredOrder = {
+    'homepage-content': 0,
+    'widget-section': 1,
+    'policy-section': 2,
+    'partners': 3
+  };
+
+  \$boxes = $(\$boxes.get().sort(function(a, b){
+    var \$a = $(a);
+    var \$b = $(b);
+    var aSlug = slugify(getLabel(\$a, 0));
+    var bSlug = slugify(getLabel(\$b, 0));
+    var aRank = Object.prototype.hasOwnProperty.call(preferredOrder, aSlug) ? preferredOrder[aSlug] : 999;
+    var bRank = Object.prototype.hasOwnProperty.call(preferredOrder, bSlug) ? preferredOrder[bSlug] : 999;
+    if (aRank !== bRank) return aRank - bRank;
+    return aSlug.localeCompare(bSlug);
+  }));
+
+  // Re-append in sorted order so visual order and tab order match.
+  var \$container = $('#normal-sortables');
+  \$boxes.each(function(){ \$container.append(this); });
+
+  function activate(index) {
+    \$boxes.each(function(i){
+      var isActive = i === index;
+      $(this).toggle(isActive);
+      \$nav.find('.lc-acf-tab-btn').eq(i)
+        .toggleClass('is-active', isActive)
+        .attr('aria-selected', isActive ? 'true' : 'false');
+    });
+    try { localStorage.setItem(stateKey, String(index)); } catch (e) {}
+
+    var tabSlug = \$nav.find('.lc-acf-tab-btn').eq(index).data('tabSlug');
+    if (tabSlug) {
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set(urlKey, tabSlug);
+        window.history.replaceState({}, '', u.toString());
+      } catch (e) {}
+    }
+  }
+
+  \$boxes.each(function(i){
+    var label = getLabel($(this), i);
+    var \$btn = $('<button type="button" class="lc-acf-tab-btn" role="tab" aria-selected="false"></button>');
+    \$btn.text(label);
+    \$btn.data('tabSlug', slugify(label) || ('section-' + (i + 1)));
+    \$btn.on('click', function(){ activate(i); });
+    \$nav.append(\$btn);
+  });
+
+  \$boxes.first().before(\$nav);
+
+  var initial = 0;
+  var hasUrlSelection = false;
+  try {
+    var u0 = new URL(window.location.href);
+    var wanted = u0.searchParams.get(urlKey);
+    if (wanted) {
+      \$nav.find('.lc-acf-tab-btn').each(function(i){
+        if ($(this).data('tabSlug') === wanted) {
+          initial = i;
+          hasUrlSelection = true;
+          return false;
+        }
+      });
+    }
+  } catch (e) {}
+
+  try {
+    if (!hasUrlSelection) {
+      var saved = parseInt(localStorage.getItem(stateKey), 10);
+      if (!isNaN(saved) && saved >= 0 && saved < \$boxes.length) initial = saved;
+    }
+  } catch (e) {}
+
+  activate(initial);
+});
+JS);
 });
 
 add_action('wp_ajax_scp_get_course_provider', function () {

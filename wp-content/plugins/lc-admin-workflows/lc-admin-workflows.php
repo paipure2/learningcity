@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: LearningCity Admin Workflows
+Plugin Name: LC Admin Workflows
 Description: Admin workflows for Course/Location editing tabs, session management, and course provider filters.
 Version: 0.1.0
 */

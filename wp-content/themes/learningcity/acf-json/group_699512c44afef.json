@@ -1,0 +1,1181 @@
+{
+    "key": "group_699512c44afef",
+    "title": "Policy Section",
+    "fields": [
+        {
+            "key": "field_ps_cols",
+            "label": "4 คอลัมน์",
+            "name": "policy_cols",
+            "aria-label": "",
+            "type": "group",
+            "instructions": "เลือกแท็บเพื่อกรอกแต่ละคอลัมน์",
+            "required": 0,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
+            },
+            "layout": "block",
+            "acfe_seamless_style": 0,
+            "acfe_group_modal": 0,
+            "sub_fields": [
+                {
+                    "key": "field_ps_tab_1",
+                    "label": "คอลัมน์ 1",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "selected": 0,
+                    "no_preference": 0
+                },
+                {
+                    "key": "field_ps_col1",
+                    "label": "คอลัมน์ที่ 1",
+                    "name": "col_1",
+                    "aria-label": "",
+                    "type": "group",
+                    "instructions": "แนะนำหัวข้อ: สนับสนุนการเรียนรู้ตลอดชีวิต",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "layout": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_ps_col1_title",
+                            "label": "หัวข้อคอลัมน์",
+                            "name": "title",
+                            "aria-label": "",
+                            "type": "textarea",
+                            "instructions": "พิมพ์ได้ 1–2 บรรทัด",
+                            "required": 0,
+                            "conditional_logic": 0,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "default_value": "สนับสนุนการ\nเรียนรู้ตลอดชีวิต",
+                            "rows": 2,
+                            "new_lines": "",
+                            "maxlength": "",
+                            "placeholder": "",
+                            "acfe_textarea_code": 0
+                        },
+                        {
+                            "key": "field_ps_col1_items",
+                            "label": "รายการ",
+                            "name": "items",
+                            "aria-label": "",
+                            "type": "repeater",
+                            "instructions": "เพิ่มกล่องข้อความในคอลัมน์นี้",
+                            "required": 0,
+                            "conditional_logic": 0,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "layout": "block",
+                            "min": 0,
+                            "max": 0,
+                            "collapsed": "field_ps_c1_item_text",
+                            "button_label": "เพิ่มรายการ",
+                            "rows_per_page": 20,
+                            "acfe_repeater_stylised_button": 0,
+                            "sub_fields": [
+                                {
+                                    "key": "field_ps_c1_item_tab_main",
+                                    "label": "ข้อมูลหลัก",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 1,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_item_text",
+                                    "label": "ข้อความรายการ",
+                                    "name": "text",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 2,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_item_highlight",
+                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "name": "highlight",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "เช่น 400 แห่ง, 481 ล้านบาท, 45% (ปล่อยว่างได้)",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_item_lifelong_targets",
+                                    "label": "แสดงในช่วงวัย",
+                                    "name": "lifelong_targets",
+                                    "aria-label": "",
+                                    "type": "checkbox",
+                                    "instructions": "เลือกช่วงวัยที่ต้องการให้รายการนี้ไปแสดงใน popup",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "choices": {
+                                        "baby": "เด็กอ่อน",
+                                        "young": "เด็กเล็ก",
+                                        "student": "วัยเรียน",
+                                        "working": "วัยทำงาน",
+                                        "senior": "สูงอายุ"
+                                    },
+                                    "default_value": [],
+                                    "return_format": "value",
+                                    "allow_custom": 0,
+                                    "layout": "horizontal",
+                                    "toggle": 0,
+                                    "save_custom": 0,
+                                    "custom_choice_button_text": "Add new choice",
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_item_tab_popup",
+                                    "label": "Popup",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 0,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_item_has_popup",
+                                    "label": "มีป๊อปอัป",
+                                    "name": "has_popup",
+                                    "aria-label": "",
+                                    "type": "true_false",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "ui": 1,
+                                    "ui_on_text": "มี",
+                                    "ui_off_text": "ไม่มี",
+                                    "default_value": 0,
+                                    "message": "",
+                                    "style": "",
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_modal_title",
+                                    "label": "หัวข้อในป๊อปอัป (ตัวหนา)",
+                                    "name": "modal_title",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c1_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_modal_body",
+                                    "label": "รายละเอียดในป๊อปอัป",
+                                    "name": "modal_body",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c1_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 4,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col1_items"
+                                }
+                            ]
+                        }
+                    ],
+                    "acfe_seamless_style": 0,
+                    "acfe_group_modal": 0,
+                    "acfe_group_modal_close": 0,
+                    "acfe_group_modal_button": "",
+                    "acfe_group_modal_size": "large"
+                },
+                {
+                    "key": "field_ps_tab_2",
+                    "label": "คอลัมน์ 2",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": false,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "selected": 0,
+                    "no_preference": 0
+                },
+                {
+                    "key": "field_ps_col2",
+                    "label": "คอลัมน์ที่ 2",
+                    "name": "col_2",
+                    "aria-label": "",
+                    "type": "group",
+                    "instructions": "แนะนำหัวข้อ: พัฒนาคุณภาพการศึกษา",
+                    "required": false,
+                    "conditional_logic": false,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "layout": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_ps_col2_title",
+                            "label": "หัวข้อคอลัมน์",
+                            "name": "title",
+                            "aria-label": "",
+                            "type": "textarea",
+                            "instructions": "",
+                            "required": false,
+                            "conditional_logic": false,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "rows": 2,
+                            "new_lines": "",
+                            "default_value": "พัฒนาคุณภาพ\nการศึกษา",
+                            "maxlength": "",
+                            "placeholder": "",
+                            "acfe_textarea_code": 0
+                        },
+                        {
+                            "key": "field_ps_col2_items",
+                            "label": "รายการ",
+                            "name": "items",
+                            "aria-label": "",
+                            "type": "repeater",
+                            "instructions": "",
+                            "required": false,
+                            "conditional_logic": false,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "layout": "block",
+                            "collapsed": "field_ps_c2_item_text",
+                            "button_label": "เพิ่มรายการ",
+                            "min": 0,
+                            "max": 0,
+                            "rows_per_page": 20,
+                            "acfe_repeater_stylised_button": 0,
+                            "sub_fields": [
+                                {
+                                    "key": "field_ps_c2_item_tab_main",
+                                    "label": "ข้อมูลหลัก",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 1,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_item_text",
+                                    "label": "ข้อความรายการ",
+                                    "name": "text",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 2,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_item_highlight",
+                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "name": "highlight",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_item_lifelong_targets",
+                                    "label": "แสดงในช่วงวัย",
+                                    "name": "lifelong_targets",
+                                    "aria-label": "",
+                                    "type": "checkbox",
+                                    "instructions": "เลือกช่วงวัยที่ต้องการให้รายการนี้ไปแสดงใน popup",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "choices": {
+                                        "baby": "เด็กอ่อน",
+                                        "young": "เด็กเล็ก",
+                                        "student": "วัยเรียน",
+                                        "working": "วัยทำงาน",
+                                        "senior": "สูงอายุ"
+                                    },
+                                    "default_value": [],
+                                    "return_format": "value",
+                                    "allow_custom": 0,
+                                    "layout": "horizontal",
+                                    "toggle": 0,
+                                    "save_custom": 0,
+                                    "custom_choice_button_text": "Add new choice",
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_item_tab_popup",
+                                    "label": "Popup",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 0,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_item_has_popup",
+                                    "label": "มีป๊อปอัป",
+                                    "name": "has_popup",
+                                    "aria-label": "",
+                                    "type": "true_false",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "ui": 1,
+                                    "ui_on_text": "มี",
+                                    "ui_off_text": "ไม่มี",
+                                    "default_value": 0,
+                                    "message": "",
+                                    "style": "",
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_modal_title",
+                                    "label": "หัวข้อในป๊อปอัป (ตัวหนา)",
+                                    "name": "modal_title",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c2_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_modal_body",
+                                    "label": "รายละเอียดในป๊อปอัป",
+                                    "name": "modal_body",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c2_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 4,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col2_items"
+                                }
+                            ]
+                        }
+                    ],
+                    "acfe_seamless_style": 0,
+                    "acfe_group_modal": 0,
+                    "acfe_group_modal_close": 0,
+                    "acfe_group_modal_button": "",
+                    "acfe_group_modal_size": "large"
+                },
+                {
+                    "key": "field_ps_tab_3",
+                    "label": "คอลัมน์ 3",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": false,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "selected": 0,
+                    "no_preference": 0
+                },
+                {
+                    "key": "field_ps_col3",
+                    "label": "คอลัมน์ที่ 3",
+                    "name": "col_3",
+                    "aria-label": "",
+                    "type": "group",
+                    "instructions": "แนะนำหัวข้อ: โรงเรียนเป็นพื้นที่ปลอดภัย",
+                    "required": false,
+                    "conditional_logic": false,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "layout": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_ps_col3_title",
+                            "label": "หัวข้อคอลัมน์",
+                            "name": "title",
+                            "aria-label": "",
+                            "type": "textarea",
+                            "instructions": "",
+                            "required": false,
+                            "conditional_logic": false,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "rows": 2,
+                            "new_lines": "",
+                            "default_value": "โรงเรียน\nเป็นพื้นที่ปลอดภัย",
+                            "maxlength": "",
+                            "placeholder": "",
+                            "acfe_textarea_code": 0
+                        },
+                        {
+                            "key": "field_ps_col3_items",
+                            "label": "รายการ",
+                            "name": "items",
+                            "aria-label": "",
+                            "type": "repeater",
+                            "instructions": "",
+                            "required": false,
+                            "conditional_logic": false,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "layout": "block",
+                            "collapsed": "field_ps_c3_item_text",
+                            "button_label": "เพิ่มรายการ",
+                            "min": 0,
+                            "max": 0,
+                            "rows_per_page": 20,
+                            "acfe_repeater_stylised_button": 0,
+                            "sub_fields": [
+                                {
+                                    "key": "field_ps_c3_item_tab_main",
+                                    "label": "ข้อมูลหลัก",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 1,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_item_text",
+                                    "label": "ข้อความรายการ",
+                                    "name": "text",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 2,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_item_highlight",
+                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "name": "highlight",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_item_lifelong_targets",
+                                    "label": "แสดงในช่วงวัย",
+                                    "name": "lifelong_targets",
+                                    "aria-label": "",
+                                    "type": "checkbox",
+                                    "instructions": "เลือกช่วงวัยที่ต้องการให้รายการนี้ไปแสดงใน popup",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "choices": {
+                                        "baby": "เด็กอ่อน",
+                                        "young": "เด็กเล็ก",
+                                        "student": "วัยเรียน",
+                                        "working": "วัยทำงาน",
+                                        "senior": "สูงอายุ"
+                                    },
+                                    "default_value": [],
+                                    "return_format": "value",
+                                    "allow_custom": 0,
+                                    "layout": "horizontal",
+                                    "toggle": 0,
+                                    "save_custom": 0,
+                                    "custom_choice_button_text": "Add new choice",
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_item_tab_popup",
+                                    "label": "Popup",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 0,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_item_has_popup",
+                                    "label": "มีป๊อปอัป",
+                                    "name": "has_popup",
+                                    "aria-label": "",
+                                    "type": "true_false",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "ui": 1,
+                                    "ui_on_text": "มี",
+                                    "ui_off_text": "ไม่มี",
+                                    "default_value": 0,
+                                    "message": "",
+                                    "style": "",
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_modal_title",
+                                    "label": "หัวข้อในป๊อปอัป (ตัวหนา)",
+                                    "name": "modal_title",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c3_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_modal_body",
+                                    "label": "รายละเอียดในป๊อปอัป",
+                                    "name": "modal_body",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c3_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 4,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col3_items"
+                                }
+                            ]
+                        }
+                    ],
+                    "acfe_seamless_style": 0,
+                    "acfe_group_modal": 0,
+                    "acfe_group_modal_close": 0,
+                    "acfe_group_modal_button": "",
+                    "acfe_group_modal_size": "large"
+                },
+                {
+                    "key": "field_ps_tab_4",
+                    "label": "คอลัมน์ 4",
+                    "name": "",
+                    "aria-label": "",
+                    "type": "tab",
+                    "instructions": "",
+                    "required": 0,
+                    "conditional_logic": 0,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "placement": "top",
+                    "endpoint": 0,
+                    "no_preference": 0,
+                    "selected": 0
+                },
+                {
+                    "key": "field_ps_col4",
+                    "label": "คอลัมน์ที่ 4",
+                    "name": "col_4",
+                    "aria-label": "",
+                    "type": "group",
+                    "instructions": "แนะนำหัวข้อ: ยกระดับการดูแลเด็กเล็ก",
+                    "required": false,
+                    "conditional_logic": false,
+                    "wrapper": {
+                        "width": "",
+                        "class": "",
+                        "id": ""
+                    },
+                    "layout": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_ps_col4_title",
+                            "label": "หัวข้อคอลัมน์",
+                            "name": "title",
+                            "aria-label": "",
+                            "type": "textarea",
+                            "instructions": "",
+                            "required": false,
+                            "conditional_logic": false,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "rows": 2,
+                            "new_lines": "",
+                            "default_value": "ยกระดับ\nการดูแลเด็กเล็ก",
+                            "maxlength": "",
+                            "placeholder": "",
+                            "acfe_textarea_code": 0
+                        },
+                        {
+                            "key": "field_ps_col4_items",
+                            "label": "รายการ",
+                            "name": "items",
+                            "aria-label": "",
+                            "type": "repeater",
+                            "instructions": "",
+                            "required": false,
+                            "conditional_logic": false,
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            },
+                            "layout": "block",
+                            "collapsed": "field_ps_c4_item_text",
+                            "button_label": "เพิ่มรายการ",
+                            "min": 0,
+                            "max": 0,
+                            "rows_per_page": 20,
+                            "acfe_repeater_stylised_button": 0,
+                            "sub_fields": [
+                                {
+                                    "key": "field_ps_c4_item_tab_main",
+                                    "label": "ข้อมูลหลัก",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 1,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_item_text",
+                                    "label": "ข้อความรายการ",
+                                    "name": "text",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 2,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_item_highlight",
+                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "name": "highlight",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_item_lifelong_targets",
+                                    "label": "แสดงในช่วงวัย",
+                                    "name": "lifelong_targets",
+                                    "aria-label": "",
+                                    "type": "checkbox",
+                                    "instructions": "เลือกช่วงวัยที่ต้องการให้รายการนี้ไปแสดงใน popup",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "choices": {
+                                        "baby": "เด็กอ่อน",
+                                        "young": "เด็กเล็ก",
+                                        "student": "วัยเรียน",
+                                        "working": "วัยทำงาน",
+                                        "senior": "สูงอายุ"
+                                    },
+                                    "default_value": [],
+                                    "return_format": "value",
+                                    "allow_custom": 0,
+                                    "layout": "horizontal",
+                                    "toggle": 0,
+                                    "save_custom": 0,
+                                    "custom_choice_button_text": "Add new choice",
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_item_tab_popup",
+                                    "label": "Popup",
+                                    "name": "",
+                                    "aria-label": "",
+                                    "type": "tab",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "placement": "top",
+                                    "endpoint": 0,
+                                    "selected": 0,
+                                    "no_preference": 0,
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_item_has_popup",
+                                    "label": "มีป๊อปอัป",
+                                    "name": "has_popup",
+                                    "aria-label": "",
+                                    "type": "true_false",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": false,
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "ui": 1,
+                                    "ui_on_text": "มี",
+                                    "ui_off_text": "ไม่มี",
+                                    "default_value": 0,
+                                    "message": "",
+                                    "style": "",
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_modal_title",
+                                    "label": "หัวข้อในป๊อปอัป (ตัวหนา)",
+                                    "name": "modal_title",
+                                    "aria-label": "",
+                                    "type": "text",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c4_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "prepend": "",
+                                    "append": "",
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_modal_body",
+                                    "label": "รายละเอียดในป๊อปอัป",
+                                    "name": "modal_body",
+                                    "aria-label": "",
+                                    "type": "textarea",
+                                    "instructions": "",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c4_item_has_popup",
+                                                "operator": "==",
+                                                "value": "1"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "rows": 4,
+                                    "new_lines": "",
+                                    "default_value": "",
+                                    "maxlength": "",
+                                    "placeholder": "",
+                                    "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col4_items"
+                                }
+                            ]
+                        }
+                    ],
+                    "acfe_seamless_style": 0,
+                    "acfe_group_modal": 0,
+                    "acfe_group_modal_close": 0,
+                    "acfe_group_modal_button": "",
+                    "acfe_group_modal_size": "large"
+                }
+            ],
+            "acfe_group_modal_close": 0,
+            "acfe_group_modal_button": "",
+            "acfe_group_modal_size": "large"
+        }
+    ],
+    "location": [
+        [
+            {
+                "param": "page_type",
+                "operator": "==",
+                "value": "front_page"
+            }
+        ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": [
+        "the_content"
+    ],
+    "active": true,
+    "description": "Policy Section: 4 columns in tabs + repeater items + optional popup fields",
+    "show_in_rest": 0,
+    "display_title": "",
+    "acfe_autosync": [
+        "json"
+    ],
+    "acfe_form": 0,
+    "acfe_meta": "",
+    "acfe_note": "",
+    "modified": 1772416199
+}

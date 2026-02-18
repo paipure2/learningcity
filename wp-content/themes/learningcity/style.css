@@ -617,4 +617,38 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   .lc-archive-filters.is-mobile-collapsible.is-mobile-open .lc-archive-filters__controls {
     display: grid;
   }
-}/*# sourceMappingURL=style.css.map */
+}
+
+/* Popup WYSIWYG content */
+.modal .modal-content .popup-wysiwyg {
+  line-height: 1.65;
+  word-break: break-word;
+}
+.modal .modal-content .popup-wysiwyg p {
+  margin: 0 0 0.75em;
+}
+.modal .modal-content .popup-wysiwyg p:last-child {
+  margin-bottom: 0;
+}
+.modal .modal-content .popup-wysiwyg ol,
+.modal .modal-content .popup-wysiwyg ul {
+  margin: 0.75em 0 0.75em 1.5em;
+  padding-left: 0.4em;
+}
+.modal .modal-content .popup-wysiwyg ol {
+  list-style: decimal outside !important;
+}
+.modal .modal-content .popup-wysiwyg ul {
+  list-style: disc outside !important;
+}
+.modal .modal-content .popup-wysiwyg li {
+  margin: 0.25em 0;
+}
+.modal .modal-content .popup-wysiwyg a {
+  color: inherit;
+  text-decoration: underline;
+}
+.modal .modal-content .popup-wysiwyg strong {
+  font-weight: 700;
+}
+/*# sourceMappingURL=style.css.map */

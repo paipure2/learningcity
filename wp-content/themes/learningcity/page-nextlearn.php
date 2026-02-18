@@ -142,104 +142,179 @@
 
                     </div>   
 
-
+                    <?php
+                    $nextlearn_widget_generated_modals = array();
+                    $front_page_id = (int) get_option('page_on_front');
+                    $widget_items = function_exists('get_field') ? get_field('highlight_items', $front_page_id) : array();
+                    $widget_fallback_items = array(
+                      array(
+                        'action_type' => 'link',
+                        'display_pages' => array('homepage', 'nextlearn'),
+                        'link_url' => site_url('/') . 'course_provider/โรงเรียนฝึกอาชีพ',
+                        'image_url' => THEME_URI . '/assets/images/highlight/playlist1.jpg',
+                        'seo_title' => 'คอร์สโรงเรียนฝึกอาชีพ เปิดรับสมัครแล้ว สำหรับ ปี 2569',
+                      ),
+                      array(
+                        'action_type' => 'link',
+                        'display_pages' => array('homepage', 'nextlearn'),
+                        'link_url' => site_url('/') . 'tag/readyforwork',
+                        'image_url' => THEME_URI . '/assets/images/highlight/playlist2.jpg',
+                        'seo_title' => 'เรียนจบปุ๊บ รับงานปั๊บ เรียนจบพร้อมต่อยอดงานทันที',
+                      ),
+                      array(
+                        'action_type' => 'link',
+                        'display_pages' => array('homepage', 'nextlearn'),
+                        'link_url' => site_url('/') . 'tag/weekend',
+                        'image_url' => THEME_URI . '/assets/images/highlight/playlist3.jpg',
+                        'seo_title' => 'เรียนวันหยุด เสาร์–อาทิตย์ เรียนได้ ไม่กระทบเวลางาน',
+                      ),
+                      array(
+                        'action_type' => 'link',
+                        'display_pages' => array('homepage', 'nextlearn'),
+                        'link_url' => site_url('/') . 'course_category/งานช่างไฟฟ้า-อิเล็กทรอน/',
+                        'image_url' => THEME_URI . '/assets/images/highlight/playlist4.jpg',
+                        'seo_title' => 'สายช่าง เสริมทักษะอาชีพ สร้างรายได้จริง',
+                      ),
+                      array(
+                        'action_type' => 'link',
+                        'display_pages' => array('homepage', 'nextlearn'),
+                        'link_url' => site_url('/') . 'course_provider/microsoft/',
+                        'image_url' => THEME_URI . '/assets/images/highlight/playlist5.jpg',
+                        'seo_title' => 'เรียน AI ไม่ตกเทรนด์ อัปสกิลเทคโนโลยี ทันโลกดิจิทัล',
+                      ),
+                    );
+                    if (empty($widget_items) || !is_array($widget_items)) {
+                      $widget_items = $widget_fallback_items;
+                    }
+                    ?>
                     <div class="xl:py-12 py-8 mt-6 sec-highlight">
                         <h2 class="text-heading">ไฮไลท์</h2>
                         <div class="swiper xl:overflow-hidden! overflow-visible!">
                             <div class="swiper-wrapper">
-                                                    
-                                <div class="swiper-slide lg:w-auto!">
-                                    <a href="<?php echo site_url('/') ?>course_provider/โรงเรียนฝึกอาชีพ" class="card-highlight lg:w-[400px]" size="medium">
+                                <?php
+                                $nextlearn_widget_modal_count = 0;
+                                $widget_tz = function_exists('wp_timezone') ? wp_timezone() : new DateTimeZone('UTC');
+                                $widget_now = new DateTimeImmutable('now', $widget_tz);
+                                $parse_widget_datetime = static function ($raw, DateTimeZone $tz) {
+                                  $raw = trim((string) $raw);
+                                  if ($raw === '') {
+                                    return null;
+                                  }
+
+                                  $dt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $raw, $tz);
+                                  if ($dt instanceof DateTimeImmutable) {
+                                    return $dt;
+                                  }
+
+                                  try {
+                                    return new DateTimeImmutable($raw, $tz);
+                                  } catch (Exception $e) {
+                                    return null;
+                                  }
+                                };
+
+                                foreach ($widget_items as $item) :
+                                  $display_pages = (isset($item['display_pages']) && is_array($item['display_pages'])) ? $item['display_pages'] : array();
+                                  $show_on_nextlearn = empty($display_pages) || in_array('nextlearn', $display_pages, true);
+                                  if (!$show_on_nextlearn) {
+                                    continue;
+                                  }
+
+                                  $schedule_enabled = !empty($item['schedule_enabled']);
+                                  if ($schedule_enabled) {
+                                    $start_at = $parse_widget_datetime($item['start_at'] ?? '', $widget_tz);
+                                    $end_at = $parse_widget_datetime($item['end_at'] ?? '', $widget_tz);
+
+                                    if ($start_at instanceof DateTimeImmutable && $widget_now < $start_at) {
+                                      continue;
+                                    }
+                                    if ($end_at instanceof DateTimeImmutable && $widget_now > $end_at) {
+                                      continue;
+                                    }
+                                  }
+
+                                  $action_type = isset($item['action_type']) ? (string) $item['action_type'] : '';
+                                  if ($action_type === '') {
+                                    $action_type = !empty($item['action_popup']) ? 'popup' : 'link';
+                                  }
+                                  $is_popup = $action_type === 'popup';
+                                  $link_url = isset($item['link_url']) ? trim((string) $item['link_url']) : '';
+
+                                  $image_url = '';
+                                  if (!empty($item['image']) && is_array($item['image'])) {
+                                    $image_url = isset($item['image']['url']) ? (string) $item['image']['url'] : '';
+                                  } elseif (!empty($item['image_url'])) {
+                                    $image_url = (string) $item['image_url'];
+                                  }
+                                  if ($image_url === '') {
+                                    continue;
+                                  }
+
+                                  $alt_text = '';
+                                  if (!empty($item['image']) && is_array($item['image']) && !empty($item['image']['alt'])) {
+                                    $alt_text = trim((string) $item['image']['alt']);
+                                  }
+                                  $seo_title = isset($item['seo_title']) ? trim((string) $item['seo_title']) : '';
+                                  if ($alt_text === '') {
+                                    $alt_text = $seo_title;
+                                  }
+                                  if ($seo_title === '') {
+                                    $seo_title = $alt_text;
+                                  }
+
+                                  $modal_id = '';
+                                  if ($is_popup) {
+                                    $nextlearn_widget_modal_count++;
+                                    $modal_id = 'nextlearn-widgetmodal' . $nextlearn_widget_modal_count;
+                                    $popup_image_url = '';
+                                    if (!empty($item['popup_image']) && is_array($item['popup_image'])) {
+                                      $popup_image_url = isset($item['popup_image']['url']) ? trim((string) $item['popup_image']['url']) : '';
+                                    }
+                                    $nextlearn_widget_generated_modals[] = array(
+                                      'id' => $modal_id,
+                                      'title' => isset($item['popup_title']) ? trim((string) $item['popup_title']) : '',
+                                      'body' => isset($item['popup_body']) ? trim((string) $item['popup_body']) : '',
+                                      'image' => $popup_image_url,
+                                      'cta_label' => isset($item['popup_cta_label']) ? trim((string) $item['popup_cta_label']) : '',
+                                      'cta_url' => isset($item['popup_cta_url']) ? trim((string) $item['popup_cta_url']) : '',
+                                    );
+                                  }
+                                ?>
+                                  <div class="swiper-slide lg:w-auto!">
+                                    <?php if ($is_popup) : ?>
+                                      <div
+                                        data-modal-id="<?php echo esc_attr($modal_id); ?>"
+                                        class="card-highlight lg:w-[400px] cursor-pointer group"
+                                        size="medium"
+                                        role="button"
+                                        tabindex="0"
+                                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+                                      >
+                                    <?php else : ?>
+                                      <a href="<?php echo esc_url($link_url !== '' ? $link_url : '#'); ?>" class="card-highlight lg:w-[400px]" size="medium">
+                                    <?php endif; ?>
                                         <div>
-                                        <img
-                                            src="<?php echo THEME_URI ?>/assets/images/highlight/playlist1.jpg"
-                                            alt="Up-skill อัพสกิลทักษะดิจิทัล"
-                                        >
+                                          <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($alt_text); ?>">
                                         </div>
 
                                         <div class="txt">
-                                        <div class="mt-auto">
-                                            <!-- SEO title (บรรทัดเดียว ซ่อน) -->
-                                            <h3 class="sr-only">คอร์สโรงเรียนฝึกอาชีพ เปิดรับสมัครแล้ว สำหรับ ปี 2569</h3>
+                                          <div class="mt-auto">
+                                            <?php if ($seo_title !== '') : ?>
+                                              <h3 class="sr-only"><?php echo esc_html($seo_title); ?></h3>
+                                            <?php endif; ?>
+                                          </div>
                                         </div>
-                                        </div>
-                                    </a>
-                                </div>
+                                        <?php if ($is_popup) : ?>
+                                          <div class="icon-plus xl:w-9 sm:w-7 w-8 aspect-square absolute bottom-4 right-4 group-hover:rotate-90 transition-transform duration-200" aria-hidden="true"></div>
+                                        <?php endif; ?>
 
-                                <div class="swiper-slide lg:w-auto!">
-                                    <a href="<?php echo site_url('/') ?>tag/readyforwork" class="card-highlight lg:w-[400px]" size="medium">
-                                        <div>
-                                        <img
-                                            src="<?php echo THEME_URI ?>/assets/images/highlight/playlist2.jpg"
-                                            alt="เรียนจบปุ๊บ รับงานปั๊บ เรียนจบพร้อมต่อยอดงานทันที"
-                                        >
-                                        </div>
-
-                                        <div class="txt">
-                                        <div class="mt-auto">
-                                            <!-- SEO title (บรรทัดเดียว ซ่อน) -->
-                                            <h3 class="sr-only">เรียนจบปุ๊บ รับงานปั๊บ เรียนจบพร้อมต่อยอดงานทันที</h3>
-                                        </div>
-                                        </div>
-                                    </a>
-                                </div>
-
-
-                                <div class="swiper-slide lg:w-auto!">
-                                    <a href="<?php echo site_url('/') ?>tag/weekend" class="card-highlight lg:w-[400px]" size="medium">
-                                        <div>
-                                        <img
-                                            src="<?php echo THEME_URI ?>/assets/images/highlight/playlist3.jpg"
-                                            alt="เรียนวันหยุด เสาร์–อาทิตย์ เรียนได้ ไม่กระทบเวลางาน"
-                                        >
-                                        </div>
-
-                                        <div class="txt">
-                                        <div class="mt-auto">
-                                            <!-- SEO title (บรรทัดเดียว ซ่อน) -->
-                                            <h3 class="sr-only">เรียนวันหยุด เสาร์–อาทิตย์ เรียนได้ ไม่กระทบเวลางาน</h3>
-                                        </div>
-                                        </div>
-                                    </a>
-                                </div>
-
-                                <div class="swiper-slide lg:w-auto!">
-                                    <a href="<?php echo site_url('/') ?>course_category/งานช่างไฟฟ้า-อิเล็กทรอน/" class="card-highlight lg:w-[400px]" size="medium">
-                                        <div>
-                                        <img
-                                            src="<?php echo THEME_URI ?>/assets/images/highlight/playlist4.jpg"
-                                            alt="สายช่าง เสริมทักษะอาชีพ สร้างรายได้จริง"
-                                        >
-                                        </div>
-
-                                        <div class="txt">
-                                        <div class="mt-auto">
-                                            <!-- SEO title (บรรทัดเดียว ซ่อน) -->
-                                            <h3 class="sr-only">สายช่าง เสริมทักษะอาชีพ สร้างรายได้จริง</h3>
-                                        </div>
-                                        </div>
-                                    </a>
-                                </div>
-
-                                <div class="swiper-slide lg:w-auto!">
-                                    <a href="<?php echo site_url('/') ?>course_provider/microsoft/" class="card-highlight lg:w-[400px]" size="medium">
-                                        <div>
-                                        <img
-                                            src="<?php echo THEME_URI ?>/assets/images/highlight/playlist5.jpg"
-                                            alt="เรียน AI ไม่ตกเทรนด์ อัปสกิลเทคโนโลยี ทันโลกดิจิทัล"
-                                        >
-                                        </div>
-
-                                        <div class="txt">
-                                        <div class="mt-auto">
-                                            <!-- SEO title (บรรทัดเดียว ซ่อน) -->
-                                            <h3 class="sr-only">เรียน AI ไม่ตกเทรนด์ อัปสกิลเทคโนโลยี ทันโลกดิจิทัล</h3>
-                                        </div>
-                                        </div>
-                                    </a>
-                                </div>
-
-
+                                    <?php if ($is_popup) : ?>
+                                      </div>
+                                    <?php else : ?>
+                                      </a>
+                                    <?php endif; ?>
+                                  </div>
+                                <?php endforeach; ?>
                             </div>
                             <div class="swiper-control">
                                 <div class="swiper-pagination"></div>
@@ -469,6 +544,53 @@
 <?php get_template_part('template-parts/components/modal-course'); ?>
 <?php get_template_part('template-parts/components/modal-category'); ?>
 <?php get_template_part('template-parts/components/modal-search'); ?>
+<?php if (!empty($nextlearn_widget_generated_modals)) : ?>
+  <?php foreach ($nextlearn_widget_generated_modals as $modal) : ?>
+    <div data-modal-content="<?php echo esc_attr($modal['id']); ?>" class="modal lg:items-center items-start lg:p-6 p-0">
+      <div class="overlay-modal"></div>
+      <div class="card-modal w-full max-w-[1150px] lg:h-[85%] lg:max-h-[680px] h-full">
+        <div class="absolute top-4 right-4 z-20">
+          <button class="close-modal bg-black rounded-full size-8 flex gap-2 justify-center items-center p-2.5">
+            <div class="icon-close"></div>
+          </button>
+        </div>
+        <div class="modal-content relative z-10 max-lg:overflow-y-auto! group max-h-screen h-full">
+          <div class="flex lg:flex-row flex-col h-full">
+            <div class="lg:flex-[60%] xl:p-16 md:p-12 sm:p-8 p-6 lg:overflow-y-auto!">
+              <div class="max-w-[650px] mx-auto max-lg:pt-6">
+                <?php if (!empty($modal['title'])) : ?>
+                  <h2 class="md:text-fs40 text-fs30 font-bold sm:mb-5 mb-4 leading-normal"><?php echo esc_html($modal['title']); ?></h2>
+                <?php endif; ?>
+                <?php if (!empty($modal['image'])) : ?>
+                  <div class="mb-6">
+                    <img src="<?php echo esc_url($modal['image']); ?>" alt="" class="w-full h-auto rounded-2xl object-cover">
+                  </div>
+                <?php endif; ?>
+                <?php if (!empty($modal['body'])) : ?>
+                  <p class="text-fs16"><?php echo nl2br(esc_html($modal['body'])); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($modal['cta_label']) && !empty($modal['cta_url'])) : ?>
+                  <div class="mt-6">
+                    <a
+                      href="<?php echo esc_url($modal['cta_url']); ?>"
+                      class="inline-flex items-center justify-center rounded-full
+                        border border-black text-black
+                        px-6 py-2.5 text-fs16 font-semibold
+                        hover:bg-black hover:text-white
+                        transition-colors duration-200"
+                    >
+                      <?php echo esc_html($modal['cta_label']); ?>
+                    </a>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <?php endforeach; ?>
+<?php endif; ?>
 
 <style>
   @keyframes lcShimmer {

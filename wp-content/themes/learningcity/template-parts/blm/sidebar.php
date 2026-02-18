@@ -109,5 +109,17 @@ if (!defined('ABSPATH')) exit;
         ล้างตัวกรองทั้งหมด
       </button>
     </div>
+
+    <div class="pt-2">
+      <button
+        id="btnSidebarAuth"
+        type="button"
+        data-lc-auth-trigger="1"
+        data-lc-auth-mode="toggle"
+        class="w-full inline-flex items-center justify-center rounded-lg border border-[#0B8664] px-3 py-2 text-sm font-semibold text-[#0B8664] hover:bg-[#0B8664] hover:text-white transition-colors"
+      >
+        เข้าสู่ระบบผู้แก้ไข
+      </button>
+    </div>
   </div>
 </aside>

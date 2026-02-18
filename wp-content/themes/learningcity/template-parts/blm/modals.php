@@ -1,5 +1,10 @@
 <?php
 if (!defined('ABSPATH')) exit;
+$lc_photo_upload_config = apply_filters('lc_public_photo_upload_config', [
+  'enabled' => false,
+  'max_files' => 6,
+  'max_file_size_mb' => 8,
+]);
 ?>
 <div id="catModal" class="hidden fixed inset-0 z-999999">
   <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
@@ -110,84 +115,62 @@ if (!defined('ABSPATH')) exit;
   </div>
 </div>
 
-<div id="reportModal" class="hidden fixed inset-0 z-999999">
+<div id="photoUploadModal" class="hidden fixed inset-0 z-999999">
   <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 
   <div class="blm-modal-panel absolute inset-x-4 top-16 bottom-16 bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
     <div class="p-4 border-b flex items-center justify-between">
-      <div class="font-bold">แจ้งแก้ไขข้อมูลสถานที่</div>
-      <button id="closeReportModal" class="text-lg">✕</button>
+      <div class="font-bold">อัปโหลดรูปสถานที่</div>
+      <button id="closePhotoUploadModal" class="text-lg">✕</button>
     </div>
 
-    <form id="reportForm" class="p-4 overflow-auto space-y-4">
-      <div class="text-sm text-slate-600">โปรดระบุข้อมูลที่ไม่ถูกต้องเพื่อให้ทีมงานแก้ไขได้เร็วขึ้น</div>
+    <form id="photoUploadForm" class="p-4 overflow-auto space-y-4" enctype="multipart/form-data">
+      <div class="text-sm text-slate-600">รูปที่ส่งเข้ามาจะอยู่ในสถานะรอตรวจสอบก่อนแสดงผลบนเว็บไซต์</div>
 
       <div>
-        <div class="text-sm font-semibold mb-2">เรื่องที่ต้องการแก้ไข</div>
-        <div class="grid grid-cols-2 gap-2 text-sm">
-          <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="report_topics[]" value="address" class="rounded">
-            ที่อยู่
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="report_topics[]" value="phone" class="rounded">
-            เบอร์โทร
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="report_topics[]" value="hours" class="rounded">
-            เวลาทำการ
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="report_topics[]" value="images" class="rounded">
-            รูปภาพ
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="report_topics[]" value="links" class="rounded">
-            ลิงก์
-          </label>
-          <label class="inline-flex items-center gap-2">
-            <input type="checkbox" name="report_topics[]" value="other" class="rounded">
-            อื่น ๆ
-          </label>
-        </div>
+        <label class="text-sm font-semibold">สถานที่</label>
+        <input id="photoUploadPlaceName" type="text" class="mt-2 w-full rounded-xl border px-3 py-2 text-sm bg-slate-100" readonly>
       </div>
 
       <div>
-        <label class="text-sm font-semibold">รายละเอียดเพิ่มเติม</label>
-        <textarea id="reportDetails" name="report_details" rows="4"
-                  class="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
-                  placeholder="เช่น เบอร์โทรควรเป็น 02-xxx-xxxx หรือเวลาทำการเป็น 09:00-17:00"></textarea>
+        <label class="text-sm font-semibold">ชื่อผู้ส่ง *</label>
+        <input id="photoUploaderName" name="uploader_name"
+               class="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
+               maxlength="120" required placeholder="กรอกชื่อ">
+      </div>
+
+      <div>
+        <label class="text-sm font-semibold">อีเมลผู้ส่ง *</label>
+        <input id="photoUploaderEmail" name="uploader_email" type="email"
+               class="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
+               maxlength="190" required placeholder="name@example.com">
+      </div>
+
+      <div>
+        <label class="text-sm font-semibold">อัปโหลดรูป *</label>
+        <input id="photoUploadFiles" name="place_images[]" type="file"
+               accept="image/jpeg,image/png,image/webp"
+               class="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
+               multiple required>
+        <div id="photoUploadHelp" class="mt-2 text-xs text-slate-500"></div>
       </div>
 
       <div class="hidden" aria-hidden="true">
         <label>Leave this empty</label>
-        <input type="text" id="reportWebsite" name="report_website" tabindex="-1" autocomplete="off">
+        <input type="text" id="photoUploadWebsite" name="photo_upload_website" tabindex="-1" autocomplete="off">
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="text-sm font-semibold">ชื่อผู้แจ้ง (ไม่บังคับ)</label>
-          <input id="reportName" name="report_name"
-                 class="mt-2 w-full rounded-xl border px-3 py-2 text-sm" placeholder="ชื่อ">
-        </div>
-        <div>
-          <label class="text-sm font-semibold">อีเมล/เบอร์ (ไม่บังคับ)</label>
-          <input id="reportContact" name="report_contact"
-                 class="mt-2 w-full rounded-xl border px-3 py-2 text-sm" placeholder="อีเมลหรือเบอร์โทร">
-        </div>
-      </div>
-
-      <div id="reportError" class="hidden text-sm text-rose-600"></div>
-      <div id="reportSuccess" class="hidden text-sm text-emerald-700"></div>
+      <div id="photoUploadError" class="hidden text-sm text-rose-600"></div>
+      <div id="photoUploadSuccess" class="hidden text-sm text-emerald-700"></div>
 
       <div class="flex items-center justify-end gap-2 pt-2">
-        <button type="button" id="cancelReport"
+        <button type="button" id="cancelPhotoUpload"
                 class="px-4 py-2 rounded-xl border text-sm font-semibold text-slate-600 hover:bg-slate-50">
           ยกเลิก
         </button>
-        <button type="submit" id="submitReport"
+        <button type="submit" id="submitPhotoUpload"
                 class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
-          ส่งรายงาน
+          ส่งรูป
         </button>
       </div>
     </form>

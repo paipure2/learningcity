@@ -40,7 +40,9 @@ $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learni
              </ul>
           </nav>
           <div class="box-right">
-             <div class="xl:w-[136px] lg:w-[110px] w-32"><img src="<?php echo THEME_URI ?>//assets/images/logo-bkk-head.png" alt=""></div>
+             <div class="flex items-center gap-2">
+                <div class="xl:w-[136px] lg:w-[110px] w-32"><img src="<?php echo THEME_URI ?>//assets/images/logo-bkk-head.png" alt=""></div>
+             </div>
              <div class="flex items-center gap-4">
                 <!-- <button class="icon-search xl:w-7 lg:w-5 w-7" data-modal-id="modal-search"></button> -->
                 <button class="hamburger-menu">

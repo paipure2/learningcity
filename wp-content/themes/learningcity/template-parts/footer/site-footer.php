@@ -1,3 +1,22 @@
+<?php
+$front_page_id = (int) get_option('page_on_front');
+$partners_title = function_exists('get_field') ? get_field('partners_title', $front_page_id) : '';
+$partners_title = trim((string) $partners_title);
+if ($partners_title === '') {
+    $partners_title = 'เพื่อนร่วมพัฒนา';
+}
+
+$partners_gallery = function_exists('get_field') ? get_field('partners_gallery', $front_page_id) : array();
+if (!is_array($partners_gallery) || empty($partners_gallery)) {
+    $partners_gallery = array();
+    for ($i = 1; $i <= 24; $i++) {
+        $partners_gallery[] = array(
+            'url' => THEME_URI . '/assets/images/logo/partner' . $i . '.png',
+            'alt' => '',
+        );
+    }
+}
+?>
  <div class="border-t border-gray-200">
      <div class="w-full max-w-[1150px] mx-auto sm:px-6 px-4">
          <footer class="pb-12 lg:pt-20 pt-12" data-aos="fade-in">
@@ -55,177 +74,25 @@
                      <h3 class="text-fs16 font-semibold font-anuphan">เพื่อนร่วมพัฒนา</h3>
                      <div class="swiper swiper-logo-loop py-4!">
                          <div class="swiper-wrapper">
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner1.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner2.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner3.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner4.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner5.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner6.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner7.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner8.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner9.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner10.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner11.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner12.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner13.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner14.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner15.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner16.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner17.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner18.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner19.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner20.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner21.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner22.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner23.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
-                             <div class="swiper-slide w-auto!">
-                                 <a href="#!"
-                                     class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
-                                     <img src="<?php echo THEME_URI ?>/assets/images/logo/partner24.png" alt="" class="w-full h-full object-cover
-                               ">
-                                 </a>
-                             </div>
+                             <?php foreach ($partners_gallery as $partner_item) :
+                                 if (!is_array($partner_item)) {
+                                     continue;
+                                 }
+                                 $partner_img = isset($partner_item['url']) ? (string) $partner_item['url'] : '';
+                                 if ($partner_img === '') {
+                                     continue;
+                                 }
+                                 $partner_alt = isset($partner_item['alt']) ? (string) $partner_item['alt'] : '';
+                             ?>
+                                 <div class="swiper-slide w-auto!">
+                                     <a href="#!"
+                                         class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]! px-1h-[50px]!">
+                                         <img src="<?php echo esc_url($partner_img); ?>" alt="<?php echo esc_attr($partner_alt); ?>" class="w-full h-full object-cover">
+                                     </a>
+                                 </div>
+                             <?php endforeach; ?>
                          </div>
                      </div>
-
                  </div>
              </div>
 
@@ -233,7 +100,17 @@
                  <div>&copy; กรุงเทพมหานคร <span id="current-year"></span></div>
                  <a href="https://www.bangkok.go.th/privacy" target="_blank" class="link-underline">นโยบายความเป็นส่วนตัว</a>
                  <div>ภาพประกอบโดย Sunhouse</div>
+                 <button
+                   type="button"
+                   data-lc-auth-trigger="1"
+                   data-lc-auth-mode="toggle"
+                   class="link-underline text-[#0B8664] font-semibold"
+                 >
+                   เข้าสู่ระบบผู้แก้ไข
+                 </button>
              </div>
          </footer>
      </div>
  </div>
+
+<?php get_template_part('template-parts/auth/location-edit-auth-modal'); ?>

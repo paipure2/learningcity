@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: lc-course-waitlist
+ * Plugin Name: LC Course Waitlist
  * Description: Course-specific waitlist notifications when registration opens.
  * Version: 1.0.0
  * Author: LearningCity

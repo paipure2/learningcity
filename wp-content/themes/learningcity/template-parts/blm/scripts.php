@@ -9,6 +9,7 @@ if (!defined('ABSPATH')) exit;
   const SITE_BASE = window.location.origin + (SITE_PATH || "");
   const SITE_ROOT = SITE_BASE.replace(/\/+$/, "");
   const BLM_API_BASE = `${SITE_ROOT}/wp-json/blm/v1`;
+  const ADMIN_AJAX_URL = "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
   const BLM_LIST_PLACEHOLDER = `${SITE_ROOT}/wp-content/themes/learningcity/assets/images/placeholder-gray.png`;
   const LOCAL_GLYPHS_BASE = `${SITE_BASE}/wp-content/themes/learningcity/assets/fonts/map-font`;
   // Must match the folder name exactly (see MapLibre Font Maker output)
@@ -25,14 +26,38 @@ if (!defined('ABSPATH')) exit;
   const appMode = appRoot?.dataset?.mode || "map";
   const singlePlaceId = Number(appRoot?.dataset?.placeId || 0);
   const isSingleMode = appMode === "single" && Number.isFinite(singlePlaceId) && singlePlaceId > 0;
-  const REPORT_AJAX_URL = "<?php echo esc_js(admin_url('admin-ajax.php')); ?>";
-  const REPORT_NONCE = "<?php echo esc_js(wp_create_nonce('lc_report_location')); ?>";
+  const PHOTO_UPLOAD_CONFIG = <?php
+    $lc_photo_upload_config = apply_filters('lc_public_photo_upload_config', [
+      'enabled' => false,
+      'max_files' => 6,
+      'max_file_size_mb' => 8,
+      'ajax_nonce' => '',
+      'submit_nonce' => '',
+      'admin_post_url' => '',
+    ]);
+    echo wp_json_encode($lc_photo_upload_config);
+  ?>;
+  const LOCATION_EDIT_CONFIG = <?php
+    $lc_location_edit_config = apply_filters('lc_public_location_edit_config', [
+      'enabled' => false,
+      'ajax_url' => admin_url('admin-ajax.php'),
+      'nonce' => '',
+    ]);
+    echo wp_json_encode($lc_location_edit_config);
+  ?>;
   const LOCATION_CACHE_KEY = "lc_user_location_v1";
   const PLACES_CACHE_KEY = "lc_blm_places_cache_v3";
   const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
   const PLACES_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes
   const WELCOME_SEEN_KEY = "lc_blm_welcome_seen_v1";
   const API_CACHE_BUST = String(Date.now());
+  const PHOTO_UPLOAD_AVAILABLE = !!PHOTO_UPLOAD_CONFIG?.enabled;
+  const INLINE_EDIT_AVAILABLE = !!(
+    LOCATION_EDIT_CONFIG?.enabled &&
+    LOCATION_EDIT_CONFIG?.has_session &&
+    LOCATION_EDIT_CONFIG?.ajax_url &&
+    LOCATION_EDIT_CONFIG?.nonce
+  );
 
   let cachedNear = null;
   let cachedRadius = null;
@@ -1857,6 +1882,19 @@ if (!defined('ABSPATH')) exit;
       row.style.display = visible ? "" : "none";
     };
 
+    const syncPhotoUploadButton = () => {
+      const uploadBtn = el("btnPlacePhotoUpload");
+      if (!uploadBtn) return;
+      uploadBtn.classList.add("hidden");
+    };
+
+    const syncReportButtonLabel = () => {
+      const reportBtn = el("btnReportIssue");
+      if (reportBtn) {
+        reportBtn.classList.add("hidden");
+      }
+    };
+
     el("dTitle").textContent = place.name || "";
     el("dDistrict").textContent = place.district ? `เขต${place.district}` : "";
     el("dCategory").textContent = drawerCategoryText;
@@ -1880,6 +1918,8 @@ if (!defined('ABSPATH')) exit;
 
     // default: hide optional rows until data is loaded
     setRowVisible("rowReportIssue", true);
+    syncPhotoUploadButton();
+    syncReportButtonLabel();
     setRowVisible("rowPhone", false);
     setRowVisible("rowHours", false);
     setRowVisible("rowAdmission", false);
@@ -1961,6 +2001,7 @@ if (!defined('ABSPATH')) exit;
 
     setActiveTab("details");
     updateDetailsRowsVisibility();
+    syncInlineFullEditButton();
     if (isMobile() && forceMapOnMobile) setMobileView("map");
 
     loadFullForId(place.id).then((full) => {
@@ -1980,6 +2021,7 @@ if (!defined('ABSPATH')) exit;
         if (coursesCountEl) coursesCountEl.textContent = "0";
         setDrawerTabsVisibility(false);
         updateDetailsRowsVisibility();
+        syncInlineFullEditButton();
         return;
       }
 
@@ -2023,6 +2065,7 @@ if (!defined('ABSPATH')) exit;
         setRowVisible("rowFacebook", false);
       }
       updateDetailsRowsVisibility();
+      syncInlineFullEditButton();
 
       const normalizeImage = (img) => {
         if (!img) return null;
@@ -2126,6 +2169,7 @@ if (!defined('ABSPATH')) exit;
         } else if (coursesSearchWrap) {
           coursesSearchWrap.classList.add("hidden");
         }
+        syncInlineFullEditButton();
       }
     });
   }
@@ -2136,6 +2180,7 @@ if (!defined('ABSPATH')) exit;
     if (!drawer) return;
 
     selectedId = null;
+    clearInlineFullEditButton();
     syncActiveMarkerState();
     drawer.classList.remove("is-expanded");
     drawer.classList.remove("is-open");
@@ -2537,37 +2582,1173 @@ if (!defined('ABSPATH')) exit;
     }
   }
 
-  // ================= REPORT MODAL =================
-  function openReportModal() {
-    const modal = el("reportModal");
-    if (!modal) return;
-    modal.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
+  const INLINE_LOCATION_FIELDS = [
+    { key: "title", label: "ชื่อสถานที่", multiline: false },
+    { key: "address", label: "ที่อยู่", multiline: true },
+    { key: "phone", label: "เบอร์โทร", multiline: false },
+    { key: "opening_hours", label: "เวลาเปิดทำการ", multiline: true },
+    { key: "description", label: "คำอธิบาย", multiline: true },
+    { key: "google_maps", label: "ลิงก์ Google Maps", multiline: false },
+    { key: "facebook", label: "ลิงก์ Facebook", multiline: false },
+  ];
+  let inlineLocationContext = null;
+  const decodeInlineHtmlEntities = (value) => {
+    const raw = String(value || "");
+    if (!raw || raw.indexOf("&") === -1) return raw;
+    const ta = document.createElement("textarea");
+    ta.innerHTML = raw;
+    return ta.value || raw;
+  };
 
-    const title = el("dTitle")?.textContent || "";
-    const header = modal.querySelector(".font-bold");
-    if (header) header.textContent = title ? `แจ้งแก้ไขข้อมูล: ${title}` : "แจ้งแก้ไขข้อมูลสถานที่";
+  function ensureInlineLocationModal() {
+    if (el("lcInlineEditModal")) return;
+    const style = document.createElement("style");
+    style.textContent = `
+      .lc-inline-modal{position:fixed;inset:0;display:none;z-index:2147483647}
+      .lc-inline-modal.is-open{display:block}
+      .lc-inline-backdrop{position:absolute;inset:0;background:rgba(11,23,38,.55)}
+      .lc-inline-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}
+      .lc-inline-card{position:relative;width:min(760px,calc(100vw - 28px));height:min(760px,calc(100vh - 32px));overflow:hidden;border:1px solid #d8e2ec;border-radius:16px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.25);display:flex;flex-direction:column}
+      .lc-inline-card,.lc-inline-card *{font-family:var(--font-anuphan),system-ui,sans-serif}
+      .lc-inline-head{display:grid;gap:10px;padding:14px 18px;border-bottom:1px solid #e8eef5;background:#f8fbff}
+      .lc-inline-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+      .lc-inline-head strong{font-size:20px;color:#132239;line-height:1.2}
+      .lc-inline-head-close{border:0;background:transparent;color:#64748b;font-size:30px;line-height:1;cursor:pointer;padding:0 2px}
+      .lc-inline-head-close:hover{color:#334155}
+      .lc-inline-body{padding:12px 14px;display:grid;gap:10px;overflow:auto;flex:1;min-height:0}
+      .lc-inline-tabs{display:flex;gap:8px;flex-wrap:wrap}
+      .lc-inline-tab{height:34px;padding:0 12px;border-radius:999px;border:1px solid #cfd9e5;background:#fff;color:#334155;font-weight:700;font-size:14px;cursor:pointer}
+      .lc-inline-tab.is-active{background:#00744b;border-color:#00744b;color:#fff}
+      .lc-inline-panel{display:none}
+      .lc-inline-panel.is-active{display:block}
+      .lc-inline-label{display:block;font-size:13px;line-height:1.35;font-weight:600;color:#475569;margin-bottom:4px}
+      .lc-inline-grid{display:grid;grid-template-columns:1fr;gap:10px}
+      .lc-inline-section{border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff}
+      .lc-inline-input{width:100%;border:1px solid #cfd9e5;border-radius:12px;padding:10px;font-size:14px;background:#fff}
+      .lc-inline-input.ta{min-height:120px;resize:vertical}
+      .lc-inline-facility-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:8px}
+      .lc-inline-facility-item{display:flex;align-items:center;gap:8px;border:1px solid #dbe4ee;border-radius:10px;background:#fff;padding:7px 8px;font-size:13px;line-height:1.3}
+      .lc-inline-subsection{border:1px solid #e2e8f0;border-radius:12px;padding:10px;background:#fff}
+      .lc-inline-subhead{font-size:14px;font-weight:800;color:#0f172a;margin:0 0 8px}
+      .lc-inline-images{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+      .lc-inline-img-item{position:relative;border:1px solid #dbe4ee;border-radius:10px;background:#fff;padding:5px}
+      .lc-inline-img-item img{width:100%;height:76px;object-fit:cover;border-radius:6px;display:block}
+      .lc-inline-img-rm{position:absolute;top:8px;right:8px;background:#fff;border:1px solid #dc2626;color:#dc2626;font-size:11px;border-radius:999px;padding:2px 7px;cursor:pointer}
+      .lc-inline-img-item.is-remove{border-color:#dc2626;background:#fff1f2}
+      .lc-inline-dropzone{border:2px dashed #cfd9e5;border-radius:12px;padding:16px;text-align:center;background:#f8fbff;cursor:pointer;transition:.15s ease}
+      .lc-inline-dropzone:hover{border-color:#00744b;background:#f0fffa}
+      .lc-inline-dropzone.is-drag{border-color:#00744b;background:#ecfdf5}
+      .lc-inline-dropzone-title{font-size:14px;font-weight:800;color:#0f172a}
+      .lc-inline-dropzone-sub{font-size:12px;color:#64748b;margin-top:4px}
+      .lc-inline-files-meta{font-size:12px;color:#334155;margin-top:8px;word-break:break-word}
+      .lc-inline-new-files{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:8px}
+      .lc-inline-new-file{border:1px solid #dbe4ee;border-radius:10px;background:#fff;padding:6px;display:grid;gap:6px}
+      .lc-inline-new-file-thumb{width:100%;height:86px;border-radius:7px;object-fit:cover;background:#f1f5f9}
+      .lc-inline-new-file-meta{font-size:12px;color:#475569;line-height:1.35}
+      .lc-inline-new-file-name{font-weight:700;color:#0f172a;word-break:break-word}
+      .lc-inline-new-file-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+      .lc-inline-new-file-remove{height:24px;padding:0 8px;border-radius:999px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:11px;font-weight:700;cursor:pointer}
+      .lc-inline-session-list{display:grid;gap:8px}
+      .lc-inline-session-item{border:1px solid #dbe4ee;border-radius:10px;background:#fff;padding:0}
+      .lc-inline-session-head{padding:10px 12px;cursor:pointer;font-weight:700;color:#0f172a;list-style:none}
+      .lc-inline-session-head::-webkit-details-marker{display:none}
+      .lc-inline-session-body{padding:0 10px 10px}
+      .lc-inline-session-body > div + div .lc-inline-label{margin-top:8px}
+      .lc-inline-session-tools{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:8px}
+      .lc-inline-session-add{border:1px dashed #c7d2fe;background:#f8faff;border-radius:12px;padding:10px;margin-bottom:10px;display:grid;gap:8px}
+      .lc-inline-session-add.hidden{display:none}
+      .lc-inline-session-add-grid{display:grid;grid-template-columns:1fr;gap:8px;align-items:end}
+      .lc-inline-select{width:100%;border:1px solid #cfd9e5;border-radius:12px;padding:10px;font-size:15px;background:#fff}
+      .lc-inline-combo{position:relative}
+      .lc-inline-combo-input{padding-right:44px}
+      .lc-inline-combo-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);height:32px;width:36px;border:0;background:transparent;color:#475569;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0}
+      .lc-inline-combo-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);max-height:240px;overflow:auto;background:#fff;border:1px solid #dbe4ee;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.12);z-index:20}
+      .lc-inline-combo-menu.hidden{display:none}
+      .lc-inline-combo-item{display:block;width:100%;text-align:left;border:0;background:#fff;padding:10px 12px;font-size:14px;line-height:1.35;color:#0f172a;cursor:pointer}
+      .lc-inline-combo-item:hover,.lc-inline-combo-item.is-active{background:#00744b;color:#fff}
+      .lc-inline-combo-empty{padding:10px 12px;font-size:13px;color:#64748b}
+      .lc-inline-session-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+      .lc-inline-session-name{font-weight:800}
+      .lc-inline-session-id{font-size:90%;font-weight:600;color:#64748b}
+      .lc-inline-session-remove{height:30px;padding:0 10px;border-radius:999px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer}
+      .lc-inline-session-remove.toggle.is-active{background:#fee2e2}
+      .lc-inline-session-item.is-remove{border-color:#dc2626;background:#fff1f2}
+      .lc-inline-session-item.is-remove .lc-inline-session-body{display:none}
+      .lc-inline-footer{border-top:1px solid #e8eef5;background:#fff;padding:10px 14px;display:grid;gap:8px}
+      .lc-inline-footer-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+      .lc-inline-confirm{display:flex;align-items:center;gap:8px;font-size:13px;color:#334155}
+      .lc-inline-confirm input{margin-top:2px}
+      .lc-inline-actions{display:flex;justify-content:flex-end;gap:8px}
+      .lc-inline-note{min-height:22px;font-size:13px}
+      .lc-inline-note.ok{color:#166534}
+      .lc-inline-note.err{color:#b91c1c}
+      .lc-inline-btn{height:38px;padding:0 14px;border-radius:12px;border:1px solid #cfd9e5;background:#fff;color:#0f172a;font-weight:700;font-size:14px;cursor:pointer}
+      .lc-inline-btn.primary{border-color:#00744b;background:#00744b;color:#fff}
+      .lc-inline-trigger{display:inline-flex;align-items:center;gap:8px}
+      .lc-inline-success-screen{display:none;flex:1;align-items:center;justify-content:center;padding:24px}
+      .lc-inline-success-box{text-align:center;max-width:540px}
+      .lc-inline-success-title{font-size:30px;font-weight:800;color:#0f172a;line-height:1.2}
+      .lc-inline-success-text{margin-top:10px;font-size:18px;color:#475569;line-height:1.5}
+      .lc-inline-success-actions{margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+      .lc-inline-card.is-success .lc-inline-body,.lc-inline-card.is-success .lc-inline-footer{display:none}
+      .lc-inline-card.is-success .lc-inline-success-screen{display:flex}
+      .lc-inline-processing{position:absolute;inset:0;background:rgba(255,255,255,.82);display:none;align-items:center;justify-content:center;z-index:40}
+      .lc-inline-card.is-processing .lc-inline-processing{display:flex}
+      .lc-inline-processing-box{display:grid;justify-items:center;gap:8px;padding:14px 16px;border:1px solid #dbe4ee;border-radius:12px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.12)}
+      .lc-inline-processing-spinner{width:28px;height:28px;border:3px solid #dbe4ee;border-top-color:#00744b;border-radius:50%;animation:lcInlineSpin .85s linear infinite}
+      .lc-inline-processing-text{font-size:14px;font-weight:700;color:#0f172a}
+      @keyframes lcInlineSpin{to{transform:rotate(360deg)}}
+      @media (max-width: 760px){.lc-inline-session-add-grid{grid-template-columns:1fr}}
+      @media (max-width: 760px){.lc-inline-footer-row{align-items:flex-start}.lc-inline-actions{width:100%;justify-content:flex-end}}
+    `;
+    document.head.appendChild(style);
 
-    const err = el("reportError");
-    const ok = el("reportSuccess");
-    err?.classList.add("hidden");
-    ok?.classList.add("hidden");
+    const modal = document.createElement("div");
+    modal.id = "lcInlineEditModal";
+    modal.className = "lc-inline-modal";
+    modal.innerHTML = `
+      <div class="lc-inline-backdrop" data-inline-backdrop="1"></div>
+      <div class="lc-inline-wrap">
+      <div class="lc-inline-card">
+        <div class="lc-inline-head">
+          <div class="lc-inline-head-row">
+            <strong id="lcInlineEditTitle">แก้ไขข้อมูลสถานที่</strong>
+            <button type="button" class="lc-inline-head-close" id="lcInlineEditClose" aria-label="ปิด">✕</button>
+          </div>
+          <div class="lc-inline-tabs" id="lcInlineTabs">
+            <button type="button" class="lc-inline-tab is-active" data-inline-tab="location">ข้อมูลสถานที่</button>
+            <button type="button" class="lc-inline-tab" data-inline-tab="images">รูปภาพสถานที่</button>
+            <button type="button" class="lc-inline-tab" data-inline-tab="sessions">ข้อมูล Session</button>
+          </div>
+        </div>
+        <div class="lc-inline-body">
+          <section class="lc-inline-section lc-inline-panel is-active" data-inline-panel="location">
+            <div class="lc-inline-grid" id="lcInlineEditGrid"></div>
+            <div style="margin-top:10px;">
+              <label class="lc-inline-label" for="lcInlineFacilitySearch">สิ่งอำนวยความสะดวก (Facility)</label>
+              <input id="lcInlineFacilitySearch" class="lc-inline-input" placeholder="ค้นหา facility...">
+              <div id="lcInlineFacilities" class="lc-inline-facility-wrap"></div>
+            </div>
+          </section>
+          <section class="lc-inline-section lc-inline-panel" data-inline-panel="images">
+            <div class="lc-inline-subsection">
+              <p class="lc-inline-subhead">รูปปัจจุบัน</p>
+              <div id="lcInlineExistingImages" class="lc-inline-images"></div>
+            </div>
+            <div class="lc-inline-subsection" style="margin-top:10px;">
+              <p class="lc-inline-subhead">เพิ่มรูปใหม่</p>
+              <div id="lcInlineDropzone" class="lc-inline-dropzone" tabindex="0" role="button" aria-label="ลากและวางรูปภาพ หรือคลิกเพื่อเลือกไฟล์">
+                <div class="lc-inline-dropzone-title">ลากและวางรูปที่นี่ หรือคลิกเพื่อเลือกไฟล์</div>
+                <div id="lcInlineDropzoneSub" class="lc-inline-dropzone-sub">รองรับ JPG / PNG / WebP</div>
+                <div id="lcInlineNewImagesMeta" class="lc-inline-files-meta">ยังไม่ได้เลือกรูป</div>
+              </div>
+              <div id="lcInlineNewImagesPreview" class="lc-inline-new-files"></div>
+              <input id="lcInlineNewImages" type="file" accept="image/*" multiple class="lc-inline-input" style="display:none;">
+            </div>
+          </section>
+          <section class="lc-inline-section lc-inline-panel" data-inline-panel="sessions">
+            <div class="lc-inline-session-tools">
+              <input id="lcInlineSessionSearch" class="lc-inline-input" placeholder="ค้นหา Session ด้วย keyword (ชื่อ/รายละเอียด)">
+              <button type="button" class="lc-inline-btn" id="lcInlineToggleAddSession">+ เพิ่ม Session</button>
+            </div>
+            <div class="lc-inline-session-add">
+              <div class="lc-inline-session-add-grid">
+                <div>
+                  <label class="lc-inline-label" for="lcInlineAddSessionCourseInput">เพิ่ม Session จากคอร์ส</label>
+                  <div class="lc-inline-combo" id="lcInlineAddSessionCourseCombo">
+                    <input id="lcInlineAddSessionCourseInput" class="lc-inline-input lc-inline-combo-input" autocomplete="off" placeholder="พิมพ์ค้นหาคอร์ส...">
+                    <button type="button" class="lc-inline-combo-toggle" id="lcInlineAddSessionCourseToggle" aria-label="เปิดรายการคอร์ส">▼</button>
+                    <div id="lcInlineAddSessionCourseMenu" class="lc-inline-combo-menu hidden"></div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label class="lc-inline-label" for="lcInlineAddSessionTimePeriod">ช่วงเวลาเรียน (สำหรับ Session ใหม่)</label>
+                <input id="lcInlineAddSessionTimePeriod" class="lc-inline-input" type="text" placeholder="เช่น จันทร์-ศุกร์ 13.00 - 16.00 น.">
+              </div>
+              <div>
+                <label class="lc-inline-label" for="lcInlineAddSessionDetails">รายละเอียด (สำหรับ Session ใหม่)</label>
+                <textarea id="lcInlineAddSessionDetails" class="lc-inline-input ta" placeholder="กรอกรายละเอียดเพิ่มเติมของ Session ใหม่"></textarea>
+              </div>
+              <div class="lc-inline-actions" style="justify-content:flex-start;">
+                <button type="button" class="lc-inline-btn primary" id="lcInlineAddSessionBtn">เพิ่ม Session</button>
+              </div>
+            </div>
+            <div id="lcInlineSessions" class="lc-inline-session-list"></div>
+          </section>
+        </div>
+        <div class="lc-inline-footer">
+          <div class="lc-inline-footer-row">
+            <label class="lc-inline-confirm"><input type="checkbox" id="lcInlineConfirmCheck"><span>ฉันตรวจสอบข้อมูลแล้ว และยืนยันการส่งคำขอแก้ไข</span></label>
+            <div class="lc-inline-actions">
+              <button type="button" class="lc-inline-btn" id="lcInlineEditCancel">ยกเลิก</button>
+              <button type="button" class="lc-inline-btn primary" id="lcInlineEditSubmit">ส่งคำขอแก้ไข</button>
+            </div>
+          </div>
+          <div class="lc-inline-note" id="lcInlineEditNote"></div>
+        </div>
+        <div class="lc-inline-success-screen" id="lcInlineSuccessScreen">
+          <div class="lc-inline-success-box">
+            <div class="lc-inline-success-title">ได้รับคำขอเรียบร้อยแล้ว</div>
+            <div class="lc-inline-success-text">กรุณารอ 3-5 วันสำหรับการรีวิว</div>
+            <div class="lc-inline-success-actions">
+              <button type="button" class="lc-inline-btn" id="lcInlineSuccessClose">ปิดหน้าต่างนี้</button>
+              <button type="button" class="lc-inline-btn primary" id="lcInlineSuccessViewAll">ดูรายการแจ้งแก้ไขทั้งหมด</button>
+            </div>
+          </div>
+        </div>
+        <div class="lc-inline-processing" id="lcInlineProcessingLayer" aria-live="polite" aria-busy="true">
+          <div class="lc-inline-processing-box">
+            <div class="lc-inline-processing-spinner"></div>
+            <div class="lc-inline-processing-text">กำลังส่งคำขอแก้ไข...</div>
+          </div>
+        </div>
+      </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const card = modal.querySelector(".lc-inline-card");
+    let addSessionCourseLookup = new Map();
+    let addSessionCourses = [];
+    let addSessionSelectedCourseId = 0;
+    const normalizeCourseText = (v) => String(v || "").trim().toLowerCase();
+    const escapeInlineHtml = (v) => String(v || "").replace(/[&<>"']/g, (m) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m] || m));
+    const findCourseFromInput = (rawValue) => {
+      const value = String(rawValue || "").trim();
+      if (!value) return null;
+      const mapped = addSessionCourseLookup.get(value);
+      if (mapped) return mapped;
+      const normalized = normalizeCourseText(value);
+      let hit = addSessionCourses.find((course) => normalizeCourseText(course.label) === normalized || normalizeCourseText(course.title) === normalized);
+      if (hit) return hit;
+      const contains = addSessionCourses.filter((course) => normalizeCourseText(course.label).includes(normalized) || normalizeCourseText(course.title).includes(normalized));
+      if (contains.length === 1) return contains[0];
+      return null;
+    };
+    const parseCourseChoiceToId = (rawValue) => {
+      const selected = addSessionCourses.find((course) => Number(course.id) === Number(addSessionSelectedCourseId));
+      if (selected && String(rawValue || "").trim() === selected.label) return Number(selected.id);
+      const hit = findCourseFromInput(rawValue);
+      return hit ? Number(hit.id) : 0;
+    };
+    const parseCourseChoiceToTitle = (rawValue) => {
+      const selected = addSessionCourses.find((course) => Number(course.id) === Number(addSessionSelectedCourseId));
+      if (selected && String(rawValue || "").trim() === selected.label) return String(selected.title || "");
+      const hit = findCourseFromInput(rawValue);
+      return hit ? String(hit.title || "") : String(rawValue || "").trim();
+    };
+    const closeCourseMenu = () => {
+      const menu = el("lcInlineAddSessionCourseMenu");
+      if (!(menu instanceof HTMLElement)) return;
+      menu.classList.add("hidden");
+    };
+    const renderCourseMenu = (queryRaw = "") => {
+      const menu = el("lcInlineAddSessionCourseMenu");
+      if (!(menu instanceof HTMLElement)) return;
+      const query = normalizeCourseText(queryRaw);
+      const rows = !query
+        ? addSessionCourses
+        : addSessionCourses.filter((course) => normalizeCourseText(course.label).includes(query) || normalizeCourseText(course.title).includes(query));
+      if (!rows.length) {
+        menu.innerHTML = `<div class="lc-inline-combo-empty">ไม่พบคอร์ส</div>`;
+        return;
+      }
+      menu.innerHTML = rows.map((course, idx) => {
+        const active = Number(course.id) === Number(addSessionSelectedCourseId) || idx === 0;
+        return `<button type="button" class="lc-inline-combo-item${active ? " is-active" : ""}" data-course-id="${String(course.id)}">${escapeInlineHtml(course.label)}</button>`;
+      }).join("");
+    };
+    const openCourseMenu = (queryRaw = "") => {
+      const menu = el("lcInlineAddSessionCourseMenu");
+      if (!(menu instanceof HTMLElement)) return;
+      renderCourseMenu(queryRaw);
+      menu.classList.remove("hidden");
+    };
+    const showSubmitSuccessInModal = (requestId) => {
+      if (!(card instanceof HTMLElement)) return;
+      card.classList.add("is-success");
+      card.setAttribute("data-last-request-id", String(Number(requestId || 0)));
+    };
+    const hideSubmitSuccessInModal = () => {
+      if (!(card instanceof HTMLElement)) return;
+      card.classList.remove("is-success");
+      card.removeAttribute("data-last-request-id");
+    };
+    const dropzoneSub = el("lcInlineDropzoneSub");
+    if (dropzoneSub) {
+      const maxFiles = Number(LOCATION_EDIT_CONFIG?.max_files || PHOTO_UPLOAD_CONFIG?.max_files || 6);
+      dropzoneSub.textContent = `รองรับ JPG / PNG / WebP · สูงสุด ${Math.max(1, maxFiles)} รูป`;
+    }
+    const showInlineProcessing = () => {
+      if (!(card instanceof HTMLElement)) return;
+      card.classList.add("is-processing");
+    };
+    const hideInlineProcessing = () => {
+      if (!(card instanceof HTMLElement)) return;
+      card.classList.remove("is-processing");
+    };
+
+    const lockInlineBodyScroll = () => {};
+    const unlockInlineBodyScroll = () => {};
+    const close = () => {
+      hideSubmitSuccessInModal();
+      hideInlineProcessing();
+      closeCourseMenu();
+      modal.classList.remove("is-open");
+      unlockInlineBodyScroll();
+      const confirm = el("lcInlineConfirmCheck");
+      if (confirm) confirm.checked = false;
+      const note = el("lcInlineEditNote");
+      if (note) {
+        note.textContent = "";
+        note.className = "lc-inline-note";
+      }
+    };
+    const setInlineTab = (tab) => {
+      modal.querySelectorAll("[data-inline-tab]").forEach((btn) => {
+        const active = btn.getAttribute("data-inline-tab") === tab;
+        btn.classList.toggle("is-active", active);
+      });
+      modal.querySelectorAll("[data-inline-panel]").forEach((panel) => {
+        const active = panel.getAttribute("data-inline-panel") === tab;
+        panel.classList.toggle("is-active", active);
+      });
+      const bodyWrap = modal.querySelector(".lc-inline-body");
+      if (bodyWrap instanceof HTMLElement) {
+        bodyWrap.scrollTop = 0;
+      }
+    };
+    const applySessionSearch = () => {
+      const q = String(el("lcInlineSessionSearch")?.value || "").trim().toLowerCase();
+      modal.querySelectorAll(".lc-inline-session-item").forEach((item) => {
+        const hay = String(item.getAttribute("data-search") || "").toLowerCase();
+        item.style.display = (!q || hay.includes(q)) ? "" : "none";
+      });
+    };
+    const applyFacilitySearch = () => {
+      const q = String(el("lcInlineFacilitySearch")?.value || "").trim().toLowerCase();
+      modal.querySelectorAll(".lc-inline-facility-item").forEach((item) => {
+        const hay = String(item.getAttribute("data-search") || "").toLowerCase();
+        item.style.display = (!q || hay.includes(q)) ? "" : "none";
+      });
+    };
+    const open = (values) => {
+      const locationValues = values?.location || values || {};
+      const grid = el("lcInlineEditGrid");
+      const facilityWrap = el("lcInlineFacilities");
+      const facilitySearch = el("lcInlineFacilitySearch");
+      const imageWrap = el("lcInlineExistingImages");
+      const sessionWrap = el("lcInlineSessions");
+      const sessionTabBtn = modal.querySelector('[data-inline-tab="sessions"]');
+      const sessionPanel = modal.querySelector('[data-inline-panel="sessions"]');
+      const addSessionCourseInput = el("lcInlineAddSessionCourseInput");
+      const addSessionCourseMenu = el("lcInlineAddSessionCourseMenu");
+      const addSessionTimePeriod = el("lcInlineAddSessionTimePeriod");
+      const addSessionDetails = el("lcInlineAddSessionDetails");
+      const addSessionPanel = modal.querySelector(".lc-inline-session-add");
+      const toggleAddSessionBtn = el("lcInlineToggleAddSession");
+      const newImagesInput = el("lcInlineNewImages");
+      const newImagesMeta = el("lcInlineNewImagesMeta");
+      const confirm = el("lcInlineConfirmCheck");
+      const sessionSearch = el("lcInlineSessionSearch");
+      if (grid) {
+        grid.innerHTML = "";
+        INLINE_LOCATION_FIELDS.forEach((cfg) => {
+          const wrap = document.createElement("div");
+          const label = document.createElement("label");
+          label.className = "lc-inline-label";
+          label.textContent = cfg.label;
+          const input = cfg.multiline ? document.createElement("textarea") : document.createElement("input");
+          input.className = `lc-inline-input${cfg.multiline ? " ta" : ""}`;
+          input.setAttribute("data-inline-field", cfg.key);
+          if (!cfg.multiline) {
+            input.type = "text";
+          }
+          input.value = String(locationValues?.[cfg.key] || "");
+          wrap.appendChild(label);
+          wrap.appendChild(input);
+          grid.appendChild(wrap);
+        });
+      }
+      if (facilityWrap) {
+        facilityWrap.innerHTML = "";
+        const options = Array.isArray(values?.facility_options) ? values.facility_options : [];
+        const selected = new Set(Array.isArray(locationValues?.facility_slugs) ? locationValues.facility_slugs.map((s) => String(s)) : []);
+        if (!options.length) {
+          facilityWrap.innerHTML = `<div class="text-sm text-slate-500">ไม่พบรายการ facility</div>`;
+        } else {
+          options.forEach((opt) => {
+            const slug = String(opt?.slug || "").trim();
+            const name = String(opt?.name || slug).trim();
+            if (!slug) return;
+            const label = document.createElement("label");
+            label.className = "lc-inline-facility-item";
+            label.dataset.search = `${name} ${slug}`;
+            const input = document.createElement("input");
+            input.type = "checkbox";
+            input.checked = selected.has(slug);
+            input.setAttribute("data-facility-checkbox", slug);
+            const text = document.createElement("span");
+            text.textContent = name;
+            label.appendChild(input);
+            label.appendChild(text);
+            facilityWrap.appendChild(label);
+          });
+        }
+      }
+      if (imageWrap) {
+        imageWrap.innerHTML = "";
+        const imgs = Array.isArray(values?.images) ? values.images : [];
+        if (!imgs.length) {
+          imageWrap.innerHTML = `<div class="text-sm text-slate-500">ยังไม่มีรูปภาพ</div>`;
+        } else {
+          imgs.forEach((img) => {
+            const aid = Number(img?.id || 0);
+            if (!aid) return;
+            const box = document.createElement("div");
+            box.className = "lc-inline-img-item";
+            box.dataset.imageId = String(aid);
+            box.innerHTML = `
+              <img src="${String(img.thumb || img.medium || img.url || "")}" alt="">
+              <button type="button" class="lc-inline-img-rm" data-remove-image="${String(aid)}">ลบ</button>
+            `;
+            imageWrap.appendChild(box);
+          });
+        }
+        modal.setAttribute("data-existing-images-html", imageWrap.innerHTML);
+      }
+      if (sessionWrap) {
+        sessionWrap.innerHTML = "";
+        const sessions = Array.isArray(values?.sessions) ? values.sessions : [];
+        const courses = Array.isArray(values?.available_courses) ? values.available_courses : [];
+        const hasSessionTabData = sessions.length > 0 || courses.length > 0;
+        if (sessionTabBtn instanceof HTMLElement) {
+          sessionTabBtn.classList.toggle("hidden", !hasSessionTabData);
+        }
+        if (sessionPanel instanceof HTMLElement) {
+          sessionPanel.classList.toggle("hidden", !hasSessionTabData);
+        }
+        const appendSessionCard = (sessionData, opts = {}) => {
+          const sid = Number(sessionData?.id || 0);
+          const isNew = !!opts.isNew;
+          const tempId = String(opts.tempId || "");
+          const courseId = Number(sessionData?.course_id || 0);
+          const courseTitle = decodeInlineHtmlEntities(String(sessionData?.course_title || "").trim());
+          const fallbackSessionTitle = decodeInlineHtmlEntities(String(sessionData?.title || "").trim());
+          const titleCore = courseTitle || fallbackSessionTitle || "Session";
+          const title = isNew ? `Session ใหม่ · ${titleCore}` : `${titleCore}${sid > 0 ? ` (#${sid})` : ""}`;
+          const item = document.createElement("details");
+          item.className = "lc-inline-session-item";
+          item.open = false;
+          item.dataset.sessionId = sid > 0 ? String(sid) : "";
+          item.dataset.sessionNew = isNew ? "1" : "0";
+          item.dataset.tempId = tempId;
+          item.dataset.courseId = courseId > 0 ? String(courseId) : "";
+          item.dataset.search = `${title} ${String(sessionData?.time_period || "")} ${String(sessionData?.session_details || "")}`;
+          const head = document.createElement("summary");
+          head.className = "lc-inline-session-head";
+          const headRow = document.createElement("div");
+          headRow.className = "lc-inline-session-head-row";
+          const name = document.createElement("span");
+          name.className = "lc-inline-session-name";
+          if (isNew || sid <= 0) {
+            name.textContent = title;
+          } else {
+            const labelSpan = document.createElement("span");
+            labelSpan.textContent = titleCore;
+            const idSpan = document.createElement("span");
+            idSpan.className = "lc-inline-session-id";
+            idSpan.textContent = ` (#${sid})`;
+            name.appendChild(labelSpan);
+            name.appendChild(idSpan);
+          }
+          const rmBtn = document.createElement("button");
+          rmBtn.type = "button";
+          if (isNew) {
+            rmBtn.className = "lc-inline-session-remove";
+            rmBtn.setAttribute("data-session-remove-new", "1");
+            rmBtn.textContent = "ลบรายการใหม่";
+          } else {
+            rmBtn.className = "lc-inline-session-remove toggle";
+            rmBtn.setAttribute("data-session-remove-existing", "1");
+            rmBtn.textContent = "ลบ Session นี้";
+          }
+          headRow.appendChild(name);
+          headRow.appendChild(rmBtn);
+          head.appendChild(headRow);
+          item.appendChild(head);
+
+          const body = document.createElement("div");
+          body.className = "lc-inline-session-body";
+          const timeWrap = document.createElement("div");
+          const timeLabel = document.createElement("label");
+          timeLabel.className = "lc-inline-label";
+          timeLabel.textContent = "ช่วงเวลาเรียน";
+          const timeInput = document.createElement("input");
+          timeInput.className = "lc-inline-input";
+          timeInput.type = "text";
+          timeInput.setAttribute("data-session-field", "time_period");
+          timeInput.value = String(sessionData?.time_period || "");
+          timeWrap.appendChild(timeLabel);
+          timeWrap.appendChild(timeInput);
+          body.appendChild(timeWrap);
+          const detailsWrap = document.createElement("div");
+          const detailsLabel = document.createElement("label");
+          detailsLabel.className = "lc-inline-label";
+          detailsLabel.textContent = "รายละเอียด";
+          const detailsTa = document.createElement("textarea");
+          detailsTa.className = "lc-inline-input ta";
+          detailsTa.setAttribute("data-session-field", "session_details");
+          detailsTa.value = String(sessionData?.session_details || "");
+          detailsWrap.appendChild(detailsLabel);
+          detailsWrap.appendChild(detailsTa);
+          body.appendChild(detailsWrap);
+          item.appendChild(body);
+          sessionWrap.appendChild(item);
+        };
+
+        addSessionCourseLookup = new Map();
+        addSessionCourses = [];
+        addSessionSelectedCourseId = 0;
+        courses.forEach((course) => {
+          const cid = Number(course?.id || 0);
+          const rawTitle = String(course?.title || "").trim();
+          const title = decodeInlineHtmlEntities(rawTitle);
+          if (!cid || !title) return;
+          const row = { id: cid, title, label: `${title} (#${cid})` };
+          addSessionCourses.push(row);
+          addSessionCourseLookup.set(row.label, row);
+        });
+        if (addSessionCourseInput instanceof HTMLInputElement) {
+          addSessionCourseInput.value = "";
+          addSessionCourseInput.placeholder = courses.length ? "พิมพ์ค้นหาคอร์ส..." : "ไม่พบคอร์สที่เพิ่มได้";
+        }
+        if (addSessionCourseMenu instanceof HTMLElement) {
+          addSessionCourseMenu.classList.add("hidden");
+          addSessionCourseMenu.innerHTML = "";
+        }
+        if (addSessionTimePeriod instanceof HTMLInputElement) {
+          addSessionTimePeriod.value = "";
+        }
+        if (addSessionDetails) {
+          addSessionDetails.value = "";
+        }
+        if (addSessionPanel instanceof HTMLElement) {
+          addSessionPanel.classList.add("hidden");
+        }
+        if (toggleAddSessionBtn instanceof HTMLButtonElement) {
+          toggleAddSessionBtn.textContent = "+ เพิ่ม Session";
+          toggleAddSessionBtn.disabled = courses.length === 0;
+          if (courses.length === 0) {
+            toggleAddSessionBtn.textContent = "ไม่พบคอร์สที่เพิ่มได้";
+          }
+        }
+
+        if (!sessions.length) {
+          sessionWrap.innerHTML = `<div class="text-sm text-slate-500">ไม่พบ Session</div>`;
+        } else {
+          sessions.forEach((s) => {
+            appendSessionCard(s, { isNew: false });
+          });
+        }
+      }
+      if (newImagesInput) newImagesInput.value = "";
+      if (newImagesMeta) newImagesMeta.textContent = "ยังไม่ได้เลือกรูป";
+      const newImagesPreview = el("lcInlineNewImagesPreview");
+      if (newImagesPreview) newImagesPreview.innerHTML = "";
+      if (newImagesInput) newImagesInput._lcPendingFiles = [];
+      if (newImagesInput && typeof newImagesInput._lcRenderMeta === "function") {
+        newImagesInput._lcRenderMeta();
+      }
+      if (confirm) confirm.checked = false;
+      if (sessionSearch) sessionSearch.value = "";
+      if (facilitySearch) facilitySearch.value = "";
+      hideSubmitSuccessInModal();
+      hideInlineProcessing();
+      setInlineTab("location");
+      applySessionSearch();
+      applyFacilitySearch();
+      modal.classList.add("is-open");
+      lockInlineBodyScroll();
+    };
+
+    modal.addEventListener("click", (e) => {
+      const target = e.target;
+      if (target instanceof Element && target.dataset.inlineBackdrop === "1") {
+        close();
+        return;
+      }
+      const clickedDropzone = target instanceof Element ? target.closest("#lcInlineDropzone") : null;
+      if (clickedDropzone) {
+        e.preventDefault();
+        el("lcInlineNewImages")?.click();
+        return;
+      }
+      if (target instanceof Element && target.matches("[data-remove-image]")) {
+        e.preventDefault();
+        const id = String(target.getAttribute("data-remove-image") || "");
+        const box = modal.querySelector(`.lc-inline-img-item[data-image-id="${id}"]`);
+        if (box) box.classList.toggle("is-remove");
+        return;
+      }
+      if (target instanceof Element && target.matches("[data-remove-new-image]")) {
+        e.preventDefault();
+        const idx = Number(target.getAttribute("data-remove-new-image") || -1);
+        const input = el("lcInlineNewImages");
+        if (!(input instanceof HTMLInputElement)) return;
+        const files = Array.isArray(input._lcPendingFiles) ? [...input._lcPendingFiles] : (input.files ? Array.from(input.files) : []);
+        if (!files.length || idx < 0 || idx >= files.length) return;
+        files.splice(idx, 1);
+        input._lcPendingFiles = files;
+        if (typeof input._lcRenderMeta === "function") input._lcRenderMeta();
+        return;
+      }
+      if (target instanceof Element && target.id === "lcInlineAddSessionBtn") {
+        e.preventDefault();
+        const courseInput = el("lcInlineAddSessionCourseInput");
+        const timeInput = el("lcInlineAddSessionTimePeriod");
+        const details = el("lcInlineAddSessionDetails");
+        const sessionWrap = el("lcInlineSessions");
+        if (!(courseInput instanceof HTMLInputElement) || !sessionWrap) return;
+        const courseId = parseCourseChoiceToId(courseInput.value);
+        if (!courseId) {
+          const note = el("lcInlineEditNote");
+          if (note) {
+            note.className = "lc-inline-note err";
+            note.textContent = "กรุณาเลือกคอร์สก่อนเพิ่ม Session";
+          }
+          return;
+        }
+        const courseTitle = parseCourseChoiceToTitle(courseInput.value);
+        const selectedCourse = findCourseFromInput(courseInput.value);
+        if (selectedCourse) {
+          addSessionSelectedCourseId = Number(selectedCourse.id);
+          courseInput.value = selectedCourse.label;
+        }
+        const safeCourseTitle = courseTitle.replace(/</g, "&lt;");
+        const timePeriod = String(timeInput?.value || "").trim();
+        const safeTimePeriod = timePeriod.replace(/</g, "&lt;");
+        const tempId = `new-${Date.now()}-${Math.floor(Math.random() * 9999)}`;
+        const emptyState = sessionWrap.querySelector(".text-sm.text-slate-500");
+        if (emptyState) emptyState.remove();
+        const item = document.createElement("details");
+        item.className = "lc-inline-session-item";
+        item.dataset.sessionNew = "1";
+        item.dataset.tempId = tempId;
+        item.dataset.courseId = String(courseId);
+        item.dataset.search = `${courseTitle} ${timePeriod} ${String(details?.value || "")}`;
+        item.open = true;
+        item.innerHTML = `
+          <summary class="lc-inline-session-head">
+            <div class="lc-inline-session-head-row">
+              <span class="lc-inline-session-name">Session ใหม่ · คอร์ส: ${safeCourseTitle}</span>
+              <button type="button" class="lc-inline-session-remove" data-session-remove-new="1">ลบรายการใหม่</button>
+            </div>
+          </summary>
+          <div class="lc-inline-session-body">
+            <div>
+              <label class="lc-inline-label">ช่วงเวลาเรียน</label>
+              <input class="lc-inline-input" type="text" data-session-field="time_period" value="${safeTimePeriod}">
+            </div>
+            <div>
+              <label class="lc-inline-label">รายละเอียด</label>
+              <textarea class="lc-inline-input ta" data-session-field="session_details">${String(details?.value || "").replace(/</g, "&lt;")}</textarea>
+            </div>
+          </div>
+        `;
+        sessionWrap.prepend(item);
+        courseInput.value = "";
+        if (timeInput instanceof HTMLInputElement) timeInput.value = "";
+        if (details) details.value = "";
+        const note = el("lcInlineEditNote");
+        if (note) {
+          note.className = "lc-inline-note";
+          note.textContent = "";
+        }
+        return;
+      }
+      if (target instanceof Element && target.matches("[data-session-remove-existing]")) {
+        e.preventDefault();
+        e.stopPropagation();
+        const item = target.closest(".lc-inline-session-item");
+        if (!item) return;
+        const active = item.classList.toggle("is-remove");
+        if (target.classList.contains("toggle")) {
+          target.classList.toggle("is-active", active);
+        }
+        target.textContent = active ? "ยกเลิกลบ Session" : "ลบ Session นี้";
+        return;
+      }
+      if (target instanceof Element && target.matches("[data-session-remove-new]")) {
+        e.preventDefault();
+        e.stopPropagation();
+        const item = target.closest(".lc-inline-session-item");
+        if (!item) return;
+        item.remove();
+        const sessionWrap = el("lcInlineSessions");
+        if (sessionWrap && !sessionWrap.querySelector(".lc-inline-session-item")) {
+          sessionWrap.innerHTML = `<div class="text-sm text-slate-500">ไม่พบ Session</div>`;
+        }
+        return;
+      }
+      if (target instanceof Element && target.closest(".lc-inline-session-remove")) {
+        e.stopPropagation();
+      }
+    });
+    const bindDropzone = () => {
+      const dropzone = el("lcInlineDropzone");
+      const input = el("lcInlineNewImages");
+      const meta = el("lcInlineNewImagesMeta");
+      const preview = el("lcInlineNewImagesPreview");
+      if (!(dropzone instanceof HTMLElement) || !(input instanceof HTMLInputElement)) return;
+      let previewUrls = [];
+      if (!Array.isArray(input._lcPendingFiles)) input._lcPendingFiles = [];
+      const resetPreviewUrls = () => {
+        previewUrls.forEach((url) => {
+          try { URL.revokeObjectURL(url); } catch (err) {}
+        });
+        previewUrls = [];
+      };
+      const formatBytes = (bytes) => {
+        const n = Number(bytes || 0);
+        if (!Number.isFinite(n) || n <= 0) return "-";
+        if (n < 1024) return `${n} B`;
+        const kb = n / 1024;
+        if (kb < 1024) return `${kb.toFixed(1)} KB`;
+        const mb = kb / 1024;
+        return `${mb.toFixed(2)} MB`;
+      };
+      const syncInputFilesFromPending = () => {
+        const dt = new DataTransfer();
+        const pending = Array.isArray(input._lcPendingFiles) ? input._lcPendingFiles : [];
+        pending.forEach((f) => dt.items.add(f));
+        input.files = dt.files;
+      };
+      const dedupeFiles = (files) => {
+        const seen = new Set();
+        const out = [];
+        files.forEach((f) => {
+          const key = `${String(f?.name || "")}::${Number(f?.size || 0)}::${Number(f?.lastModified || 0)}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push(f);
+        });
+        return out;
+      };
+      const appendPendingFiles = (incoming) => {
+        const maxFiles = Math.max(1, Number(LOCATION_EDIT_CONFIG?.max_files || PHOTO_UPLOAD_CONFIG?.max_files || 6));
+        const current = Array.isArray(input._lcPendingFiles) ? input._lcPendingFiles : [];
+        const merged = dedupeFiles([...current, ...incoming]);
+        if (merged.length > maxFiles) {
+          input._lcPendingFiles = merged.slice(0, maxFiles);
+          const note = el("lcInlineEditNote");
+          if (note) {
+            note.className = "lc-inline-note err";
+            note.textContent = `อัปโหลดได้สูงสุด ${maxFiles} รูป`;
+          }
+          return;
+        }
+        input._lcPendingFiles = merged;
+      };
+      const renderMeta = () => {
+        const files = Array.isArray(input._lcPendingFiles) ? input._lcPendingFiles : [];
+        syncInputFilesFromPending();
+        if (meta) {
+          if (!files.length) {
+            meta.textContent = "ยังไม่ได้เลือกรูป";
+          } else {
+            meta.textContent = `เลือกแล้ว ${files.length} ไฟล์`;
+          }
+        }
+        if (!(preview instanceof HTMLElement)) return;
+        const existingWrap = el("lcInlineExistingImages");
+        if (existingWrap instanceof HTMLElement && !existingWrap.innerHTML.trim()) {
+          const backupHtml = String(modal.getAttribute("data-existing-images-html") || "");
+          if (backupHtml) existingWrap.innerHTML = backupHtml;
+        }
+        resetPreviewUrls();
+        preview.innerHTML = "";
+        if (!files.length) return;
+        files.forEach((file, idx) => {
+          const ext = String(file.name || "").split(".").pop()?.toUpperCase() || "-";
+          const row = document.createElement("div");
+          row.className = "lc-inline-new-file";
+          const img = document.createElement("img");
+          img.className = "lc-inline-new-file-thumb";
+          img.alt = "";
+          const objectUrl = URL.createObjectURL(file);
+          previewUrls.push(objectUrl);
+          img.src = objectUrl;
+          const metaWrap = document.createElement("div");
+          metaWrap.className = "lc-inline-new-file-meta";
+          const name = document.createElement("div");
+          name.className = "lc-inline-new-file-name";
+          name.textContent = file.name || `file-${idx + 1}`;
+          const info = document.createElement("div");
+          info.textContent = `${ext} • ${formatBytes(file.size)}`;
+          const action = document.createElement("div");
+          action.className = "lc-inline-new-file-row";
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "lc-inline-new-file-remove";
+          remove.setAttribute("data-remove-new-image", String(idx));
+          remove.textContent = "ลบ";
+          action.appendChild(remove);
+          metaWrap.appendChild(name);
+          metaWrap.appendChild(info);
+          metaWrap.appendChild(action);
+          row.appendChild(img);
+          row.appendChild(metaWrap);
+          preview.appendChild(row);
+        });
+      };
+      input._lcRenderMeta = renderMeta;
+      input.addEventListener("change", () => {
+        const selectedNow = input.files ? Array.from(input.files) : [];
+        if (!selectedNow.length) return;
+        appendPendingFiles(selectedNow);
+        renderMeta();
+      });
+      dropzone.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          input.click();
+        }
+      });
+      ["dragenter", "dragover"].forEach((evt) => {
+        dropzone.addEventListener(evt, (ev) => {
+          ev.preventDefault();
+          dropzone.classList.add("is-drag");
+        });
+      });
+      ["dragleave", "drop"].forEach((evt) => {
+        dropzone.addEventListener(evt, (ev) => {
+          ev.preventDefault();
+          dropzone.classList.remove("is-drag");
+        });
+      });
+      dropzone.addEventListener("drop", (ev) => {
+        const files = Array.from(ev.dataTransfer?.files || []);
+        if (!files.length) return;
+        appendPendingFiles(files);
+        renderMeta();
+      });
+    };
+    bindDropzone();
+    modal.addEventListener("input", (e) => {
+      const input = e.target;
+      if (!(input instanceof Element)) return;
+      if (!input.matches("[data-session-field='session_details'],[data-session-field='time_period']")) return;
+      const item = input.closest(".lc-inline-session-item");
+      if (!item) return;
+      const head = item.querySelector(".lc-inline-session-name");
+      const title = String(head?.textContent || "");
+      const time = String(item.querySelector("[data-session-field='time_period']")?.value || "");
+      const details = String(item.querySelector("[data-session-field='session_details']")?.value || "");
+      item.setAttribute("data-search", `${title} ${time} ${details}`);
+    });
+    el("lcInlineEditClose")?.addEventListener("click", close);
+    el("lcInlineEditCancel")?.addEventListener("click", close);
+    el("lcInlineTabs")?.addEventListener("click", (e) => {
+      const btn = e.target instanceof Element ? e.target.closest("[data-inline-tab]") : null;
+      if (!btn) return;
+      setInlineTab(String(btn.getAttribute("data-inline-tab") || "location"));
+    });
+    el("lcInlineSessionSearch")?.addEventListener("input", applySessionSearch);
+    el("lcInlineFacilitySearch")?.addEventListener("input", applyFacilitySearch);
+    el("lcInlineAddSessionCourseInput")?.addEventListener("focus", (e) => {
+      const input = e.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      if (!addSessionCourses.length) return;
+      openCourseMenu(input.value);
+    });
+    el("lcInlineAddSessionCourseInput")?.addEventListener("input", (e) => {
+      const input = e.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      const selected = addSessionCourses.find((course) => Number(course.id) === Number(addSessionSelectedCourseId));
+      if (!selected || input.value.trim() !== selected.label) {
+        addSessionSelectedCourseId = 0;
+      }
+      if (!addSessionCourses.length) return;
+      openCourseMenu(input.value);
+    });
+    el("lcInlineAddSessionCourseInput")?.addEventListener("keydown", (e) => {
+      const input = e.target;
+      const menu = el("lcInlineAddSessionCourseMenu");
+      if (!(input instanceof HTMLInputElement) || !(menu instanceof HTMLElement)) return;
+      if (e.key === "Escape") {
+        closeCourseMenu();
+        return;
+      }
+      if (e.key === "Enter") {
+        const first = menu.querySelector(".lc-inline-combo-item");
+        if (first instanceof HTMLButtonElement && !menu.classList.contains("hidden")) {
+          e.preventDefault();
+          first.click();
+        }
+      }
+    });
+    el("lcInlineAddSessionCourseToggle")?.addEventListener("click", () => {
+      const input = el("lcInlineAddSessionCourseInput");
+      const menu = el("lcInlineAddSessionCourseMenu");
+      if (!(input instanceof HTMLInputElement) || !(menu instanceof HTMLElement)) return;
+      if (!addSessionCourses.length) return;
+      if (menu.classList.contains("hidden")) {
+        openCourseMenu(input.value);
+        input.focus();
+      } else {
+        closeCourseMenu();
+      }
+    });
+    el("lcInlineAddSessionCourseMenu")?.addEventListener("click", (e) => {
+      const btn = e.target instanceof Element ? e.target.closest("[data-course-id]") : null;
+      const input = el("lcInlineAddSessionCourseInput");
+      if (!btn || !(input instanceof HTMLInputElement)) return;
+      const courseId = Number(btn.getAttribute("data-course-id") || 0);
+      if (!courseId) return;
+      const row = addSessionCourses.find((course) => Number(course.id) === courseId);
+      if (!row) return;
+      addSessionSelectedCourseId = courseId;
+      input.value = row.label;
+      closeCourseMenu();
+    });
+    document.addEventListener("click", (e) => {
+      const combo = el("lcInlineAddSessionCourseCombo");
+      if (!(combo instanceof HTMLElement)) return;
+      const target = e.target;
+      if (target instanceof Node && combo.contains(target)) return;
+      closeCourseMenu();
+    });
+    el("lcInlineToggleAddSession")?.addEventListener("click", () => {
+      const panel = modal.querySelector(".lc-inline-session-add");
+      const btn = el("lcInlineToggleAddSession");
+      if (!(panel instanceof HTMLElement) || !(btn instanceof HTMLButtonElement)) return;
+      const willOpen = panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", !willOpen);
+      btn.textContent = willOpen ? "ปิดเพิ่ม Session" : "+ เพิ่ม Session";
+      if (willOpen) {
+        const courseInput = el("lcInlineAddSessionCourseInput");
+        if (courseInput instanceof HTMLInputElement) courseInput.focus();
+      }
+    });
+    el("lcInlineSuccessClose")?.addEventListener("click", () => {
+      close();
+    });
+    el("lcInlineSuccessViewAll")?.addEventListener("click", () => {
+      const rid = Number(card?.getAttribute("data-last-request-id") || 0);
+      close();
+      document.dispatchEvent(new CustomEvent("lc:location-edit-submitted", {
+        detail: { requestId: rid, locationId: Number(selectedId || 0) }
+      }));
+    });
+    window.lcInlineEditModalApi = { open, close, showSubmitSuccessInModal, hideSubmitSuccessInModal, showInlineProcessing, hideInlineProcessing };
   }
 
-  function closeReportModal() {
-    const modal = el("reportModal");
-    if (!modal) return;
-    modal.classList.add("hidden");
-    document.body.style.overflow = "";
-    const form = el("reportForm");
-    if (form) form.reset();
+  function syncInlineFullEditButton() {
+    const row = el("rowReportIssue");
+    const actionWrap = row?.querySelector("div.flex");
+    const existing = el("btnInlineFullLocationEdit");
+    if (!INLINE_EDIT_AVAILABLE || !selectedId || !row || !actionWrap) {
+      if (existing) existing.remove();
+      return;
+    }
+    ensureInlineLocationModal();
+    bindInlineEditModalSubmit();
+    if (existing) return;
+    const btn = document.createElement("button");
+    btn.id = "btnInlineFullLocationEdit";
+    btn.type = "button";
+    btn.className = "lc-report-btn lc-inline-trigger";
+    btn.innerHTML = `<span class="lc-report-btn__icon" aria-hidden="true">✎</span><span>แจ้งแก้ไขข้อมูลสถานที่</span>`;
+    btn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      const note = el("lcInlineEditNote");
+      btn.setAttribute("disabled", "disabled");
+      try {
+        const fd = new FormData();
+        fd.append("action", "lc_get_inline_location_edit_context");
+        fd.append("nonce", String(LOCATION_EDIT_CONFIG?.nonce || ""));
+        fd.append("location_id", String(Number(selectedId || 0)));
+        const res = await fetch(String(LOCATION_EDIT_CONFIG?.ajax_url || ""), { method: "POST", body: fd, credentials: "same-origin" });
+        const json = await res.json();
+        if (!json?.success) throw new Error(json?.data?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ");
+        inlineLocationContext = json.data || null;
+        window.lcInlineEditModalApi?.open(inlineLocationContext || {});
+        if (note) {
+          note.className = "lc-inline-note";
+          note.textContent = "";
+        }
+      } catch (err) {
+        alert(String(err?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ"));
+      } finally {
+        btn.removeAttribute("disabled");
+      }
+    });
+    actionWrap.appendChild(btn);
   }
 
-  function setReportMessage(type, msg) {
-    const err = el("reportError");
-    const ok = el("reportSuccess");
+  function clearInlineFullEditButton() {
+    el("btnInlineFullLocationEdit")?.remove();
+  }
+
+  async function submitInlineEditFromModal() {
+    const modal = el("lcInlineEditModal");
+    const note = el("lcInlineEditNote");
+    const submitBtn = el("lcInlineEditSubmit");
+    const confirmCheck = el("lcInlineConfirmCheck");
+    if (!modal || !note || !submitBtn || !confirmCheck) return;
+    const currentValues = inlineLocationContext?.location || {};
+    const nextValues = {};
+    modal.querySelectorAll("[data-inline-field]").forEach((node) => {
+      const key = String(node.getAttribute("data-inline-field") || "").trim();
+      if (!key) return;
+      nextValues[key] = String(node.value || "").trim();
+    });
+    INLINE_LOCATION_FIELDS.forEach((cfg) => {
+      if (!Object.prototype.hasOwnProperty.call(nextValues, cfg.key)) {
+        nextValues[cfg.key] = String(currentValues?.[cfg.key] || "");
+      }
+    });
+    if (String(nextValues.title || "").trim() === "" || String(nextValues.title || "").trim() === "-") {
+      nextValues.title = String(currentValues?.title || "");
+    }
+    const nextFacilitySlugs = Array.from(modal.querySelectorAll("[data-facility-checkbox]"))
+      .filter((node) => node instanceof HTMLInputElement && node.checked)
+      .map((node) => String(node.getAttribute("data-facility-checkbox") || "").trim())
+      .filter((slug) => slug !== "");
+    const removedImageIds = Array.from(modal.querySelectorAll(".lc-inline-img-item.is-remove"))
+      .map((node) => Number(node.getAttribute("data-image-id") || 0))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    const sessionItems = Array.from(modal.querySelectorAll(".lc-inline-session-item"));
+    const sessions = sessionItems
+    .filter((item) => item.getAttribute("data-session-new") !== "1" && !item.classList.contains("is-remove"))
+    .map((item) => {
+      const sid = Number(item.getAttribute("data-session-id") || 0);
+      const row = { id: sid };
+      item.querySelectorAll("[data-session-field]").forEach((input) => {
+        const key = String(input.getAttribute("data-session-field") || "").trim();
+        if (!key) return;
+        row[key] = String(input.value || "").trim();
+      });
+      return row;
+    }).filter((row) => Number(row.id) > 0);
+    const deleteSessionIds = sessionItems
+      .filter((item) => item.getAttribute("data-session-new") !== "1" && item.classList.contains("is-remove"))
+      .map((item) => Number(item.getAttribute("data-session-id") || 0))
+      .filter((sid) => Number.isFinite(sid) && sid > 0);
+    const newSessions = sessionItems
+      .filter((item) => item.getAttribute("data-session-new") === "1")
+      .map((item) => {
+        const courseId = Number(item.getAttribute("data-course-id") || 0);
+        const detailsInput = item.querySelector("[data-session-field='session_details']");
+        const timeInput = item.querySelector("[data-session-field='time_period']");
+        return {
+          course_id: courseId,
+          time_period: String(timeInput?.value || "").trim(),
+          session_details: String(detailsInput?.value || "").trim(),
+        };
+      })
+      .filter((row) => Number(row.course_id) > 0);
+    const newImageInput = el("lcInlineNewImages");
+    const newFiles = newImageInput?.files ? Array.from(newImageInput.files) : [];
+
+    const locationChanged = INLINE_LOCATION_FIELDS.some((f) => (String(nextValues[f.key] || "").trim() !== String(currentValues[f.key] || "").trim()));
+    const currentSessionMap = new Map((Array.isArray(inlineLocationContext?.sessions) ? inlineLocationContext.sessions : []).map((s) => [Number(s.id || 0), s]));
+    const currentFacilitySlugs = Array.isArray(currentValues?.facility_slugs) ? currentValues.facility_slugs.map((s) => String(s).trim()).filter(Boolean) : [];
+    const facilityChanged = JSON.stringify([...new Set(currentFacilitySlugs)].sort()) !== JSON.stringify([...new Set(nextFacilitySlugs)].sort());
+    const sessionChanged = sessions.some((row) => {
+      const before = currentSessionMap.get(Number(row.id || 0));
+      if (!before) return true;
+      const keys = ["time_period", "session_details"];
+      return keys.some((k) => String(row[k] || "").trim() !== String(before[k] || "").trim());
+    });
+    const deleteSessionChanged = deleteSessionIds.length > 0;
+    const newSessionChanged = newSessions.length > 0;
+    const changed = locationChanged || facilityChanged || sessionChanged || deleteSessionChanged || newSessionChanged || removedImageIds.length > 0 || newFiles.length > 0;
+    if (!changed) {
+      note.className = "lc-inline-note err";
+      note.textContent = "ข้อความใหม่เหมือนข้อมูลเดิม";
+      return;
+    }
+    if (!confirmCheck.checked) {
+      note.className = "lc-inline-note err";
+      note.textContent = "กรุณาติ๊กยืนยันว่าตรวจสอบข้อมูลแล้วก่อนส่ง";
+      return;
+    }
+    submitBtn.setAttribute("disabled", "disabled");
+    window.lcInlineEditModalApi?.showInlineProcessing?.();
+    note.className = "lc-inline-note";
+    note.textContent = "กำลังส่งคำขอแก้ไข...";
+    try {
+      const fd = new FormData();
+      fd.append("action", "lc_submit_inline_location_edit");
+      fd.append("nonce", String(LOCATION_EDIT_CONFIG?.nonce || ""));
+      fd.append("location_id", String(Number(selectedId || 0)));
+      fd.append("mode", "full_location");
+      INLINE_LOCATION_FIELDS.forEach((f) => {
+        fd.append(f.key, String(nextValues[f.key] || ""));
+      });
+      nextFacilitySlugs.forEach((slug) => fd.append("facility_slugs[]", slug));
+      removedImageIds.forEach((id) => fd.append("remove_image_ids[]", String(id)));
+      fd.append("sessions", JSON.stringify(sessions));
+      deleteSessionIds.forEach((id) => fd.append("delete_session_ids[]", String(id)));
+      fd.append("new_sessions", JSON.stringify(newSessions));
+      newFiles.forEach((file) => fd.append("new_images[]", file));
+      const res = await fetch(String(LOCATION_EDIT_CONFIG?.ajax_url || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      const json = await res.json();
+      if (!json?.success) {
+        throw new Error(json?.data?.message || "ส่งคำขอแก้ไขไม่สำเร็จ");
+      }
+      const requestId = Number(json?.data?.request_id || 0);
+      window.lcInlineEditModalApi?.hideInlineProcessing?.();
+      window.lcInlineEditModalApi?.showSubmitSuccessInModal?.(requestId);
+    } catch (err) {
+      window.lcInlineEditModalApi?.hideInlineProcessing?.();
+      note.className = "lc-inline-note err";
+      note.textContent = String(err?.message || "ส่งคำขอแก้ไขไม่สำเร็จ");
+    } finally {
+      submitBtn.removeAttribute("disabled");
+    }
+  }
+
+  function bindInlineEditModalSubmit() {
+    const btn = el("lcInlineEditSubmit");
+    if (!btn || btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", submitInlineEditFromModal);
+  }
+
+  function openLocationEditAccessModal() {
+    const locationId = Number(selectedId || 0);
+    if (window.lcLocationEditAuth?.open) {
+      window.lcLocationEditAuth.open({ locationId });
+      return;
+    }
+    alert("ไม่พบระบบล็อกอิน OTP กรุณารีเฟรชหน้าแล้วลองใหม่อีกครั้ง");
+  }
+
+  (function bindEditRequestButton() {
+    const openBtn = el("btnReportIssue");
+    if (!openBtn || openBtn.dataset.bound === "1") return;
+    openBtn.dataset.bound = "1";
+
+    openBtn?.addEventListener("click", () => {
+      if (!selectedId) return;
+      if (LOCATION_EDIT_CONFIG?.enabled) {
+        openLocationEditAccessModal();
+        return;
+      }
+      alert("ระบบแจ้งแก้ไขนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ");
+    });
+  })();
+
+  // ================= PHOTO UPLOAD MODAL =================
+  function setPhotoUploadMessage(type, msg) {
+    const err = el("photoUploadError");
+    const ok = el("photoUploadSuccess");
     if (err) err.classList.add("hidden");
     if (ok) ok.classList.add("hidden");
+    if (!msg) return;
     if (type === "error" && err) {
       err.textContent = msg;
       err.classList.remove("hidden");
@@ -2578,70 +3759,461 @@ if (!defined('ABSPATH')) exit;
     }
   }
 
-  (function bindReportModal() {
-    const modal = el("reportModal");
-    const openBtn = el("btnReportIssue");
-    const closeBtn = el("closeReportModal");
-    const cancelBtn = el("cancelReport");
-    const form = el("reportForm");
-    const submitBtn = el("submitReport");
-    if (!form) return;
-
-    openBtn?.addEventListener("click", () => {
-      if (!selectedId) return;
-      openReportModal();
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("อ่านไฟล์ไม่สำเร็จ"));
+      reader.readAsDataURL(file);
     });
-    closeBtn?.addEventListener("click", closeReportModal);
-    cancelBtn?.addEventListener("click", closeReportModal);
+  }
+
+  function loadImageFromFile(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const blobUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(blobUrl);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error("อ่านรูปไม่สำเร็จ"));
+      };
+      img.src = blobUrl;
+    });
+  }
+
+  const __lcScriptPromiseCache = new Map();
+  function loadExternalScriptOnce(src) {
+    if (!src) return Promise.reject(new Error("invalid script src"));
+    if (__lcScriptPromiseCache.has(src)) return __lcScriptPromiseCache.get(src);
+    const p = new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[data-lc-src="${src}"]`);
+      if (existing && existing.dataset.loaded === "1") {
+        resolve(true);
+        return;
+      }
+      const s = existing || document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.defer = true;
+      s.dataset.lcSrc = src;
+      s.onload = () => {
+        s.dataset.loaded = "1";
+        resolve(true);
+      };
+      s.onerror = () => reject(new Error(`โหลดไลบรารีไม่สำเร็จ: ${src}`));
+      if (!existing) document.head.appendChild(s);
+    });
+    __lcScriptPromiseCache.set(src, p);
+    return p;
+  }
+
+  async function ensureImageProcessingLibs() {
+    const jobs = [];
+    if (typeof window.imageCompression !== "function") {
+      jobs.push(loadExternalScriptOnce("https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"));
+    }
+    if (typeof window.heic2any !== "function") {
+      jobs.push(loadExternalScriptOnce("https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"));
+    }
+    if (jobs.length) {
+      try {
+        await Promise.all(jobs);
+      } catch (err) {
+        // Keep fallback path (canvas) working even if CDN is blocked.
+      }
+    }
+  }
+
+  function isLikelyHeic(file) {
+    const type = String(file?.type || "").toLowerCase();
+    const name = String(file?.name || "").toLowerCase();
+    return type.includes("heic") || type.includes("heif") || /\.(heic|heif)$/i.test(name);
+  }
+
+  function toJpegFileName(name) {
+    const base = String(name || "upload").replace(/\.[^.]+$/, "").trim() || "upload";
+    return `${base}.jpg`;
+  }
+
+  function dataUrlToFile(dataUrl, filename, fallbackType = "image/jpeg") {
+    const raw = String(dataUrl || "");
+    const match = raw.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) {
+      throw new Error("รูปแบบข้อมูลรูปไม่ถูกต้อง");
+    }
+    const mime = String(match[1] || fallbackType);
+    const b64 = String(match[2] || "");
+    const binary = atob(b64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    return new File([blob], filename || "upload.jpg", { type: mime, lastModified: Date.now() });
+  }
+
+  async function convertHeicToJpegIfNeeded(file) {
+    if (!isLikelyHeic(file)) return file;
+    if (typeof window.heic2any !== "function") {
+      throw new Error("ไฟล์ HEIC ต้องใช้ตัวแปลง แต่โหลดไม่สำเร็จ");
+    }
+    const out = await window.heic2any({ blob: file, toType: "image/jpeg", quality: 0.88 });
+    const blob = Array.isArray(out) ? out[0] : out;
+    if (!(blob instanceof Blob)) {
+      throw new Error("แปลงไฟล์ HEIC ไม่สำเร็จ");
+    }
+    return new File([blob], toJpegFileName(file.name), { type: "image/jpeg", lastModified: Date.now() });
+  }
+
+  async function downscaleImageFile(file, options = {}) {
+    const maxWidth = Number(options.maxWidth || 1600);
+    const maxHeight = Number(options.maxHeight || 1600);
+    const quality = Number(options.quality || 0.8);
+    const maxSizeMB = Number(options.maxSizeMB || 0.9);
+    const outputType = "image/jpeg";
+
+    await ensureImageProcessingLibs();
+
+    let inputFile = file;
+    if (isLikelyHeic(inputFile)) {
+      inputFile = await convertHeicToJpegIfNeeded(inputFile);
+    }
+
+    if (typeof window.imageCompression === "function") {
+      try {
+        const compressed = await window.imageCompression(inputFile, {
+          maxSizeMB,
+          maxWidthOrHeight: Math.max(maxWidth, maxHeight),
+          useWebWorker: true,
+          initialQuality: quality,
+          fileType: outputType,
+        });
+        const jpegFile = compressed instanceof File
+          ? compressed
+          : new File([compressed], toJpegFileName(inputFile.name), { type: outputType, lastModified: Date.now() });
+        return {
+          name: toJpegFileName(inputFile.name),
+          type: outputType,
+          data: await readFileAsDataUrl(jpegFile),
+        };
+      } catch (err) {
+        // fallback to canvas below
+      }
+    }
+
+    const img = await loadImageFromFile(inputFile);
+    const width = Number(img.naturalWidth || img.width || 0);
+    const height = Number(img.naturalHeight || img.height || 0);
+    if (!width || !height) {
+      return {
+        name: toJpegFileName(inputFile.name),
+        type: outputType,
+        data: await readFileAsDataUrl(inputFile),
+      };
+    }
+
+    const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+
+    if (scale >= 1 && inputFile.size <= 1024 * 1024 * 1.5 && String(inputFile.type || "").toLowerCase() === outputType) {
+      return {
+        name: toJpegFileName(inputFile.name),
+        type: outputType,
+        data: await readFileAsDataUrl(inputFile),
+      };
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return {
+        name: toJpegFileName(inputFile.name),
+        type: outputType,
+        data: await readFileAsDataUrl(inputFile),
+      };
+    }
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    const toBlob = () =>
+      new Promise((resolve) => {
+        canvas.toBlob(
+          (blob) => resolve(blob || null),
+          outputType,
+          quality
+        );
+      });
+    const blob = await toBlob();
+    if (!blob) {
+      return {
+        name: toJpegFileName(inputFile.name),
+        type: outputType,
+        data: await readFileAsDataUrl(inputFile),
+      };
+    }
+    const dataUrl = await readFileAsDataUrl(blob);
+    return {
+      name: toJpegFileName(inputFile.name),
+      type: outputType,
+      data: dataUrl,
+    };
+  }
+
+  function openPhotoUploadModal() {
+    if (LOCATION_EDIT_CONFIG?.enabled) {
+      openLocationEditAccessModal();
+      return;
+    }
+    const modal = el("photoUploadModal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+
+    const place = allPlaces.find(x => String(x.id) === String(selectedId));
+    const placeNameInput = el("photoUploadPlaceName");
+    if (placeNameInput) placeNameInput.value = place?.name || "";
+
+    const help = el("photoUploadHelp");
+    if (help) {
+      const maxFiles = Number(PHOTO_UPLOAD_CONFIG?.max_files || 6);
+      help.textContent = `สูงสุด ${maxFiles} รูป, รองรับ JPG/PNG/WebP/HEIC ระบบจะแปลงเป็น JPG และย่อให้ก่อนส่ง`;
+    }
+
+    setPhotoUploadMessage("success", "");
+  }
+
+  function closePhotoUploadModal() {
+    const modal = el("photoUploadModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    document.body.style.overflow = "";
+    const form = el("photoUploadForm");
+    if (form) form.reset();
+  }
+
+  (function bindPhotoUploadModal() {
+    const modal = el("photoUploadModal");
+    const openBtn = el("btnPlacePhotoUpload");
+    const closeBtn = el("closePhotoUploadModal");
+    const cancelBtn = el("cancelPhotoUpload");
+    const form = el("photoUploadForm");
+    const submitBtn = el("submitPhotoUpload");
+    if (!openBtn) return;
+
+    openBtn.classList.toggle("hidden", !PHOTO_UPLOAD_AVAILABLE);
+    if (!PHOTO_UPLOAD_AVAILABLE) return;
+
+    const openPhotoModalFromButton = () => {
+      if (!selectedId) return;
+      if (LOCATION_EDIT_CONFIG?.enabled) {
+        openLocationEditAccessModal();
+        return;
+      }
+      openPhotoUploadModal();
+    };
+    window.lcOpenPhotoUploadModal = openPhotoModalFromButton;
+    openBtn.addEventListener("click", openPhotoModalFromButton);
+    closeBtn?.addEventListener("click", closePhotoUploadModal);
+    cancelBtn?.addEventListener("click", closePhotoUploadModal);
     modal?.addEventListener("click", (e) => {
       const target = e.target;
       if (!(target instanceof Element)) return;
-      if (target.dataset.modalBackdrop === "1") closeReportModal();
+      if (target.dataset.modalBackdrop === "1") closePhotoUploadModal();
     });
 
+    if (!form) return;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!selectedId) {
-        setReportMessage("error", "ไม่พบรหัสสถานที่ กรุณาลองใหม่อีกครั้ง");
+        setPhotoUploadMessage("error", "ไม่พบรหัสสถานที่ กรุณาลองใหม่อีกครั้ง");
         return;
       }
 
-      const topics = Array.from(document.querySelectorAll('input[name="report_topics[]"]:checked'))
-        .map((el) => el.value);
-      const details = (el("reportDetails")?.value || "").trim();
-      const name = (el("reportName")?.value || "").trim();
-      const contact = (el("reportContact")?.value || "").trim();
+      const uploaderName = (el("photoUploaderName")?.value || "").trim();
+      const uploaderEmail = (el("photoUploaderEmail")?.value || "").trim();
+      const fileInput = el("photoUploadFiles");
+      const files = fileInput?.files ? Array.from(fileInput.files) : [];
+      const maxFiles = Number(PHOTO_UPLOAD_CONFIG?.max_files || 6);
+      const maxFileSizeMb = Number(PHOTO_UPLOAD_CONFIG?.max_file_size_mb || 8);
+      const maxBytes = maxFileSizeMb * 1024 * 1024;
+      const maxRawBytes = Math.max(maxBytes, 30 * 1024 * 1024);
 
-      if (!topics.length && details.length < 3) {
-        setReportMessage("error", "กรุณาเลือกหัวข้อ หรือพิมพ์รายละเอียดเพิ่มเติม");
+      if (!uploaderName) {
+        setPhotoUploadMessage("error", "กรุณากรอกชื่อผู้ส่ง");
         return;
+      }
+      if (!uploaderEmail) {
+        setPhotoUploadMessage("error", "กรุณากรอกอีเมลผู้ส่ง");
+        return;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(uploaderEmail)) {
+        setPhotoUploadMessage("error", "รูปแบบอีเมลไม่ถูกต้อง");
+        return;
+      }
+      if (!files.length) {
+        setPhotoUploadMessage("error", "กรุณาเลือกรูปอย่างน้อย 1 รูป");
+        return;
+      }
+      if (files.length > maxFiles) {
+        setPhotoUploadMessage("error", `อัปโหลดได้สูงสุด ${maxFiles} รูปต่อครั้ง`);
+        return;
+      }
+      for (const file of files) {
+        if (file.size > maxRawBytes) {
+          setPhotoUploadMessage("error", `ไฟล์ต้นฉบับใหญ่เกิน ${Math.round(maxRawBytes / (1024 * 1024))}MB`);
+          return;
+        }
       }
 
       submitBtn?.setAttribute("disabled", "disabled");
       submitBtn?.classList.add("opacity-60", "cursor-not-allowed");
-      setReportMessage("success", "กำลังส่งรายงาน...");
-
-      const fd = new FormData();
-      fd.append("action", "lc_report_location");
-      fd.append("nonce", REPORT_NONCE);
-      fd.append("location_id", String(selectedId));
-      topics.forEach(t => fd.append("topics[]", t));
-      fd.append("details", details);
-      fd.append("name", name);
-      fd.append("contact", contact);
-      const hp = el("reportWebsite")?.value || "";
-      fd.append("website", hp);
+      setPhotoUploadMessage("success", "กำลังส่งรูป...");
 
       try {
-        const res = await fetch(REPORT_AJAX_URL, { method: "POST", body: fd });
-        const json = await res.json();
-        if (!json || !json.success) {
-          throw new Error(json?.data?.message || "ส่งรายงานไม่สำเร็จ");
+        const imagesBase64 = [];
+        let totalPayloadBytes = 0;
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          setPhotoUploadMessage("success", `กำลังเตรียมรูป ${i + 1}/${files.length}...`);
+          const reduced = await downscaleImageFile(file, {
+            maxWidth: 1600,
+            maxHeight: 1600,
+            quality: 0.78,
+            maxSizeMB: 0.7,
+          });
+          totalPayloadBytes += (reduced.data || "").length;
+          imagesBase64.push(reduced);
         }
-        setReportMessage("success", "ขอบคุณครับ ทีมงานได้รับรายงานแล้ว");
-        setTimeout(() => closeReportModal(), 1200);
+
+        if (totalPayloadBytes > 6_000_000) {
+          setPhotoUploadMessage("error", "ขนาดรูปหลังย่อยังใหญ่เกินไป กรุณาเลือกภาพที่เล็กลง");
+          return;
+        }
+
+        const reducedFiles = imagesBase64.map((item, idx) => {
+          try {
+            return dataUrlToFile(item?.data, item?.name || `upload-${idx + 1}.jpg`, item?.type || "image/jpeg");
+          } catch (err) {
+            return null;
+          }
+        }).filter(Boolean);
+
+        const buildParams = (mode) => {
+          const p = new URLSearchParams();
+          if (mode === "admin_post") {
+            p.set("action", "lc_submit_place_photos_json");
+            if (PHOTO_UPLOAD_CONFIG?.submit_nonce) {
+              p.set("_lc_place_photo_nonce", String(PHOTO_UPLOAD_CONFIG.submit_nonce));
+            }
+          } else if (mode === "ajax") {
+            p.set("action", "lc_submit_place_photos_ajax");
+          }
+          p.set("location_id", String(selectedId));
+          p.set("uploader_name", uploaderName);
+          p.set("uploader_email", uploaderEmail);
+          p.set("images_base64", JSON.stringify(imagesBase64));
+          return p.toString();
+        };
+
+        const buildMultipart = (mode) => {
+          const fd = new FormData();
+          if (mode === "admin_post") {
+            fd.append("action", "lc_submit_place_photos_json");
+            if (PHOTO_UPLOAD_CONFIG?.submit_nonce) {
+              fd.append("_lc_place_photo_nonce", String(PHOTO_UPLOAD_CONFIG.submit_nonce));
+            }
+          } else if (mode === "ajax") {
+            fd.append("action", "lc_submit_place_photos_ajax");
+          }
+          fd.append("location_id", String(selectedId));
+          fd.append("uploader_name", uploaderName);
+          fd.append("uploader_email", uploaderEmail);
+          for (const f of reducedFiles) {
+            fd.append("place_images[]", f, f.name);
+          }
+          return fd;
+        };
+
+        const endpointQueue = [
+          { url: PHOTO_UPLOAD_CONFIG?.admin_post_url, mode: "admin_post", name: "admin-post", encoding: "multipart" },
+          { url: PHOTO_UPLOAD_CONFIG?.direct_url, mode: "direct", name: "direct", encoding: "multipart" },
+          { url: ADMIN_AJAX_URL, mode: "ajax", name: "ajax", encoding: "multipart" },
+          { url: PHOTO_UPLOAD_CONFIG?.admin_post_url, mode: "admin_post", name: "admin-post", encoding: "base64" },
+          { url: PHOTO_UPLOAD_CONFIG?.direct_url, mode: "direct", name: "direct", encoding: "base64" },
+          { url: ADMIN_AJAX_URL, mode: "ajax", name: "ajax", encoding: "base64" },
+        ].filter((x, idx, arr) => {
+          if (!x.url) return false;
+          return arr.findIndex((y) => y.url === x.url && y.mode === x.mode && y.encoding === x.encoding) === idx;
+        });
+
+        let successPayload = null;
+        let lastError = "ส่งรูปไม่สำเร็จ";
+
+        for (let i = 0; i < endpointQueue.length; i++) {
+          const item = endpointQueue[i];
+          setPhotoUploadMessage("success", `กำลังอัปโหลด... (${i + 1}/${endpointQueue.length})`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+          try {
+            const body = item.encoding === "multipart"
+              ? buildMultipart(item.mode)
+              : buildParams(item.mode);
+            const headers = item.encoding === "multipart"
+              ? { "X-Requested-With": "XMLHttpRequest" }
+              : {
+                  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                  "X-Requested-With": "XMLHttpRequest"
+                };
+
+            const res = await fetch(item.url, {
+              method: "POST",
+              body,
+              signal: controller.signal,
+              headers
+            });
+
+            const raw = await res.text();
+            let json = null;
+            try {
+              json = JSON.parse(raw);
+            } catch (err) {
+              json = null;
+            }
+
+            if (res.ok && json?.success) {
+              successPayload = json;
+              break;
+            }
+
+            const msg = json?.data?.message || json?.message || raw.slice(0, 160) || "ส่งรูปไม่สำเร็จ";
+            lastError = `[${item.name}:${item.encoding}] ${String(msg)}`;
+          } catch (err) {
+            if (err?.name === "AbortError") {
+              lastError = `[${item.name}:${item.encoding}] ใช้เวลานานเกินไป`;
+            } else {
+              lastError = `[${item.name}:${item.encoding}] ${String(err?.message || "ส่งรูปไม่สำเร็จ")}`;
+            }
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        }
+
+        if (!successPayload?.success) {
+          throw new Error(lastError);
+        }
+
+        setPhotoUploadMessage("success", successPayload?.data?.message || "ส่งรูปสำเร็จ");
+        setTimeout(() => closePhotoUploadModal(), 1400);
       } catch (err) {
-        setReportMessage("error", err.message || "ส่งรายงานไม่สำเร็จ");
+        const message = err?.name === "AbortError"
+          ? "ใช้เวลานานเกินไป กรุณาลองใหม่ด้วยรูปจำนวนน้อยลง"
+          : String(err?.message || "ส่งรูปไม่สำเร็จ");
+        setPhotoUploadMessage("error", message);
       } finally {
         submitBtn?.removeAttribute("disabled");
         submitBtn?.classList.remove("opacity-60", "cursor-not-allowed");
