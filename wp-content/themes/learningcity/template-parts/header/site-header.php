@@ -35,8 +35,7 @@ $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learni
                   แหล่งเรียนรู้
                   </a>
                </li>
-                <li><a href="#!" disabled>การเรียนรู้นอกระบบ<span>เร็วๆนี้</span></a></li>
-                <li><a href="#!" disabled>เกี่ยวกับโครงการ<span>เร็วๆนี้</span></a></li>
+               <li><a href="#!" disabled>บทความ<span>เร็วๆนี้</span></a></li>
              </ul>
           </nav>
           <div class="box-right">
@@ -77,8 +76,7 @@ $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learni
                 แหล่งเรียนรู้
              </a>
              </li>
-             <li><a href="#!" disabled>การเรียนรู้นอกระบบ<span>เร็วๆนี้</span></a></li>
-             <li><a href="#!" disabled>เกี่ยวกับโครงการ<span>เร็วๆนี้</span></a></li>
+             <li><a href="#!" disabled>บทความ<span>เร็วๆนี้</span></a></li>
           </ul>
           <a href="<?php echo site_url('/') ?>"><span class="logo-site"></span></a>
        </div>

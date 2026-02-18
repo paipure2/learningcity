@@ -16,4 +16,17 @@ add_action('after_setup_theme', function () {
     });
     // remove_theme_support('block-templates');
     add_theme_support('editor-styles');
+    add_theme_support('wp-block-styles');
+    add_theme_support('align-wide');
+    add_theme_support('custom-spacing');
+    add_theme_support('custom-line-height');
+    add_theme_support('custom-units');
+    add_theme_support('post-formats', ['aside', 'gallery', 'image', 'quote', 'video']);
 });
+
+add_filter('use_block_editor_for_post_type', function ($use_block_editor, $post_type) {
+    if ($post_type === 'post') {
+        return true;
+    }
+    return $use_block_editor;
+}, 10, 2);

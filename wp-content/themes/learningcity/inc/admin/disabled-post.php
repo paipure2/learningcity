@@ -1,4 +1,12 @@
 <?php
+/**
+ * Keep backward compatibility for environments that intentionally disable WP default posts.
+ * For normal use, posts stay enabled (required for the blog feature).
+ */
+if (!defined('LC_DISABLE_DEFAULT_POSTS') || LC_DISABLE_DEFAULT_POSTS !== true) {
+    return;
+}
+
 // 1. ซ่อนเมนู Post ด้านข้าง
 add_action('admin_menu', function () {
     remove_menu_page('edit.php');
@@ -38,7 +46,7 @@ add_action('admin_init', function () {
     }
 });
 
-// 6. 🔒 ลบเมนู "Post" ใน admin bar (+ New)
+// 6. ลบเมนู "Post" ใน admin bar (+ New)
 add_action('admin_bar_menu', function ($admin_bar) {
     $admin_bar->remove_node('new-post');
 }, 999);

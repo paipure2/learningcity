@@ -1,86 +1,114 @@
 <?php wp_footer(); ?>
-
+<?php $mourning_image = get_template_directory_uri() . '/assets/images/mourning-popup.jpg'; ?>
 <style>
-  /* Optional: map to your site's CSS variables if they exist */
-  :root {
-    --modal-bg: var(--background, #ffffff);
-    --modal-fg: var(--foreground, #111827);
-    --modal-muted: var(--muted-foreground, #6b7280);
-    --modal-border: var(--border, #e5e7eb);
-    --modal-primary: var(--primary, #111827);
-    --modal-primary-fg: var(--primary-foreground, #ffffff);
-    --modal-surface: var(--card, #ffffff);
+  #mourningModal {
+    position: fixed;
+    inset: 0;
+    z-index: 99999999;
+    display: none;
+  }
+  #mourningModal.is-open {
+    display: block;
+  }
+  #mourningModal .mourning-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.76);
+    backdrop-filter: blur(2px);
+    animation: fadeInMourning 0.35s ease both;
+  }
+  #mourningModal .mourning-wrap {
+    position: relative;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #mourningModal .mourning-panel {
+    width: min(92vw, 560px);
+    background: #0f0f10;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+    animation: panelInMourning 0.42s cubic-bezier(.2,.8,.2,1) both;
+  }
+  #mourningModal .mourning-image {
+    position: relative;
+    background: #000;
+  }
+  #mourningModal .mourning-image img {
+    display: block;
+    width: 100%;
+    height: auto;
+    animation: imageBreath 5s ease-in-out infinite;
+  }
+  #mourningModal .mourning-content {
+    padding: 14px 16px 16px;
+    color: #f4f4f4;
+    text-align: center;
+  }
+  #mourningModal .mourning-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+  #mourningModal .mourning-subtitle {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.82);
+    line-height: 1.6;
+  }
+  #mourningModal .mourning-actions {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+  }
+  #mourningModal .mourning-btn {
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  #mourningModal .mourning-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+  }
+  #mourningModal .mourning-btn:active {
+    transform: translateY(1px);
+  }
+  @keyframes fadeInMourning {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes panelInMourning {
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes imageBreath {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.015); }
+    100% { transform: scale(1); }
   }
 </style>
 
-<div id="welcomeModal" class="fixed inset-0 z-99999999 hidden" role="dialog" aria-modal="true">
-  <!-- Backdrop -->
-  <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
-
-  <!-- Panel -->
-  <div class="relative flex min-h-full items-center justify-center p-4">
-    <div
-      class="w-full max-w-2xl rounded-2xl shadow-2xl"
-      style="background: var(--modal-surface); color: var(--modal-fg);"
-    >
-      <div class="flex items-start justify-between gap-4 px-6 py-4 border-b" style="border-color: var(--modal-border);">
-        <div class="min-w-0">
-          <h2 class="text-lg font-semibold tracking-tight" id="welcome-title">
-            เว็บไซต์นี้อยู่ในช่วงทดสอบระบบ
-          </h2>
-      
+<div id="mourningModal" role="dialog" aria-modal="true" aria-label="ประกาศไว้อาลัย">
+  <div class="mourning-overlay"></div>
+  <div class="mourning-wrap">
+    <div class="mourning-panel">
+      <div class="mourning-image">
+        <img src="<?php echo esc_url($mourning_image); ?>" alt="ประกาศไว้อาลัย">
+      </div>
+      <div class="mourning-content">
+        <div class="mourning-actions">
+          <button type="button" id="mourningAcknowledge" class="mourning-btn">เข้าสู่เว็บไซต์</button>
         </div>
-
-        <button
-          type="button"
-          id="welcomeCloseBtn"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-black/5 focus:outline-none focus:ring-2 focus:ring-black/20"
-          aria-label="ปิดหน้าต่าง"
-        >
-          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-      </div>
-
-      <div class="px-6 py-5 text-sm leading-relaxed">
-        <p>
-          เว็บไซต์นี้อยู่ในช่วงทดสอบระบบ ทีมงานกทม. ในหน่วยงานต่างๆ ได้แก่
-        </p>
-
-        <ul class="mt-3 list-disc space-y-1 pl-6">
-          <li>ศูนย์นันทนาการ</li>
-          <li>ศูนย์บริการผู้สูงอายุ</li>
-          <li>ศูนย์ฝึกอาชีพกทม.(สังกัดสำนักงานเขต)</li>
-          <li>โรงเรียนฝึกอาชีพ</li>
-        </ul>
-
-        <p class="mt-4">
-          กรุณาตรวจสอบข้อมูลความถูกต้องของเนื้อหา
-          และหากพบว่าข้อมูลส่วนใดผิดพลาดสามารถแจ้งทีมงานได้ตามช่องทางที่กำหนด
-        </p>
-
-      </div>
-
-      <div class="flex flex-col-reverse gap-2 px-6 py-4 border-t sm:flex-row sm:justify-end" style="border-color: var(--modal-border);">
-        <button
-          type="button"
-          id="welcomeOkBtn"
-          class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold"
-          style="background: var(--modal-primary); color: var(--modal-primary-fg);"
-        >
-          รับทราบ
-        </button>
-
-        <button
-          type="button"
-          id="welcomeHideBtn"
-          class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold border hover:bg-black/5"
-          style="border-color: var(--modal-border);"
-          title="ซ่อนและไม่แสดงอีกในเบราว์เซอร์นี้"
-        >
-          ไม่ต้องแสดงอีก
-        </button>
       </div>
     </div>
   </div>
@@ -88,39 +116,50 @@
 
 <script>
   (function () {
-    const modal = document.getElementById("welcomeModal");
-    const closeBtn = document.getElementById("welcomeCloseBtn");
-    const okBtn = document.getElementById("welcomeOkBtn");
-    const hideBtn = document.getElementById("welcomeHideBtn");
-    const STORAGE_KEY = "welcome_modal_dismissed_v1";
+    var modal = document.getElementById("mourningModal");
+    var acknowledgeBtn = document.getElementById("mourningAcknowledge");
+    var STORAGE_KEY = "mourning_modal_expire_at_v1";
+    var ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+    if (!modal || !acknowledgeBtn) return;
+
+    function now() {
+      return Date.now();
+    }
+
+    function shouldShow() {
+      var expireAt = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10);
+      return !expireAt || now() >= expireAt;
+    }
 
     function openModal() {
-      modal.classList.remove("hidden");
+      modal.classList.add("is-open");
       document.body.style.overflow = "hidden";
     }
-    function closeModal() {
-      modal.classList.add("hidden");
+
+    function closeModalAndCache() {
+      localStorage.setItem(STORAGE_KEY, String(now() + ONE_DAY_MS));
+      modal.classList.remove("is-open");
       document.body.style.overflow = "";
     }
 
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      window.addEventListener("load", () => setTimeout(openModal, 120));
+    if (shouldShow()) {
+      window.addEventListener("load", function () {
+        setTimeout(openModal, 180);
+      });
     }
 
-    closeBtn.addEventListener("click", closeModal);
-    okBtn.addEventListener("click", closeModal);
-    hideBtn.addEventListener("click", () => {
-      localStorage.setItem(STORAGE_KEY, "1");
-      closeModal();
+    acknowledgeBtn.addEventListener("click", closeModalAndCache);
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal || e.target.classList.contains("mourning-overlay")) {
+        closeModalAndCache();
+      }
     });
 
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
-    });
-
-    // clicking backdrop
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal();
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && modal.classList.contains("is-open")) {
+        closeModalAndCache();
+      }
     });
   })();
 </script>

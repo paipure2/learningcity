@@ -1153,9 +1153,9 @@
     "location": [
         [
             {
-                "param": "page_type",
+                "param": "options_page",
                 "operator": "==",
-                "value": "front_page"
+                "value": "lc-home-policy"
             }
         ]
     ],
@@ -1177,5 +1177,5 @@
     "acfe_form": 0,
     "acfe_meta": "",
     "acfe_note": "",
-    "modified": 1772416199
+    "modified": 1771426532
 }

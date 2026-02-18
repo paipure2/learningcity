@@ -197,6 +197,119 @@ if (!function_exists('load_course_modal')) {
   }
 }
 
+/* =========================================================
+ * [FRONT] AJAX Modal Search (No plugin)
+ * ========================================================= */
+add_action('wp_enqueue_scripts', function () {
+  $script_path = get_template_directory() . '/assets/scripts/modules/modal-search-ajax.js';
+  wp_enqueue_script(
+    'lc-modal-search-ajax',
+    get_template_directory_uri() . '/assets/scripts/modules/modal-search-ajax.js',
+    [],
+    file_exists($script_path) ? filemtime($script_path) : null,
+    true
+  );
+
+  wp_add_inline_script(
+    'lc-modal-search-ajax',
+    'window.LC_MODAL_SEARCH = ' . wp_json_encode([
+      'ajax_url' => admin_url('admin-ajax.php'),
+      'nonce'    => wp_create_nonce('lc_modal_search_nonce'),
+    ]) . ';',
+    'before'
+  );
+}, 35);
+
+if (!function_exists('lc_modal_search_collect_sections')) {
+  function lc_modal_search_clean_text($text = '') {
+    $text = wp_strip_all_tags((string) $text);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace('/\s+/u', ' ', $text);
+    return trim((string) $text);
+  }
+
+  function lc_modal_search_collect_sections($query = '') {
+    $query = trim((string) $query);
+    $limit = 6;
+
+    $popular_keywords = [];
+    $popular_terms = get_terms([
+      'taxonomy'   => 'course_category',
+      'parent'     => 0,
+      'hide_empty' => true,
+      'orderby'    => 'count',
+      'order'      => 'DESC',
+      'number'     => $limit,
+    ]);
+
+    if (!is_wp_error($popular_terms) && is_array($popular_terms)) {
+      foreach ($popular_terms as $term) {
+        $popular_keywords[] = (string) $term->name;
+      }
+    }
+
+    $nextlearn = [];
+    $course_query = new WP_Query([
+      'post_type'           => 'course',
+      'post_status'         => 'publish',
+      'posts_per_page'      => $limit,
+      's'                   => $query,
+      'ignore_sticky_posts' => true,
+      'no_found_rows'       => true,
+    ]);
+
+    if ($course_query->have_posts()) {
+      while ($course_query->have_posts()) {
+        $course_query->the_post();
+        $nextlearn[] = [
+          'title'    => lc_modal_search_clean_text(get_the_title()),
+          'url'      => get_permalink(),
+          'subtitle' => lc_modal_search_clean_text(wp_trim_words(get_the_excerpt(), 12)),
+        ];
+      }
+      wp_reset_postdata();
+    }
+
+    $locations = [];
+    $location_query = new WP_Query([
+      'post_type'           => 'location',
+      'post_status'         => 'publish',
+      'posts_per_page'      => $limit,
+      's'                   => $query,
+      'ignore_sticky_posts' => true,
+      'no_found_rows'       => true,
+    ]);
+
+    if ($location_query->have_posts()) {
+      while ($location_query->have_posts()) {
+        $location_query->the_post();
+        $locations[] = [
+          'title'    => lc_modal_search_clean_text(get_the_title()),
+          'url'      => get_permalink(),
+          'subtitle' => lc_modal_search_clean_text(wp_trim_words(get_the_excerpt(), 12)),
+        ];
+      }
+      wp_reset_postdata();
+    }
+
+    return [
+      'popular_keywords' => $popular_keywords,
+      'nextlearn'   => $nextlearn,
+      'locations'   => $locations,
+    ];
+  }
+}
+
+add_action('wp_ajax_lc_modal_search', 'lc_modal_search_ajax');
+add_action('wp_ajax_nopriv_lc_modal_search', 'lc_modal_search_ajax');
+if (!function_exists('lc_modal_search_ajax')) {
+  function lc_modal_search_ajax() {
+    check_ajax_referer('lc_modal_search_nonce', 'nonce');
+    $query = isset($_POST['q']) ? sanitize_text_field(wp_unslash($_POST['q'])) : '';
+    wp_send_json_success(lc_modal_search_collect_sections($query));
+  }
+}
+
 // Enqueue BLM assets only on BLM page template
 add_action('wp_enqueue_scripts', function () {
   if (!is_page_template('page-blm.php')) return;
@@ -942,7 +1055,59 @@ function nav_active($args = []) {
     return 'active';
   }
 
+  // blog pages
+  if (!empty($args['blog']) && (is_home() || is_singular('post') || is_category() || is_tag())) {
+    return 'active';
+  }
+
   return '';
+}
+
+/* =========================================================
+ * [BLOG] Helpers
+ * ========================================================= */
+function lc_get_share_links($post_id = 0) {
+    $post_id = $post_id ? (int) $post_id : get_the_ID();
+    if (!$post_id) {
+        return [];
+    }
+
+    $title = rawurlencode(wp_strip_all_tags(get_the_title($post_id)));
+    $url   = rawurlencode(get_permalink($post_id));
+
+    return [
+        'facebook' => 'https://www.facebook.com/sharer/sharer.php?u=' . $url,
+        'x'        => 'https://twitter.com/intent/tweet?text=' . $title . '&url=' . $url,
+        'line'     => 'https://social-plugins.line.me/lineit/share?url=' . $url,
+        'copy'     => get_permalink($post_id),
+    ];
+}
+
+function lc_get_related_posts($post_id = 0, $limit = 3) {
+    $post_id = $post_id ? (int) $post_id : get_the_ID();
+    if (!$post_id) {
+        return new WP_Query(['post__in' => [0]]);
+    }
+
+    $categories = wp_get_post_categories($post_id, ['fields' => 'ids']);
+    if (empty($categories)) {
+        return new WP_Query([
+            'post_type'           => 'post',
+            'post_status'         => 'publish',
+            'post__not_in'        => [$post_id],
+            'posts_per_page'      => (int) $limit,
+            'ignore_sticky_posts' => true,
+        ]);
+    }
+
+    return new WP_Query([
+        'post_type'           => 'post',
+        'post_status'         => 'publish',
+        'post__not_in'        => [$post_id],
+        'posts_per_page'      => (int) $limit,
+        'ignore_sticky_posts' => true,
+        'category__in'        => $categories,
+    ]);
 }
 
 
@@ -1787,6 +1952,16 @@ add_action('admin_menu', function () {
 
     $capability = 'edit_pages';
 
+    $homepage_hook = add_menu_page(
+        'Homepage',
+        'Homepage',
+        $capability,
+        'lc-home-homepage',
+        '__return_null',
+        'dashicons-admin-home',
+        25.0
+    );
+
     $widget_hook = add_menu_page(
         'Widget',
         'Widget',
@@ -1817,6 +1992,12 @@ add_action('admin_menu', function () {
         25.3
     );
 
+    if ($homepage_hook) {
+        add_action('load-' . $homepage_hook, function () {
+            lc_admin_redirect_to_homepage_tab('homepage-content');
+        });
+    }
+
     if ($widget_hook) {
         add_action('load-' . $widget_hook, function () {
             lc_admin_redirect_to_homepage_tab('widget-section');
@@ -1835,6 +2016,49 @@ add_action('admin_menu', function () {
         });
     }
 }, 99);
+
+/* =========================================================
+ * [ADMIN STABILITY] Normalize plugin update transient objects
+ * - Prevent warning: Undefined property stdClass::$plugin
+ * ========================================================= */
+if (!function_exists('lc_normalize_update_plugins_transient')) {
+    function lc_normalize_update_plugins_transient($transient) {
+        if (!is_object($transient)) {
+            return $transient;
+        }
+
+        foreach (['response', 'no_update'] as $bucket) {
+            if (!isset($transient->{$bucket})) {
+                continue;
+            }
+
+            $items = $transient->{$bucket};
+            if (is_object($items)) {
+                $items = (array) $items;
+            }
+            if (!is_array($items)) {
+                continue;
+            }
+
+            foreach ($items as $plugin_file => $item) {
+                if (is_object($item) && empty($item->plugin)) {
+                    $item->plugin = (string) $plugin_file;
+                    $items[$plugin_file] = $item;
+                } elseif (is_array($item) && empty($item['plugin'])) {
+                    $item['plugin'] = (string) $plugin_file;
+                    $items[$plugin_file] = $item;
+                }
+            }
+
+            $transient->{$bucket} = $items;
+        }
+
+        return $transient;
+    }
+}
+
+add_filter('site_transient_update_plugins', 'lc_normalize_update_plugins_transient', 5);
+add_filter('pre_set_site_transient_update_plugins', 'lc_normalize_update_plugins_transient', 5);
 
 /* =========================================================
  * [ADMIN PAGE] Generic tabs for ACF field groups on Homepage

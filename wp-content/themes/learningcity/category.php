@@ -7,10 +7,10 @@
         <div class="container">
             <section class="lc-blog-wrap">
                 <header class="lc-blog-hero">
-                    <p class="lc-blog-hero__eyebrow">แท็ก</p>
-                    <h1 class="lc-blog-hero__title">#<?php single_tag_title(); ?></h1>
-                    <?php if (tag_description()) : ?>
-                        <div class="lc-blog-hero__desc"><?php echo wp_kses_post(tag_description()); ?></div>
+                    <p class="lc-blog-hero__eyebrow">หมวดหมู่</p>
+                    <h1 class="lc-blog-hero__title"><?php single_cat_title(); ?></h1>
+                    <?php if (category_description()) : ?>
+                        <div class="lc-blog-hero__desc"><?php echo wp_kses_post(category_description()); ?></div>
                     <?php endif; ?>
                 </header>
 
@@ -31,7 +31,7 @@
                         ?>
                     </div>
                 <?php else : ?>
-                    <p class="lc-blog-empty">ยังไม่มีบทความที่ใช้แท็กนี้</p>
+                    <p class="lc-blog-empty">ยังไม่มีบทความในหมวดหมู่นี้</p>
                 <?php endif; ?>
             </section>
 
