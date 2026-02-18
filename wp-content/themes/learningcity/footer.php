@@ -164,6 +164,115 @@
   })();
 </script>
 
+<style>
+  #pdpaConsentBar {
+    position: fixed;
+    left: 20px;
+    right: auto;
+    bottom: 14px;
+    z-index: 99999998;
+    display: none;
+    width: calc(100vw - 40px);
+    max-width: 450px;
+    background: #ededed;
+    border: 1px solid #c9c9c9;
+    border-radius: 22px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 12px 14px;
+  }
+  #pdpaConsentBar.is-open {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  #pdpaConsentBar .pdpa-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.35;
+    font-weight: 400;
+    color: #1f2937;
+  }
+  #pdpaConsentBar .pdpa-text a {
+    color: #00744b;
+    font-weight: 600;
+    text-decoration: underline;
+  }
+  #pdpaConsentBar .pdpa-btn {
+    border: 0;
+    border-radius: 999px;
+    background: #00744b;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08) inset;
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  #pdpaConsentBar .pdpa-btn:hover {
+    filter: brightness(0.95);
+  }
+  #pdpaConsentBar .pdpa-btn:active {
+    transform: translateY(1px);
+  }
+  @media (max-width: 640px) {
+    #pdpaConsentBar.is-open {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    #pdpaConsentBar {
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      width: auto;
+      max-width: none;
+    }
+    #pdpaConsentBar .pdpa-text {
+      font-size: 14px;
+    }
+    #pdpaConsentBar .pdpa-btn {
+      width: 100%;
+      font-size: 18px;
+      padding: 10px 18px;
+    }
+  }
+</style>
+
+<div id="pdpaConsentBar" role="dialog" aria-live="polite" aria-label="การยอมรับ PDPA">
+  <p class="pdpa-text">เว็บไซต์นี้มีการใช้งานข้อมูลตาม <a href="https://www.bangkok.go.th/privacy" target="_blank" rel="noopener noreferrer">นโยบายความเป็นส่วนตัว</a></p>
+  <button type="button" id="pdpaAcceptBtn" class="pdpa-btn">ยอมรับ</button>
+</div>
+
+<script>
+  (function () {
+    var bar = document.getElementById("pdpaConsentBar");
+    var acceptBtn = document.getElementById("pdpaAcceptBtn");
+    var PDPA_KEY = "pdpa_consent_v1";
+
+    if (!bar || !acceptBtn) return;
+
+    try {
+      if (localStorage.getItem(PDPA_KEY) !== "accepted") {
+        bar.classList.add("is-open");
+      }
+    } catch (e) {
+      bar.classList.add("is-open");
+    }
+
+    acceptBtn.addEventListener("click", function () {
+      try {
+        localStorage.setItem(PDPA_KEY, "accepted");
+      } catch (e) {}
+      bar.classList.remove("is-open");
+    });
+  })();
+</script>
+
 
 
 </body>

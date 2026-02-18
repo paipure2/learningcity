@@ -6,13 +6,8 @@
 
   if (!input || !modal || !cfg.ajax_url || !cfg.nonce) return;
 
-  const quickTitle = modal.querySelector('#lc-search-quick-title');
-  const listQuick = modal.querySelector('[data-list="quick"]');
   const listNextlearn = modal.querySelector('[data-list="nextlearn"]');
   const listLocations = modal.querySelector('[data-list="locations"]');
-
-  const HISTORY_KEY = 'lc_modal_search_history_v1';
-  const HISTORY_MAX = 8;
 
   let activeController = null;
   let debounceTimer = null;
@@ -26,47 +21,6 @@
       .replace(/'/g, '&#039;');
   }
 
-  function readHistory() {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(arr)) return [];
-      return arr.filter((v) => typeof v === 'string' && v.trim() !== '').slice(0, HISTORY_MAX);
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function writeHistory(history) {
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, HISTORY_MAX)));
-    } catch (e) {
-      // ignore storage errors
-    }
-  }
-
-  function pushHistory(query) {
-    const q = String(query || '').trim();
-    if (q.length < 2) return;
-
-    const current = readHistory().filter((v) => v.toLowerCase() !== q.toLowerCase());
-    current.unshift(q);
-    writeHistory(current);
-  }
-
-  function renderQuickChips(chips, emptyText) {
-    if (!listQuick) return;
-
-    if (!Array.isArray(chips) || !chips.length) {
-      listQuick.innerHTML = `<div class="lc-search-empty">${esc(emptyText || 'ยังไม่มีข้อมูล')}</div>`;
-      return;
-    }
-
-    listQuick.innerHTML = `<div class="lc-search-chip-wrap">${chips
-      .map((label) => `<button type="button" class="lc-search-chip" data-chip-query="${esc(label)}">${esc(label)}</button>`)
-      .join('')}</div>`;
-  }
-
   function renderListItems(container, items) {
     if (!container) return;
 
@@ -77,29 +31,14 @@
 
     container.innerHTML = items
       .map((item) => {
-        const subtitle = item.subtitle ? `<div class="lc-search-item__sub">${esc(item.subtitle)}</div>` : '';
-        return `<a class="lc-search-item" href="${esc(item.url)}"><span class="lc-search-item__title">${esc(
-          item.title
-        )}</span>${subtitle}</a>`;
+        const badge = item.badge ? `<span class="lc-search-item__badge">${esc(item.badge)}</span>` : '';
+        return `<a class="lc-search-item" href="${esc(item.url)}"><span class="lc-search-item__head"><span class="lc-search-item__title">${esc(item.title)}</span>${badge}</span></a>`;
       })
       .join('');
   }
 
   function setMeta(text) {
     if (meta) meta.textContent = text;
-  }
-
-  function renderQuickSection(popularKeywords) {
-    const history = readHistory();
-
-    if (history.length > 0) {
-      if (quickTitle) quickTitle.textContent = 'ประวัติการค้นหา';
-      renderQuickChips(history, 'ยังไม่มีประวัติการค้นหา');
-      return;
-    }
-
-    if (quickTitle) quickTitle.textContent = 'คำค้นหาบ่อย';
-    renderQuickChips(popularKeywords || [], 'ยังไม่มีคำค้นหาบ่อย');
   }
 
   async function requestSearch(query) {
@@ -133,16 +72,14 @@
     try {
       const data = await requestSearch(q);
 
-      if (q.length >= 2 && ((data.nextlearn || []).length > 0 || (data.locations || []).length > 0)) {
-        pushHistory(q);
+      if (q.length >= 2 && window.LCAnalytics && typeof window.LCAnalytics.trackSearch === 'function') {
+        window.LCAnalytics.trackSearch(q);
       }
 
-      renderQuickSection(data.popular_keywords || []);
       renderListItems(listNextlearn, data.nextlearn || []);
       renderListItems(listLocations, data.locations || []);
     } catch (error) {
       if (error && error.name === 'AbortError') return;
-      renderQuickSection([]);
       renderListItems(listNextlearn, []);
       renderListItems(listLocations, []);
       setMeta('เกิดข้อผิดพลาดในการค้นหา');
@@ -155,16 +92,6 @@
   }
 
   input.addEventListener('input', scheduleSearch);
-
-  modal.addEventListener('click', (event) => {
-    const chip = event.target.closest('[data-chip-query]');
-    if (!chip) return;
-
-    const q = chip.getAttribute('data-chip-query') || '';
-    input.value = q;
-    input.focus();
-    runSearch(q);
-  });
 
   document.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-modal-id="modal-search"]');

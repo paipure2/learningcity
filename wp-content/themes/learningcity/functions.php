@@ -221,18 +221,47 @@ add_action('wp_enqueue_scripts', function () {
 }, 35);
 
 if (!function_exists('lc_modal_search_collect_sections')) {
-  function lc_modal_search_clean_text($text = '') {
-    $text = wp_strip_all_tags((string) $text);
-    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $text = preg_replace('/\s+/u', ' ', $text);
-    return trim((string) $text);
-  }
+  function lc_modal_search_get_popular_keywords($limit = 6) {
+    global $wpdb;
 
-  function lc_modal_search_collect_sections($query = '') {
-    $query = trim((string) $query);
-    $limit = 6;
+    $limit = max(1, min(20, absint($limit)));
+    $keywords = [];
 
-    $popular_keywords = [];
+    $table = $wpdb->prefix . 'lc_analytics_events';
+    $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+
+    if ($table_exists === $table) {
+      $rows = $wpdb->get_results(
+        $wpdb->prepare(
+          "SELECT keyword, COUNT(*) AS total
+           FROM {$table}
+           WHERE event_type = %s
+             AND keyword <> ''
+             AND created_at >= DATE_SUB(%s, INTERVAL %d DAY)
+           GROUP BY keyword
+           ORDER BY total DESC
+           LIMIT %d",
+          'search_keyword',
+          current_time('mysql'),
+          30,
+          $limit
+        )
+      );
+
+      if (!empty($rows) && is_array($rows)) {
+        foreach ($rows as $row) {
+          $keyword = lc_modal_search_clean_text($row->keyword ?? '');
+          if ($keyword !== '') {
+            $keywords[] = $keyword;
+          }
+        }
+      }
+    }
+
+    if (!empty($keywords)) {
+      return array_values(array_unique($keywords));
+    }
+
     $popular_terms = get_terms([
       'taxonomy'   => 'course_category',
       'parent'     => 0,
@@ -244,53 +273,277 @@ if (!function_exists('lc_modal_search_collect_sections')) {
 
     if (!is_wp_error($popular_terms) && is_array($popular_terms)) {
       foreach ($popular_terms as $term) {
-        $popular_keywords[] = (string) $term->name;
+        $term_name = lc_modal_search_clean_text($term->name ?? '');
+        if ($term_name !== '') {
+          $keywords[] = $term_name;
+        }
       }
     }
 
-    $nextlearn = [];
-    $course_query = new WP_Query([
-      'post_type'           => 'course',
-      'post_status'         => 'publish',
-      'posts_per_page'      => $limit,
-      's'                   => $query,
-      'ignore_sticky_posts' => true,
-      'no_found_rows'       => true,
-    ]);
+    return array_values(array_unique($keywords));
+  }
 
-    if ($course_query->have_posts()) {
-      while ($course_query->have_posts()) {
-        $course_query->the_post();
-        $nextlearn[] = [
-          'title'    => lc_modal_search_clean_text(get_the_title()),
-          'url'      => get_permalink(),
-          'subtitle' => lc_modal_search_clean_text(wp_trim_words(get_the_excerpt(), 12)),
+  function lc_modal_search_clean_text($text = '') {
+    $text = wp_strip_all_tags((string) $text);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = preg_replace('/\s+/u', ' ', $text);
+    return trim((string) $text);
+  }
+
+  function lc_modal_search_collect_sections($query = '') {
+    $query = trim((string) $query);
+    $limit = 6;
+    $has_query = ($query !== '');
+
+    $popular_keywords = lc_modal_search_get_popular_keywords($limit);
+    $blm_pages = get_posts([
+      'post_type'      => 'page',
+      'posts_per_page' => 1,
+      'meta_key'       => '_wp_page_template',
+      'meta_value'     => 'page-blm.php',
+      'post_status'    => 'publish',
+      'fields'         => 'ids',
+    ]);
+    $learning_map_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
+
+    $get_top_viewed_ids = function ($post_type, $limit = 6) {
+      global $wpdb;
+
+      $post_type = sanitize_key((string) $post_type);
+      $limit = max(1, min(30, absint($limit)));
+
+      if ($post_type === 'course') {
+        $object_type = 'course';
+        $event_type = 'course_view';
+      } elseif ($post_type === 'location') {
+        $object_type = 'location';
+        $event_type = 'location_view';
+      } else {
+        return [];
+      }
+
+      $table = $wpdb->prefix . 'lc_analytics_events';
+      $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+      if ($table_exists !== $table) return [];
+
+      $rows = $wpdb->get_col(
+        $wpdb->prepare(
+          "SELECT e.object_id
+           FROM {$table} e
+           INNER JOIN {$wpdb->posts} p ON p.ID = e.object_id
+           WHERE e.object_type = %s
+             AND e.event_type = %s
+             AND e.object_id > 0
+             AND p.post_type = %s
+             AND p.post_status = 'publish'
+           GROUP BY e.object_id
+           ORDER BY COUNT(*) DESC, MAX(e.created_at) DESC
+           LIMIT %d",
+          $object_type,
+          $event_type,
+          $post_type,
+          $limit
+        )
+      );
+
+      return array_values(array_filter(array_map('absint', (array) $rows)));
+    };
+
+    $collect_items = function ($post_type, $taxonomies = []) use ($query, $limit, $has_query, $learning_map_url, $get_top_viewed_ids) {
+      $ids = [];
+      $text_hit_ids = [];
+      $meta_hit_ids = [];
+      $taxonomy_items = [];
+      $search_pool_limit = max($limit * 3, 18);
+
+      if ($has_query) {
+        $taxonomy_term_map = [];
+        $text_hit_ids = get_posts([
+          'post_type'              => $post_type,
+          'post_status'            => 'publish',
+          'posts_per_page'         => $search_pool_limit,
+          'fields'                 => 'ids',
+          's'                      => $query,
+          'ignore_sticky_posts'    => true,
+          'no_found_rows'          => true,
+          'orderby'                => 'date',
+          'order'                  => 'DESC',
+          'update_post_meta_cache' => false,
+          'update_post_term_cache' => false,
+        ]);
+        $ids = $text_hit_ids;
+
+        $tax_query = ['relation' => 'OR'];
+        foreach ((array) $taxonomies as $taxonomy) {
+          $taxonomy = sanitize_key((string) $taxonomy);
+          if ($taxonomy === '') continue;
+
+          $term_ids = get_terms([
+            'taxonomy'   => $taxonomy,
+            'hide_empty' => true,
+            'fields'     => 'ids',
+            'name__like' => $query,
+            'number'     => 20,
+          ]);
+
+          if (!is_wp_error($term_ids) && !empty($term_ids)) {
+            foreach ((array) $term_ids as $term_id) {
+              $term_id = absint($term_id);
+              if ($term_id > 0) {
+                $taxonomy_term_map[$taxonomy][] = $term_id;
+              }
+            }
+            $tax_query[] = [
+              'taxonomy' => $taxonomy,
+              'field'    => 'term_id',
+              'terms'    => array_map('absint', (array) $term_ids),
+              'operator' => 'IN',
+            ];
+          }
+        }
+
+        if (count($tax_query) > 1) {
+          $tax_ids = get_posts([
+            'post_type'              => $post_type,
+            'post_status'            => 'publish',
+            'posts_per_page'         => $search_pool_limit,
+            'fields'                 => 'ids',
+            'tax_query'              => $tax_query,
+            'ignore_sticky_posts'    => true,
+            'no_found_rows'          => true,
+            'orderby'                => 'date',
+            'order'                  => 'DESC',
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
+          ]);
+          $ids = array_merge((array) $ids, array_values(array_unique(array_filter(array_map('absint', (array) $tax_ids)))));
+        }
+
+        if (!empty($taxonomy_term_map)) {
+          foreach ($taxonomy_term_map as $taxonomy => $term_ids) {
+            $terms = get_terms([
+              'taxonomy'   => $taxonomy,
+              'hide_empty' => true,
+              'include'    => array_values(array_unique(array_filter(array_map('absint', (array) $term_ids)))),
+            ]);
+            if (is_wp_error($terms) || empty($terms)) continue;
+
+            foreach ($terms as $term) {
+              if (!($term instanceof WP_Term)) continue;
+              $title = lc_modal_search_clean_text($term->name);
+              if ($title === '') continue;
+
+              if ($post_type === 'location') {
+                $map_args = [];
+                if ($taxonomy === 'location-type') {
+                  $map_args['categories'] = (string) $term->slug;
+                } elseif ($taxonomy === 'age_range') {
+                  $map_args['tags'] = (string) $term->slug;
+                } elseif ($taxonomy === 'facility') {
+                  $map_args['amenities'] = (string) $term->slug;
+                } elseif ($taxonomy === 'admission_policy') {
+                  $map_args['admission'] = (string) $term->slug;
+                } elseif ($taxonomy === 'district') {
+                  $map_args['district'] = (string) $term->slug;
+                } else {
+                  $map_args['categories'] = (string) $term->slug;
+                }
+                $url = add_query_arg($map_args, $learning_map_url);
+              } else {
+                $url = get_term_link($term);
+              }
+              if (is_wp_error($url) || !$url) continue;
+
+              $taxonomy_items[] = [
+                'title' => $title,
+                'url'   => $url,
+                'badge' => 'หมวดหมู่',
+              ];
+            }
+          }
+        }
+
+        global $wpdb;
+        $like = '%' . $wpdb->esc_like($query) . '%';
+        $sql = $wpdb->prepare(
+          "SELECT DISTINCT p.ID
+           FROM {$wpdb->posts} p
+           INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+           WHERE p.post_type = %s
+             AND p.post_status = 'publish'
+             AND pm.meta_key NOT LIKE %s
+             AND pm.meta_value LIKE %s
+           ORDER BY p.post_date DESC
+           LIMIT %d",
+          $post_type,
+          '\_%',
+          $like,
+          $search_pool_limit
+        );
+        $meta_hit_ids = array_values(array_filter(array_map('absint', (array) $wpdb->get_col($sql))));
+        if (!empty($meta_hit_ids)) {
+          $ids = array_merge((array) $ids, $meta_hit_ids);
+        }
+
+      } else {
+        $ids = $get_top_viewed_ids($post_type, $limit);
+        if (empty($ids)) {
+          $ids = get_posts([
+            'post_type'              => $post_type,
+            'post_status'            => 'publish',
+            'posts_per_page'         => $limit,
+            'fields'                 => 'ids',
+            'ignore_sticky_posts'    => true,
+            'no_found_rows'          => true,
+            'orderby'                => 'date',
+            'order'                  => 'DESC',
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false,
+          ]);
+        }
+      }
+
+      $ids = array_values(array_unique(array_filter(array_map('absint', (array) $ids))));
+      $post_items = [];
+      foreach ($ids as $post_id) {
+        $title = lc_modal_search_clean_text(get_the_title((int) $post_id));
+        $url = get_permalink((int) $post_id);
+        if ($title === '' || !$url) continue;
+        $post_items[] = [
+          'title' => $title,
+          'url'   => $url,
+          'badge' => '',
         ];
       }
-      wp_reset_postdata();
-    }
 
-    $locations = [];
-    $location_query = new WP_Query([
-      'post_type'           => 'location',
-      'post_status'         => 'publish',
-      'posts_per_page'      => $limit,
-      's'                   => $query,
-      'ignore_sticky_posts' => true,
-      'no_found_rows'       => true,
-    ]);
+      $merged = array_merge($taxonomy_items, $post_items);
+      if (empty($merged)) return [];
 
-    if ($location_query->have_posts()) {
-      while ($location_query->have_posts()) {
-        $location_query->the_post();
-        $locations[] = [
-          'title'    => lc_modal_search_clean_text(get_the_title()),
-          'url'      => get_permalink(),
-          'subtitle' => lc_modal_search_clean_text(wp_trim_words(get_the_excerpt(), 12)),
-        ];
+      $unique = [];
+      $seen = [];
+      foreach ($merged as $item) {
+        $key = strtolower(trim((string) ($item['url'] ?? ''))) . '|' . strtolower(trim((string) ($item['title'] ?? '')));
+        if ($key === '|' || isset($seen[$key])) continue;
+        $seen[$key] = true;
+        $unique[] = $item;
+        if (count($unique) >= $limit) break;
       }
-      wp_reset_postdata();
-    }
+
+      return $unique;
+    };
+
+    $course_taxonomies = array_values(array_filter((array) get_object_taxonomies('course', 'names'), function ($taxonomy) {
+      $obj = get_taxonomy($taxonomy);
+      return ($obj && !empty($obj->public));
+    }));
+
+    $location_taxonomies = array_values(array_filter((array) get_object_taxonomies('location', 'names'), function ($taxonomy) {
+      $obj = get_taxonomy($taxonomy);
+      return ($obj && !empty($obj->public));
+    }));
+
+    $nextlearn = $collect_items('course', $course_taxonomies);
+    $locations = $collect_items('location', $location_taxonomies);
 
     return [
       'popular_keywords' => $popular_keywords,

@@ -32,36 +32,6 @@ $lc_photo_upload_config = apply_filters('lc_public_photo_upload_config', [
   </div>
 </div>
 
-<div id="welcomeModal" class="hidden fixed inset-0 z-999999">
-  <div class="absolute inset-0 bg-black/45" data-modal-backdrop="1"></div>
-
-  <div class="blm-modal-panel blm-welcome-panel absolute inset-x-4 bg-white rounded-2xl shadow-xl overflow-hidden">
-    <div class="p-5 sm:p-6">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h3 class="text-xl font-bold text-slate-900">ยินดีต้อนรับสู่แผนที่แหล่งเรียนรู้</h3>
-          <p class="mt-2 text-sm text-slate-600">หน้านี้ช่วยให้คุณค้นหาสถานที่เรียนรู้ใกล้บ้าน และดูรายละเอียดได้ในที่เดียว</p>
-        </div>
-        <button id="closeWelcomeModal" class="text-lg text-slate-500 hover:text-slate-700" aria-label="ปิด">✕</button>
-      </div>
-
-      <div class="mt-4 grid gap-2 text-sm text-slate-700">
-        <div>1. ใช้ตัวกรองเพื่อเลือกประเภทสถานที่ เขต ช่วงวัย และสิ่งอำนวยความสะดวก</div>
-        <div>2. คลิกหมุดหรือชื่อสถานที่บนแผนที่เพื่อเปิดรายละเอียด</div>
-        <div>3. คัดลอกลิงก์สถานที่เพื่อแชร์ให้ผู้อื่นได้ทันที</div>
-      </div>
-
-      <div class="mt-6 flex justify-end">
-        <button id="btnWelcomeStart"
-                class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
-          เริ่มใช้งาน
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
 <div id="facilityModal" class="hidden fixed inset-0 z-999999">
   <div class="absolute inset-0 bg-black/40" data-modal-backdrop="1"></div>
 

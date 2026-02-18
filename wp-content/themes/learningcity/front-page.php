@@ -13,8 +13,55 @@
             <div class="icon-search white"></div>
           </div>
           <span
+                id="searchbar-floating-text"
                 class="text-black md:text-fs26 text-fs18 font-semibold block md:px-4 px-2.5 leading-normal">คุณอยากเรียนอะไร</span>
         </button>
+        <script>
+          (function () {
+            var textEl = document.getElementById("searchbar-floating-text");
+            if (!textEl) return;
+
+            var messages = [
+              "คุณอยากเรียนอะไร",
+              "แหล่งเรียนรู้ในกทม.",
+              "หาคลาสที่ใช่สำหรับคุณ",
+              "อยากพัฒนาทักษะด้านไหน"
+            ];
+
+            if (messages.length < 2) return;
+
+            var index = 0;
+            var prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+            textEl.style.display = "block";
+            textEl.style.willChange = "opacity, transform";
+            textEl.style.transition = prefersReducedMotion
+              ? "opacity 0.12s linear"
+              : "opacity 0.18s ease, transform 0.18s ease";
+
+            window.setInterval(function () {
+              index = (index + 1) % messages.length;
+              var nextText = messages[index];
+
+              if (prefersReducedMotion) {
+                textEl.style.opacity = "0";
+                window.setTimeout(function () {
+                  textEl.textContent = nextText;
+                  textEl.style.opacity = "1";
+                }, 80);
+                return;
+              }
+
+              textEl.style.opacity = "0";
+              textEl.style.transform = "translateY(4px)";
+              window.setTimeout(function () {
+                textEl.textContent = nextText;
+                textEl.style.transform = "translateY(0)";
+                textEl.style.opacity = "1";
+              }, 180);
+            }, 2800);
+          })();
+        </script>
 
         <?php
         $media_url = static function ($field_value) {

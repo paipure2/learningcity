@@ -713,6 +713,16 @@ function lcw_ajax_subscribe() {
     ]);
   }
 
+  if (class_exists('LearningCity_Analytics') && is_callable(['LearningCity_Analytics', 'track_event'])) {
+    LearningCity_Analytics::track_event([
+      'event_type'  => 'course_notify_subscribe',
+      'object_type' => 'course',
+      'object_id'   => $course_id,
+      'keyword'     => $email,
+      'context'     => 'waitlist_ajax',
+    ]);
+  }
+
   wp_send_json_success([
     'message' => 'subscribed',
   ]);

@@ -19,23 +19,16 @@
                                 class="lc-modal-search__input"
                                 type="search"
                                 autocomplete="off"
-                                placeholder="ค้นหา Next Learn หรือแหล่งเรียนรู้"
+                                placeholder="ค้นหาคอร์สเรียน หรือแหล่งเรียนรู้"
                             >
                         </div>
                         <p id="lc-modal-search-meta" class="lc-modal-search__meta">พิมพ์เพื่อค้นหาแบบเรียลไทม์</p>
                     </div>
 
                     <div id="lc-modal-search-results" class="lc-modal-search__results">
-                        <section class="lc-search-section" data-section="quick">
-                            <header class="lc-search-section__head">
-                                <h3 id="lc-search-quick-title">คำค้นหาบ่อย</h3>
-                            </header>
-                            <div class="lc-search-section__list" data-list="quick"></div>
-                        </section>
-
                         <section class="lc-search-section" data-section="nextlearn">
                             <header class="lc-search-section__head">
-                                <h3>Next Learn</h3>
+                                <h3>คอร์สเรียน</h3>
                             </header>
                             <div class="lc-search-section__list" data-list="nextlearn"></div>
                         </section>

@@ -60,6 +60,10 @@
 
       emailInput.value = '';
       setMessage(form, CFG.success || 'บันทึกแล้ว', false);
+
+      if (window.LCAnalytics && typeof window.LCAnalytics.trackCourseNotify === 'function') {
+        window.LCAnalytics.trackCourseNotify(email, courseId, 'waitlist_subscribe');
+      }
     } catch (err) {
       setMessage(form, CFG.error || 'ไม่สามารถบันทึกได้', true);
     } finally {

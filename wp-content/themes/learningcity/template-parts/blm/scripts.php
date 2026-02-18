@@ -49,7 +49,6 @@ if (!defined('ABSPATH')) exit;
   const PLACES_CACHE_KEY = "lc_blm_places_cache_v3";
   const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
   const PLACES_CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes
-  const WELCOME_SEEN_KEY = "lc_blm_welcome_seen_v1";
   const API_CACHE_BUST = String(Date.now());
   const PHOTO_UPLOAD_AVAILABLE = !!PHOTO_UPLOAD_CONFIG?.enabled;
   const INLINE_EDIT_AVAILABLE = !!(
@@ -2504,32 +2503,6 @@ if (!defined('ABSPATH')) exit;
         e.stopPropagation();
       }
     }, true);
-  }
-
-  function shouldShowWelcomeModal() {
-    if (isSingleMode) return false;
-    try {
-      return localStorage.getItem(WELCOME_SEEN_KEY) !== "1";
-    } catch (e) {
-      return true;
-    }
-  }
-
-  function openWelcomeModal() {
-    const modal = el("welcomeModal");
-    if (!modal) return;
-    modal.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-  }
-
-  function closeWelcomeModal(markSeen = true) {
-    const modal = el("welcomeModal");
-    if (!modal) return;
-    if (markSeen) {
-      try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch (e) {}
-    }
-    modal.classList.add("hidden");
-    document.body.style.overflow = "";
   }
 
   function buildPlaceShareUrl(place) {
@@ -5213,9 +5186,6 @@ if (!defined('ABSPATH')) exit;
 
     el("drawerClose")?.addEventListener("click", closeDrawer);
     el("btnSharePlace")?.addEventListener("click", copyCurrentPlaceLink);
-    el("btnWelcomeStart")?.addEventListener("click", () => closeWelcomeModal(true));
-    el("closeWelcomeModal")?.addEventListener("click", () => closeWelcomeModal(true));
-    bindBackdropClose("welcomeModal", () => closeWelcomeModal(true));
 
     document.querySelectorAll(".tabBtn").forEach((btn) =>
       btn.addEventListener("click", () => setActiveTab(btn.dataset.tab))
@@ -5249,7 +5219,6 @@ if (!defined('ABSPATH')) exit;
         closeSearchPanel();
         closeDrawer();
         el("catModal").classList.add("hidden");
-        closeWelcomeModal(true);
         closeSidebarMobile();
       }
     });
@@ -5445,8 +5414,6 @@ if (!defined('ABSPATH')) exit;
     renderFacilityPillsTop(); // ให้ top10 สะท้อน state
 
     await initMap();
-
-    if (shouldShowWelcomeModal()) openWelcomeModal();
 
     if (isSingleMode && singlePlace) {
       openDrawer(singlePlace, { forceMapOnMobile: true });
