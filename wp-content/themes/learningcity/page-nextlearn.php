@@ -12,10 +12,334 @@
         <div class="container">
             <div class="layout-sidebar">
                 <?php get_template_part('template-parts/components/aside'); ?>
-                <section class="min-w-px">
+                <section class="min-w-px flex flex-col">
+                    <?php
+                    $nl_fallback_rows = array(
+                      array('acf_fc_layout' => 'hero_fixed'),
+                      array('acf_fc_layout' => 'highlight'),
+                      array('acf_fc_layout' => 'term_slider', 'taxonomy' => 'course_category', 'section_title' => 'หมวดหมู่', 'source_mode' => 'taxonomy_auto', 'limit' => 12),
+                      array('acf_fc_layout' => 'recommended'),
+                      array('acf_fc_layout' => 'term_slider', 'taxonomy' => 'audience', 'section_title' => 'คอร์สที่เหมาะสำหรับ...', 'source_mode' => 'mixed', 'limit' => 8),
+                      array('acf_fc_layout' => 'nearby_fixed'),
+                      array('acf_fc_layout' => 'term_slider', 'taxonomy' => 'course_provider', 'section_title' => 'คอร์สโดย', 'source_mode' => 'mixed', 'limit' => 10),
+                    );
+                    $nl_page_id = get_queried_object_id();
+                    $nl_sections_rows = function_exists('get_field') ? get_field('nextlearn_sections', $nl_page_id) : array();
+                    if (!is_array($nl_sections_rows) || empty($nl_sections_rows)) {
+                      $nl_sections_rows = $nl_fallback_rows;
+                    }
+                    $nl_pick_first = static function ($row, $keys, $default = '') {
+                      if (!is_array($row)) return $default;
+                      foreach ((array) $keys as $k) {
+                        if (array_key_exists($k, $row) && $row[$k] !== '' && $row[$k] !== null) {
+                          return $row[$k];
+                        }
+                      }
+                      return $default;
+                    };
+
+                    $nl_get_image_url = static function ($image, $fallback = '') {
+                      if (is_array($image) && !empty($image['url'])) {
+                        return (string) $image['url'];
+                      }
+                      if (is_int($image) || ctype_digit((string) $image)) {
+                        $url = wp_get_attachment_image_url((int) $image, 'full');
+                        if (is_string($url) && $url !== '') {
+                          return $url;
+                        }
+                      }
+                      if (is_string($image) && $image !== '') {
+                        return $image;
+                      }
+                      return (string) $fallback;
+                    };
+
+                    $nl_default_manual_by_taxonomy = array(
+                      'audience' => array(
+                        array('title' => 'ทุกวัย', 'url' => site_url('/') . 'audience/ทุกวัย', 'image' => THEME_URI . '/assets/images/category-other/allage.jpg'),
+                        array('title' => 'เด็กเล็ก', 'url' => site_url('/') . 'audience/เด็กเล็ก', 'image' => THEME_URI . '/assets/images/category-other/toddler.jpg'),
+                        array('title' => 'เด็กและเยาวชน', 'url' => site_url('/') . 'audience/เด็กและเยาวชน', 'image' => THEME_URI . '/assets/images/category-other/kid.jpg'),
+                        array('title' => 'ผู้ใหญ่', 'url' => site_url('/') . 'audience/ผู้ใหญ่', 'image' => THEME_URI . '/assets/images/category-other/work.jpg'),
+                        array('title' => 'ผู้สูงอายุ', 'url' => site_url('/') . 'audience/ผู้สูงอายุ', 'image' => THEME_URI . '/assets/images/category-other/old.jpg'),
+                      ),
+                      'course_provider' => array(
+                        array('title' => 'ETDA', 'url' => site_url('/') . 'course_provider/etda/', 'image' => THEME_URI . '/assets/images/category-other/ETDA.jpg'),
+                        array('title' => 'DSD Online Training', 'url' => site_url('/') . 'tag/dsd/', 'image' => THEME_URI . '/assets/images/category-other/dsd.jpg'),
+                        array('title' => 'Hook', 'url' => site_url('/') . 'course_provider/hook/', 'image' => THEME_URI . '/assets/images/category-other/hook.jpg'),
+                        array('title' => 'Microsoft', 'url' => site_url('/') . 'course_provider/microsoft/', 'image' => THEME_URI . '/assets/images/category-other/Microsoft.jpg'),
+                        array('title' => 'Starfish Labz', 'url' => site_url('/') . 'course_provider/starfish-labz/', 'image' => THEME_URI . '/assets/images/category-other/Starfish.jpg'),
+                        array('title' => 'ก่อร่างสร้างเด็ก', 'url' => site_url('/') . 'course_provider/ก่อร่างสร้างเด็ก', 'image' => THEME_URI . '/assets/images/category-other/sharecare.jpg'),
+                        array('title' => 'ศูนย์นันทนาการ', 'url' => site_url('/') . 'course_provider/ศูนย์นันทนาการ', 'image' => THEME_URI . '/assets/images/category-other/Recreation-Center.jpg'),
+                        array('title' => 'ศูนย์บริการผู้สูงอายุ', 'url' => site_url('/') . 'course_provider/ศูนย์บริการผู้สูงอายุ', 'image' => THEME_URI . '/assets/images/category-other/bangkok-2.jpg'),
+                        array('title' => 'ศูนย์ฝึกอาชีพ กทม.', 'url' => site_url('/') . 'course_provider/ศูนย์ฝึกอาชีพกรุงเทพมห', 'image' => THEME_URI . '/assets/images/category-other/bangkok.jpg'),
+                        array('title' => 'โรงเรียนฝึกอาชีพ', 'url' => site_url('/') . 'course_provider/โรงเรียนฝึกอาชีพ', 'image' => THEME_URI . '/assets/images/category-other/bangkok-2.jpg'),
+                      ),
+                      'course_category' => array(),
+                    );
+
+                    $nl_resolved_rows = array();
+                    foreach ($nl_sections_rows as $row) {
+                      if (!is_array($row)) {
+                        continue;
+                      }
+                      $layout = isset($row['acf_fc_layout']) ? (string) $row['acf_fc_layout'] : '';
+                      if (strpos($layout, 'layout_nl_') === 0) {
+                        $layout = str_replace('layout_nl_', '', $layout);
+                      }
+                      if ($layout === 'hero_fixed' || $layout === 'highlight' || $layout === 'recommended' || $layout === 'nearby_fixed') {
+                        $nl_resolved_rows[] = array('layout' => $layout, 'row' => $row);
+                        continue;
+                      }
+                      if ($layout === 'term_slider' || $layout === 'category' || $layout === 'audience' || $layout === 'provider') {
+                        if ($layout === 'category') {
+                          $row['taxonomy'] = 'course_category';
+                          if (empty($row['section_title'])) {
+                            $row['section_title'] = 'หมวดหมู่';
+                          }
+                        } elseif ($layout === 'audience') {
+                          $row['taxonomy'] = 'audience';
+                          if (empty($row['section_title'])) {
+                            $row['section_title'] = 'คอร์สที่เหมาะสำหรับ...';
+                          }
+                        } elseif ($layout === 'provider') {
+                          $row['taxonomy'] = 'course_provider';
+                          if (empty($row['section_title'])) {
+                            $row['section_title'] = 'คอร์สโดย';
+                          }
+                        }
+                        $nl_resolved_rows[] = array('layout' => 'term_slider', 'row' => $row);
+                      }
+                    }
+                    if (empty($nl_resolved_rows)) {
+                      foreach ($nl_fallback_rows as $row) {
+                        $nl_resolved_rows[] = array('layout' => (string) $row['acf_fc_layout'], 'row' => $row);
+                      }
+                    }
+
+                    $nl_fixed_order = array(
+                      'hero_fixed' => 99,
+                      'highlight' => 99,
+                      'recommended' => 99,
+                      'nearby_fixed' => 99,
+                    );
+                    $nl_term_sliders = array();
+                    $nl_recommended_row = array();
+                    foreach ($nl_resolved_rows as $index => $item) {
+                      $layout = $item['layout'];
+                      $order = $index + 1;
+                      if (isset($nl_fixed_order[$layout])) {
+                        if ($nl_fixed_order[$layout] > 90) {
+                          $nl_fixed_order[$layout] = $order;
+                        }
+                        if ($layout === 'recommended' && empty($nl_recommended_row) && is_array($item['row'])) {
+                          $nl_recommended_row = $item['row'];
+                        }
+                        continue;
+                      }
+                      if ($layout === 'term_slider') {
+                        $row = is_array($item['row']) ? $item['row'] : array();
+                        $taxonomy = isset($row['taxonomy']) ? (string) $row['taxonomy'] : '';
+                        if (!in_array($taxonomy, array('audience', 'course_provider', 'course_category'), true)) {
+                          continue;
+                        }
+                        $title = trim((string) $nl_pick_first($row, array('section_title', 'title', 'heading'), ''));
+                        if ($title === '') {
+                          $title = ($taxonomy === 'audience') ? 'คอร์สที่เหมาะสำหรับ...' : (($taxonomy === 'course_provider') ? 'คอร์สโดย' : 'หมวดหมู่');
+                        }
+                        $nl_term_sliders[] = array('order' => $order, 'taxonomy' => $taxonomy, 'title' => $title, 'row' => $row);
+                      }
+                    }
+
+                    $nl_build_hybrid_cards = static function ($taxonomy, $settings) use ($nl_get_image_url, $nl_default_manual_by_taxonomy) {
+                      $source_mode = isset($settings['source_mode']) ? (string) $settings['source_mode'] : 'mixed';
+                      if (!in_array($source_mode, array('manual', 'taxonomy_auto', 'mixed'), true)) {
+                        $source_mode = 'mixed';
+                      }
+                      $limit = isset($settings['limit']) ? (int) $settings['limit'] : 10;
+                      if ($limit <= 0) {
+                        $limit = 10;
+                      }
+                      $hide_empty = !empty($settings['hide_empty']);
+                      $orderby = isset($settings['orderby']) ? (string) $settings['orderby'] : 'name';
+                      $order = isset($settings['order']) ? (string) $settings['order'] : 'ASC';
+                      $exclude_terms = isset($settings['exclude_terms']) && is_array($settings['exclude_terms']) ? array_values(array_filter(array_map('intval', $settings['exclude_terms']))) : array();
+
+                      $manual_rows = isset($settings['manual_items']) && is_array($settings['manual_items']) ? $settings['manual_items'] : array();
+                      $manual_cards = array();
+                      if (!empty($manual_rows)) {
+                        foreach ($manual_rows as $row) {
+                          $link_type = isset($row['link_type']) ? (string) $row['link_type'] : 'custom_url';
+                          $title = isset($row['title']) ? trim((string) $row['title']) : '';
+                          $url = '';
+                          $term_id = 0;
+                          if ($link_type === 'taxonomy_term') {
+                            $term_field = ($taxonomy === 'audience') ? 'term_audience' : (($taxonomy === 'course_provider') ? 'term_provider' : 'term_category');
+                            $term_value = $row[$term_field] ?? ($row['term'] ?? null);
+                            if ($term_value instanceof WP_Term) {
+                              $term_id = (int) $term_value->term_id;
+                            } elseif (is_numeric($term_value)) {
+                              $term_id = (int) $term_value;
+                            }
+                            if ($term_id > 0) {
+                              $term_obj = get_term($term_id, $taxonomy);
+                              if ($term_obj instanceof WP_Term && !is_wp_error($term_obj)) {
+                                $url = get_term_link($term_obj);
+                                if ($title === '') {
+                                  $title = $term_obj->name;
+                                }
+                              }
+                            }
+                          } else {
+                            $url = isset($row['custom_url']) ? trim((string) $row['custom_url']) : '';
+                          }
+                          $manual_cards[] = array(
+                            'term_id' => $term_id,
+                            'title' => $title,
+                            'url' => $url,
+                            'image' => $nl_get_image_url($row['image'] ?? null, ''),
+                          );
+                        }
+                      } elseif (isset($nl_default_manual_by_taxonomy[$taxonomy])) {
+                        $manual_cards = $nl_default_manual_by_taxonomy[$taxonomy];
+                      }
+                      $manual_cards = array_values(array_filter($manual_cards, static function ($card) {
+                        return !empty($card['title']) && !empty($card['url']) && !is_wp_error($card['url']);
+                      }));
+
+                      $terms = get_terms(array(
+                        'taxonomy' => $taxonomy,
+                        'hide_empty' => $hide_empty,
+                        'orderby' => $orderby,
+                        'order' => $order,
+                        'exclude' => $exclude_terms,
+                        'number' => $limit,
+                      ));
+                      $taxonomy_cards = array();
+                      if (is_array($terms) && !is_wp_error($terms)) {
+                        foreach ($terms as $term) {
+                          if (!$term instanceof WP_Term) {
+                            continue;
+                          }
+                          $image = $nl_get_image_url(function_exists('get_field') ? get_field('thumbnail', $term) : null, '');
+                          if ($image === '') {
+                            $image = $nl_get_image_url(function_exists('get_field') ? get_field('image', $term) : null, '');
+                          }
+                          if ($image === '') {
+                            $image = $nl_get_image_url(function_exists('get_field') ? get_field('icon', $term) : null, '');
+                          }
+                          $taxonomy_cards[] = array(
+                            'term_id' => (int) $term->term_id,
+                            'title' => $term->name,
+                            'url' => get_term_link($term),
+                            'image' => $image,
+                          );
+                        }
+                      }
+                      $taxonomy_cards = array_values(array_filter($taxonomy_cards, static function ($card) {
+                        return !empty($card['url']) && !is_wp_error($card['url']);
+                      }));
+
+                      if ($source_mode === 'manual') {
+                        return array_slice($manual_cards, 0, $limit);
+                      }
+                      if ($source_mode === 'taxonomy_auto') {
+                        return array_slice($taxonomy_cards, 0, $limit);
+                      }
+
+                      $cards = array();
+                      $used_term_ids = array();
+                      foreach ($manual_cards as $card) {
+                        $cards[] = $card;
+                        if (!empty($card['term_id'])) {
+                          $used_term_ids[(int) $card['term_id']] = true;
+                        }
+                        if (count($cards) >= $limit) {
+                          break;
+                        }
+                      }
+                      foreach ($taxonomy_cards as $card) {
+                        if (count($cards) >= $limit) {
+                          break;
+                        }
+                        $term_id = isset($card['term_id']) ? (int) $card['term_id'] : 0;
+                        if ($term_id > 0 && isset($used_term_ids[$term_id])) {
+                          continue;
+                        }
+                        $cards[] = $card;
+                        if ($term_id > 0) {
+                          $used_term_ids[$term_id] = true;
+                        }
+                      }
+                      return $cards;
+                    };
+
+                    $nl_term_slider_blocks = array();
+                    foreach ($nl_term_sliders as $slider) {
+                      $row = $slider['row'];
+                      $taxonomy = $slider['taxonomy'];
+                      $exclude_terms = $row['exclude_terms'] ?? array();
+                      if ($taxonomy === 'audience' && isset($row['exclude_terms_audience'])) {
+                        $exclude_terms = $row['exclude_terms_audience'];
+                      } elseif ($taxonomy === 'course_provider' && isset($row['exclude_terms_provider'])) {
+                        $exclude_terms = $row['exclude_terms_provider'];
+                      } elseif ($taxonomy === 'course_category' && isset($row['exclude_terms_category'])) {
+                        $exclude_terms = $row['exclude_terms_category'];
+                      }
+                      if (!is_array($exclude_terms)) {
+                        $exclude_terms = array();
+                      }
+                      $settings = array(
+                        'source_mode' => isset($row['source_mode']) ? $row['source_mode'] : 'mixed',
+                        'limit' => isset($row['limit']) ? (int) $row['limit'] : 10,
+                        'hide_empty' => !empty($row['hide_empty']),
+                        'orderby' => isset($row['orderby']) ? $row['orderby'] : 'name',
+                        'order' => isset($row['order']) ? $row['order'] : 'ASC',
+                        'exclude_terms' => $exclude_terms,
+                        'manual_items' => isset($row['manual_items']) ? $row['manual_items'] : array(),
+                      );
+                      $nl_term_slider_blocks[] = array(
+                        'order' => (int) $slider['order'],
+                        'title' => (string) $slider['title'],
+                        'cards' => $nl_build_hybrid_cards($taxonomy, $settings),
+                      );
+                    }
+
+                    $nl_recommended_mode = (string) $nl_pick_first($nl_recommended_row, array('recommended_mode', 'mode'), 'random');
+                    if (!in_array($nl_recommended_mode, array('random', 'popular', 'handpick', 'mixed'), true)) {
+                      $nl_recommended_mode = 'random';
+                    }
+                    $nl_recommended_limit = (int) $nl_pick_first($nl_recommended_row, array('limit', 'count'), 6);
+                    if ($nl_recommended_limit <= 0) {
+                      $nl_recommended_limit = 6;
+                    }
+                    $nl_recommended_title = trim((string) $nl_pick_first($nl_recommended_row, array('section_title', 'title', 'heading'), 'คอร์สแนะนำ'));
+                    if ($nl_recommended_title === '') {
+                      $nl_recommended_title = 'คอร์สแนะนำ';
+                    }
+                    $nl_recommended_fallback_mode = (string) $nl_pick_first($nl_recommended_row, array('fallback_mode'), 'random');
+                    if (!in_array($nl_recommended_fallback_mode, array('random', 'popular'), true)) {
+                      $nl_recommended_fallback_mode = 'random';
+                    }
+                    $nl_recommended_popular_metric = (string) $nl_pick_first($nl_recommended_row, array('popular_metric'), 'engagement');
+                    if (!in_array($nl_recommended_popular_metric, array('engagement', 'views'), true)) {
+                      $nl_recommended_popular_metric = 'engagement';
+                    }
+                    $nl_recommended_popular_days = (int) $nl_pick_first($nl_recommended_row, array('popular_days'), 30);
+                    if ($nl_recommended_popular_days <= 0) {
+                      $nl_recommended_popular_days = 30;
+                    }
+                    $nl_recommended_handpicked_ids = isset($nl_recommended_row['handpicked_courses']) && is_array($nl_recommended_row['handpicked_courses'])
+                      ? array_values(array_filter(array_map('intval', $nl_recommended_row['handpicked_courses'])))
+                      : array();
+
+                    $nl_section_style = static function ($key) use ($nl_fixed_order) {
+                      $order = isset($nl_fixed_order[$key]) ? (int) $nl_fixed_order[$key] : 99;
+                      return 'order:' . $order . ';';
+                    };
+                    ?>
 
 
-                    <div class="box-chart h-auto! sm:rounded-3xl rounded-2xl overflow-hidden">
+                    <div class="box-chart h-auto! sm:rounded-3xl rounded-2xl overflow-hidden" style="<?php echo esc_attr($nl_section_style('hero_fixed')); ?>">
 
                         <div class="grid lg:grid-cols-2 grid-cols-1">
                             <div
@@ -187,7 +511,7 @@
                       $widget_items = $widget_fallback_items;
                     }
                     ?>
-                    <div class="xl:py-12 py-8 mt-6 sec-highlight">
+                    <div class="xl:py-12 py-8 mt-6 sec-highlight" style="<?php echo esc_attr($nl_section_style('highlight')); ?>">
                         <h2 class="text-heading">ไฮไลท์</h2>
                         <div class="swiper xl:overflow-hidden! overflow-visible!">
                             <div class="swiper-wrapper">
@@ -327,30 +651,20 @@
                     </div>
 
 
-                    <div class="xl:py-12 py-8 sec-category" data-aos="fade-in">
-                        <h2 class="text-heading">หมวดหมู่</h2>
-                        
-                        <?php
-                        set_query_var('cc_taxonomy', 'course_category');
-                        set_query_var('cc_hide_empty', false); // หรือ true
-                        set_query_var('cc_parent', 0);         // เฉพาะหมวดหลัก
-                        set_query_var('cc_default_img', THEME_URI . '/assets/images/category/img01.png');
-
-                        get_template_part('template-parts/course/category-swiper');
-                        ?>
-             
-
-
-
+                    <div style="<?php echo esc_attr($nl_section_style('recommended')); ?>">
+                      <?php
+                      set_query_var('rc_count', $nl_recommended_limit);
+                      set_query_var('rc_title', $nl_recommended_title);
+                      set_query_var('rc_mode', $nl_recommended_mode);
+                      set_query_var('rc_fallback_mode', $nl_recommended_fallback_mode);
+                      set_query_var('rc_popular_metric', $nl_recommended_popular_metric);
+                      set_query_var('rc_popular_days', $nl_recommended_popular_days);
+                      set_query_var('rc_handpicked_ids', $nl_recommended_handpicked_ids);
+                      get_template_part('template-parts/course/recommended-grid');
+                      ?>
                     </div>
 
-
-                    <?php
-                    set_query_var('rc_count', 6); // อยากให้สุ่มกี่ใบ
-                    get_template_part('template-parts/course/recommended-grid');
-                    ?>
-
-                    <div id="nearby-home-section" class="xl:py-12 py-8 sec-course" data-aos="fade-in">
+                    <div id="nearby-home-section" class="xl:py-12 py-8 sec-course" data-aos="fade-in" style="<?php echo esc_attr($nl_section_style('nearby_fixed')); ?>">
                         <h2 class="text-heading">เรียนใกล้บ้านเลยล่ะ</h2>
                         <div id="nearby-home-grid" class="mt-6 grid xl:grid-cols-2 grid-cols-1 xl:gap-6 gap-4">
                           <?php for ($i = 0; $i < 6; $i++) : ?>
@@ -371,170 +685,50 @@
                           <?php endfor; ?>
                         </div>
                     </div>
+                    <?php foreach ($nl_term_slider_blocks as $block) : ?>
+                      <div class="xl:py-12 py-8 sec-category-other" data-aos="fade-in" style="<?php echo esc_attr('order:' . (int) $block['order'] . ';'); ?>">
+                          <h2 class="text-heading"><?php echo esc_html($block['title']); ?></h2>
+                          <div class="-m-4 xl:overflow-hidden! overflow-visible!">
+                              <div class="p-4">
+                                  <div class="swiper overflow-visible!">
+                                      <div class="swiper-wrapper">
+                                          <?php foreach ($block['cards'] as $item) : ?>
+                                            <?php
+                                            $item_url = isset($item['url']) ? (string) $item['url'] : '';
+                                            $item_title = isset($item['title']) ? (string) $item['title'] : '';
+                                            if ($item_url === '' || $item_title === '') {
+                                              continue;
+                                            }
+                                            $item_image = isset($item['image']) ? (string) $item['image'] : '';
+                                            ?>
+                                            <div class="swiper-slide">
+                                              <a href="<?php echo esc_url($item_url); ?>" class="card-category-other">
+                                                <?php if ($item_image !== '') : ?>
+                                                  <img src="<?php echo esc_url($item_image); ?>" alt="<?php echo esc_attr($item_title); ?>">
+                                                <?php endif; ?>
+                                                <div class="txt">
+                                                  <p><?php echo esc_html($item_title); ?></p>
+                                                </div>
+                                              </a>
+                                            </div>
+                                          <?php endforeach; ?>
+                                      </div>
+                                      <div class="swiper-control">
+                                          <div class="swiper-pagination"></div>
+                                          <div class="flex items-center justify-end gap-3">
+                                              <div class="swiper-button-prev"></div>
+                                              <div class="swiper-button-next"></div>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                    <?php endforeach; ?>
 
-
-
-                    <div class="xl:py-12 py-8 sec-category-other" data-aos="fade-in">
-                        <h2 class="text-heading">คอร์สที่เหมาะสำหรับ...</h2>
-                        <div class="-m-4 xl:overflow-hidden! overflow-visible!">
-                            <div class="p-4">
-                                <div class="swiper overflow-visible!">
-                                    <div class="swiper-wrapper">
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>audience/ทุกวัย" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/allage.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ทุกวัย</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>audience/เด็กเล็ก" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/toddler.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>เด็กเล็ก</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>audience/เด็กและเยาวชน" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/kid.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>เด็กและเยาวชน</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>audience/ผู้ใหญ่" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/work.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ผู้ใหญ่</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>audience/ผู้สูงอายุ" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/old.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ผู้สูงอายุ</p>
-                                                </div>
-                                            </a>
-                                        </div>
-
-                                    </div>
-                                    <div class="swiper-control">
-                                        <div class="swiper-pagination"></div>
-                                        <div class="flex items-center justify-end gap-3">
-                                            <div class="swiper-button-prev"></div>
-                                            <div class="swiper-button-next"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <div style="order:999;">
+                      <?php get_template_part('template-parts/footer/site-footer'); ?>
                     </div>
-
-
-                    <div class="xl:py-12 py-8 sec-category-other" data-aos="fade-in">
-                        <h2 class="text-heading">คอร์สโดย</h2>
-                        <div class="-m-4 xl:overflow-hidden! overflow-visible!">
-                            <div class="p-4">
-                                <div class="swiper overflow-visible!">
-                                    <div class="swiper-wrapper">
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/etda/" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/ETDA.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ETDA</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                         <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>tag/dsd/" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/dsd.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>DSD Online Training</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/hook/" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/hook.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>Hook</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/microsoft/" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/Microsoft.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>Microsoft</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/starfish-labz/" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/Starfish.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>Starfish Labz</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/ก่อร่างสร้างเด็ก" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/sharecare.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ก่อร่างสร้างเด็ก</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/ศูนย์นันทนาการ" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/Recreation-Center.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ศูนย์นันทนาการ</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/ศูนย์บริการผู้สูงอายุ" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/bangkok-2.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ศูนย์บริการผู้สูงอายุ</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/ศูนย์ฝึกอาชีพกรุงเทพมห" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/bangkok.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>ศูนย์ฝึกอาชีพ กทม.</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                        <div class="swiper-slide">
-                                            <a href="<?php echo site_url('/') ?>course_provider/โรงเรียนฝึกอาชีพ" class="card-category-other" >
-                                                <img src="<?php echo THEME_URI ?>/assets/images/category-other/bangkok-2.jpg" alt="">
-                                                <div class="txt">
-                                                    <p>โรงเรียนฝึกอาชีพ</p>
-                                                </div>
-                                            </a>
-                                        </div>
-                                    </div>
-                                    <div class="swiper-control">
-                                        <div class="swiper-pagination"></div>
-                                        <div class="flex items-center justify-end gap-3">
-                                            <div class="swiper-button-prev"></div>
-                                            <div class="swiper-button-next"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <?php get_template_part('template-parts/footer/site-footer'); ?>
                 </section>
             </div>
         </div>
@@ -593,6 +787,27 @@
 <?php endif; ?>
 
 <style>
+  .sec-category-other .swiper-slide {
+    height: auto;
+  }
+  .sec-category-other .card-category-other {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .sec-category-other .card-category-other .txt {
+    min-height: 5.4rem;
+    display: flex;
+    align-items: flex-start;
+  }
+  .sec-category-other .card-category-other .txt p {
+    line-height: 1.35;
+    min-height: calc(1.35em * 2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   @keyframes lcShimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }

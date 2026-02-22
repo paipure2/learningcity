@@ -27,6 +27,27 @@
     return qs('[data-modal-content="modal-course"]');
   }
 
+  function bindCourseGalleryFancybox(scopeEl) {
+    if (!scopeEl || !window.Fancybox) return;
+
+    const groups = new Set(
+      Array.from(scopeEl.querySelectorAll('[data-fancybox^="course-gallery-"]'))
+        .map((el) => el.getAttribute('data-fancybox'))
+        .filter(Boolean)
+    );
+
+    groups.forEach((group) => {
+      window.Fancybox.bind(`[data-fancybox="${group}"]`, {
+        caption: (_, slide) => {
+          const cap = slide?.triggerEl?.dataset?.caption || slide?.triggerEl?.dataset?.fancyboxCaption;
+          return cap || "";
+        },
+        Thumbs: false,
+        Toolbar: { display: { left: [], middle: [], right: ["close"] } },
+      });
+    });
+  }
+
   function openCourseModal() {
     const modal = getModalEl();
     if (!modal) return;
@@ -188,7 +209,10 @@
       }
 
       const body = modal.querySelector('[data-course-modal-body]');
-      if (body) body.innerHTML = data.html;
+      if (body) {
+        body.innerHTML = data.html;
+        bindCourseGalleryFancybox(body);
+      }
 
       // ✅ ใช้ single permalink ให้ 2 ปุ่ม
       const singleUrl = data.permalink || fallbackUrl || '';

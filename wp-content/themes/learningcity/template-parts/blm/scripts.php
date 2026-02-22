@@ -53,7 +53,6 @@ if (!defined('ABSPATH')) exit;
   const PHOTO_UPLOAD_AVAILABLE = !!PHOTO_UPLOAD_CONFIG?.enabled;
   const INLINE_EDIT_AVAILABLE = !!(
     LOCATION_EDIT_CONFIG?.enabled &&
-    LOCATION_EDIT_CONFIG?.has_session &&
     LOCATION_EDIT_CONFIG?.ajax_url &&
     LOCATION_EDIT_CONFIG?.nonce
   );
@@ -352,6 +351,32 @@ if (!defined('ABSPATH')) exit;
     }
     return out;
   };
+  const decodePlaceText = (value) => {
+    if (typeof value !== "string") return value;
+    return decodeHtmlEntities(value);
+  };
+  const decodePlaceTextList = (list) => {
+    if (!Array.isArray(list)) return list;
+    return list.map((item) => decodePlaceText(item));
+  };
+  function normalizePlaceRecord(place) {
+    if (!place || typeof place !== "object") return place;
+    return {
+      ...place,
+      name: decodePlaceText(place.name),
+      district: decodePlaceText(place.district),
+      category: decodePlaceText(place.category),
+      address: decodePlaceText(place.address),
+      categories: decodePlaceTextList(place.categories),
+      tags: decodePlaceTextList(place.tags),
+      amenities: decodePlaceTextList(place.amenities),
+      admission_policies: decodePlaceTextList(place.admission_policies),
+    };
+  }
+  function normalizePlacesList(places) {
+    if (!Array.isArray(places)) return [];
+    return places.map((place) => normalizePlaceRecord(place));
+  }
 
   function isMobile() {
     return window.matchMedia("(max-width: 1023px)").matches;
@@ -512,7 +537,7 @@ if (!defined('ABSPATH')) exit;
       const data = JSON.parse(raw);
       if (!data || !Array.isArray(data.places)) return null;
       if (!data.ts || (Date.now() - data.ts > PLACES_CACHE_TTL_MS)) return null;
-      return data.places;
+      return normalizePlacesList(data.places);
     } catch (e) {
       return null;
     }
@@ -2556,7 +2581,7 @@ if (!defined('ABSPATH')) exit;
   }
 
   const INLINE_LOCATION_FIELDS = [
-    { key: "title", label: "ชื่อสถานที่", multiline: false },
+    { key: "title", label: "ชื่อสถานที่", multiline: false, locked: true },
     { key: "address", label: "ที่อยู่", multiline: true },
     { key: "phone", label: "เบอร์โทร", multiline: false },
     { key: "opening_hours", label: "เวลาเปิดทำการ", multiline: true },
@@ -2564,6 +2589,9 @@ if (!defined('ABSPATH')) exit;
     { key: "google_maps", label: "ลิงก์ Google Maps", multiline: false },
     { key: "facebook", label: "ลิงก์ Facebook", multiline: false },
   ];
+  const INLINE_LOCATION_LOCKED_FIELDS = new Set(
+    INLINE_LOCATION_FIELDS.filter((cfg) => !!cfg?.locked).map((cfg) => String(cfg.key || "").trim()).filter(Boolean)
+  );
   let inlineLocationContext = null;
   const decodeInlineHtmlEntities = (value) => {
     const raw = String(value || "");
@@ -2581,7 +2609,10 @@ if (!defined('ABSPATH')) exit;
       .lc-inline-modal.is-open{display:block}
       .lc-inline-backdrop{position:absolute;inset:0;background:rgba(11,23,38,.55)}
       .lc-inline-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}
-      .lc-inline-card{position:relative;width:min(760px,calc(100vw - 28px));height:min(760px,calc(100vh - 32px));overflow:hidden;border:1px solid #d8e2ec;border-radius:16px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.25);display:flex;flex-direction:column}
+      .lc-inline-card{position:relative;width:min(760px,calc(100vw - 28px));height:min(760px,calc(100dvh - 24px));max-height:calc(100dvh - 24px);overflow:hidden;border:1px solid #d8e2ec;border-radius:16px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.25);display:flex;flex-direction:column}
+      @supports not (height: 100dvh){
+        .lc-inline-card{height:min(760px,calc(100vh - 24px));max-height:calc(100vh - 24px)}
+      }
       .lc-inline-card,.lc-inline-card *{font-family:var(--font-anuphan),system-ui,sans-serif}
       .lc-inline-head{display:grid;gap:10px;padding:14px 18px;border-bottom:1px solid #e8eef5;background:#f8fbff}
       .lc-inline-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -2599,6 +2630,7 @@ if (!defined('ABSPATH')) exit;
       .lc-inline-section{border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff}
       .lc-inline-input{width:100%;border:1px solid #cfd9e5;border-radius:12px;padding:10px;font-size:14px;background:#fff}
       .lc-inline-input.ta{min-height:120px;resize:vertical}
+      .lc-inline-input.is-locked{background:#f1f5f9;border-color:#d1d5db;color:#64748b;cursor:not-allowed}
       .lc-inline-facility-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:8px}
       .lc-inline-facility-item{display:flex;align-items:center;gap:8px;border:1px solid #dbe4ee;border-radius:10px;background:#fff;padding:7px 8px;font-size:13px;line-height:1.3}
       .lc-inline-subsection{border:1px solid #e2e8f0;border-radius:12px;padding:10px;background:#fff}
@@ -2640,10 +2672,12 @@ if (!defined('ABSPATH')) exit;
       .lc-inline-combo-item{display:block;width:100%;text-align:left;border:0;background:#fff;padding:10px 12px;font-size:14px;line-height:1.35;color:#0f172a;cursor:pointer}
       .lc-inline-combo-item:hover,.lc-inline-combo-item.is-active{background:#00744b;color:#fff}
       .lc-inline-combo-empty{padding:10px 12px;font-size:13px;color:#64748b}
-      .lc-inline-session-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-      .lc-inline-session-name{font-weight:800}
+      .lc-inline-session-head-row{display:flex;align-items:center;justify-content:flex-start;gap:8px}
+      .lc-inline-session-name{font-weight:800;flex:1;min-width:0;text-align:left}
       .lc-inline-session-id{font-size:90%;font-weight:600;color:#64748b}
-      .lc-inline-session-remove{height:30px;padding:0 10px;border-radius:999px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer}
+      .lc-inline-session-chevron{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:#64748b;font-size:14px;line-height:1;transition:transform .18s ease}
+      .lc-inline-session-item[open] .lc-inline-session-chevron{transform:rotate(180deg)}
+      .lc-inline-session-remove{height:30px;padding:0 10px;border-radius:999px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:auto}
       .lc-inline-session-remove.toggle.is-active{background:#fee2e2}
       .lc-inline-session-item.is-remove{border-color:#dc2626;background:#fff1f2}
       .lc-inline-session-item.is-remove .lc-inline-session-body{display:none}
@@ -2654,6 +2688,23 @@ if (!defined('ABSPATH')) exit;
       .lc-inline-actions{display:flex;justify-content:flex-end;gap:8px}
       .lc-inline-note{min-height:22px;font-size:13px}
       .lc-inline-note.ok{color:#166534}
+      @media (max-width: 768px){
+        .lc-inline-wrap{
+          align-items:flex-start;
+          padding:8px;
+          padding-top:max(8px, env(safe-area-inset-top));
+          padding-bottom:max(8px, env(safe-area-inset-bottom));
+        }
+        .lc-inline-card{
+          width:100%;
+          max-width:none;
+          border-radius:14px;
+          height:calc(100dvh - 16px);
+          max-height:calc(100dvh - 16px);
+        }
+        .lc-inline-session-head-row{flex-wrap:wrap;align-items:flex-start}
+        .lc-inline-session-head-row .lc-inline-session-remove{width:auto;min-width:56px;max-width:100%;height:32px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto}
+      }
       .lc-inline-note.err{color:#b91c1c}
       .lc-inline-btn{height:38px;padding:0 14px;border-radius:12px;border:1px solid #cfd9e5;background:#fff;color:#0f172a;font-weight:700;font-size:14px;cursor:pointer}
       .lc-inline-btn.primary{border-color:#00744b;background:#00744b;color:#fff}
@@ -2938,6 +2989,12 @@ if (!defined('ABSPATH')) exit;
             input.type = "text";
           }
           input.value = String(locationValues?.[cfg.key] || "");
+          if (cfg.locked) {
+            input.readOnly = true;
+            input.disabled = true;
+            input.classList.add("is-locked");
+            input.setAttribute("data-inline-locked", "1");
+          }
           wrap.appendChild(label);
           wrap.appendChild(input);
           grid.appendChild(wrap);
@@ -3035,17 +3092,22 @@ if (!defined('ABSPATH')) exit;
             name.appendChild(labelSpan);
             name.appendChild(idSpan);
           }
+          const chevron = document.createElement("span");
+          chevron.className = "lc-inline-session-chevron";
+          chevron.setAttribute("aria-hidden", "true");
+          chevron.textContent = "▾";
           const rmBtn = document.createElement("button");
           rmBtn.type = "button";
           if (isNew) {
             rmBtn.className = "lc-inline-session-remove";
             rmBtn.setAttribute("data-session-remove-new", "1");
-            rmBtn.textContent = "ลบรายการใหม่";
+            rmBtn.textContent = "ลบ";
           } else {
             rmBtn.className = "lc-inline-session-remove toggle";
             rmBtn.setAttribute("data-session-remove-existing", "1");
-            rmBtn.textContent = "ลบ Session นี้";
+            rmBtn.textContent = "ลบ";
           }
+          headRow.appendChild(chevron);
           headRow.appendChild(name);
           headRow.appendChild(rmBtn);
           head.appendChild(headRow);
@@ -3214,8 +3276,9 @@ if (!defined('ABSPATH')) exit;
         item.innerHTML = `
           <summary class="lc-inline-session-head">
             <div class="lc-inline-session-head-row">
+              <span class="lc-inline-session-chevron" aria-hidden="true">▾</span>
               <span class="lc-inline-session-name">Session ใหม่ · คอร์ส: ${safeCourseTitle}</span>
-              <button type="button" class="lc-inline-session-remove" data-session-remove-new="1">ลบรายการใหม่</button>
+              <button type="button" class="lc-inline-session-remove" data-session-remove-new="1">ลบ</button>
             </div>
           </summary>
           <div class="lc-inline-session-body">
@@ -3249,7 +3312,7 @@ if (!defined('ABSPATH')) exit;
         if (target.classList.contains("toggle")) {
           target.classList.toggle("is-active", active);
         }
-        target.textContent = active ? "ยกเลิกลบ Session" : "ลบ Session นี้";
+        target.textContent = active ? "ยกเลิก" : "ลบ";
         return;
       }
       if (target instanceof Element && target.matches("[data-session-remove-new]")) {
@@ -3535,6 +3598,10 @@ if (!defined('ABSPATH')) exit;
     btn.innerHTML = `<span class="lc-report-btn__icon" aria-hidden="true">✎</span><span>แจ้งแก้ไขข้อมูลสถานที่</span>`;
     btn.addEventListener("click", async (event) => {
       event.preventDefault();
+      if (!window.lcLocationEditAuth?.isLoggedIn?.()) {
+        openLocationEditAccessModal();
+        return;
+      }
       const note = el("lcInlineEditNote");
       btn.setAttribute("disabled", "disabled");
       try {
@@ -3625,7 +3692,9 @@ if (!defined('ABSPATH')) exit;
     const newImageInput = el("lcInlineNewImages");
     const newFiles = newImageInput?.files ? Array.from(newImageInput.files) : [];
 
-    const locationChanged = INLINE_LOCATION_FIELDS.some((f) => (String(nextValues[f.key] || "").trim() !== String(currentValues[f.key] || "").trim()));
+    const locationChanged = INLINE_LOCATION_FIELDS
+      .filter((f) => !INLINE_LOCATION_LOCKED_FIELDS.has(String(f.key || "").trim()))
+      .some((f) => (String(nextValues[f.key] || "").trim() !== String(currentValues[f.key] || "").trim()));
     const currentSessionMap = new Map((Array.isArray(inlineLocationContext?.sessions) ? inlineLocationContext.sessions : []).map((s) => [Number(s.id || 0), s]));
     const currentFacilitySlugs = Array.isArray(currentValues?.facility_slugs) ? currentValues.facility_slugs.map((s) => String(s).trim()).filter(Boolean) : [];
     const facilityChanged = JSON.stringify([...new Set(currentFacilitySlugs)].sort()) !== JSON.stringify([...new Set(nextFacilitySlugs)].sort());
@@ -3659,6 +3728,7 @@ if (!defined('ABSPATH')) exit;
       fd.append("location_id", String(Number(selectedId || 0)));
       fd.append("mode", "full_location");
       INLINE_LOCATION_FIELDS.forEach((f) => {
+        if (INLINE_LOCATION_LOCKED_FIELDS.has(String(f.key || "").trim())) return;
         fd.append(f.key, String(nextValues[f.key] || ""));
       });
       nextFacilitySlugs.forEach((slug) => fd.append("facility_slugs[]", slug));
@@ -4827,7 +4897,7 @@ if (!defined('ABSPATH')) exit;
       if (!Array.isArray(json.places)) {
         throw new Error("locations-light JSON missing places[]");
       }
-      allPlaces = json.places;
+      allPlaces = normalizePlacesList(json.places);
       savePlacesCache(allPlaces);
     } catch (e) {
       console.error(e);

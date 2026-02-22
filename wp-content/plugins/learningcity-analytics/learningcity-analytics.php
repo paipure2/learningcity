@@ -81,12 +81,14 @@ final class LearningCity_Analytics {
 
     public static function enqueue_frontend_tracker() {
         if (is_admin()) return;
+        $script_path = plugin_dir_path(__FILE__) . 'assets/js/tracker.js';
+        $script_ver = file_exists($script_path) ? (string) filemtime($script_path) : self::VERSION;
 
         wp_enqueue_script(
             'lc-analytics-tracker',
             plugin_dir_url(__FILE__) . 'assets/js/tracker.js',
             [],
-            self::VERSION,
+            $script_ver,
             true
         );
 
@@ -154,6 +156,7 @@ final class LearningCity_Analytics {
             'location_view',
             'course_popup_click',
             'course_click',
+            'course_learning_link_click',
             'location_click',
             'search_keyword',
             'search_popup_open',
@@ -194,7 +197,7 @@ final class LearningCity_Analytics {
 
         $table = self::table_name();
 
-        return (bool) $wpdb->insert(
+        $inserted = (bool) $wpdb->insert(
             $table,
             [
                 'event_type' => $event_type,
@@ -210,6 +213,40 @@ final class LearningCity_Analytics {
             ],
             ['%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s']
         );
+
+        if (
+            $inserted &&
+            $event_type === 'course_learning_link_click' &&
+            $object_type === 'course' &&
+            $object_id > 0
+        ) {
+            self::accumulate_course_attendance_hours($object_id);
+        }
+
+        return $inserted;
+    }
+
+    private static function accumulate_course_attendance_hours($course_id) {
+        $course_id = absint($course_id);
+        if ($course_id <= 0 || get_post_type($course_id) !== 'course') {
+            return;
+        }
+
+        $minutes = (float) get_post_meta($course_id, 'total_minutes', true);
+        if ($minutes <= 0) {
+            return;
+        }
+
+        $delta_hours = $minutes / 60;
+        if ($delta_hours <= 0) {
+            return;
+        }
+
+        $current_hours = (float) get_post_meta($course_id, 'total_attendance_hours', true);
+        $next_hours = $current_hours + $delta_hours;
+
+        // Keep a compact numeric value for ACF/meta while preserving hour precision.
+        update_post_meta($course_id, 'total_attendance_hours', round($next_hours, 2));
     }
 
     public static function track_page_views() {
@@ -369,10 +406,46 @@ final class LearningCity_Analytics {
         return $wpdb->get_results($wpdb->prepare($sql, $params));
     }
 
+    private static function get_top_course_categories(array $events, $days = 30, $limit = 10) {
+        global $wpdb;
+
+        $table = self::table_name();
+        $events = array_filter(array_map([__CLASS__, 'normalize_event_type'], $events));
+        if (empty($events)) return [];
+
+        $event_placeholders = implode(', ', array_fill(0, count($events), '%s'));
+
+        $sql = "SELECT t.term_id, t.name, COUNT(*) AS total
+                FROM {$table} e
+                INNER JOIN {$wpdb->posts} p ON p.ID = e.object_id
+                INNER JOIN {$wpdb->term_relationships} tr ON tr.object_id = p.ID
+                INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
+                INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id
+                WHERE e.object_type = %s
+                  AND e.object_id > 0
+                  AND e.event_type IN ({$event_placeholders})
+                  AND e.created_at >= DATE_SUB(%s, INTERVAL %d DAY)
+                  AND p.post_type = %s
+                  AND p.post_status = 'publish'
+                  AND tt.taxonomy = %s
+                GROUP BY t.term_id, t.name
+                ORDER BY total DESC
+                LIMIT %d";
+
+        $params = array_merge(
+            ['course'],
+            $events,
+            [current_time('mysql'), absint($days), 'course', 'course_category', absint($limit)]
+        );
+
+        return $wpdb->get_results($wpdb->prepare($sql, $params));
+    }
+
     public static function render_dashboard_widget() {
         $course_views_combined = self::get_count(['course_view', 'course_popup_click'], 7);
         $location_views = self::get_count(['location_view'], 7);
         $search_logs = self::get_count(['search_keyword'], 7);
+        $course_learning_link_clicks = self::get_count(['course_learning_link_click'], 7);
         $course_notify_clicks = self::get_count(['course_notify_subscribe'], 7);
         $course_notify_unique_emails = self::get_unique_keyword_count('course_notify_subscribe', 7);
         $top_keywords = self::get_top_keywords(7, 5);
@@ -382,6 +455,7 @@ final class LearningCity_Analytics {
         echo '<li>การเข้าชมคอร์ส (รวม Popup): <strong>' . absint($course_views_combined) . '</strong></li>';
         echo '<li>เข้าแหล่งเรียนรู้: <strong>' . absint($location_views) . '</strong></li>';
         echo '<li>คำค้นหา: <strong>' . absint($search_logs) . '</strong></li>';
+        echo '<li>คลิกปุ่มเริ่มต้นเรียน: <strong>' . absint($course_learning_link_clicks) . '</strong></li>';
         echo '<li>กดแจ้งเตือนคอร์ส: <strong>' . absint($course_notify_clicks) . '</strong></li>';
         echo '<li>อีเมลแจ้งเตือนไม่ซ้ำ: <strong>' . absint($course_notify_unique_emails) . '</strong></li>';
         echo '</ul>';
@@ -405,6 +479,7 @@ final class LearningCity_Analytics {
         $location_views = self::get_count(['location_view'], 7);
         $search_logs = self::get_count(['search_keyword'], 7);
         $course_clicks = self::get_count(['course_click'], 7);
+        $course_learning_link_clicks = self::get_count(['course_learning_link_click'], 7);
         $location_clicks = self::get_count(['location_click'], 7);
         $search_popup_opens = self::get_count(['search_popup_open'], 7);
         $course_notify_clicks = self::get_count(['course_notify_subscribe'], 7);
@@ -414,6 +489,7 @@ final class LearningCity_Analytics {
         $top_courses = self::get_top_objects('course', ['course_view', 'course_click', 'course_popup_click'], 30, 10);
         $top_locations = self::get_top_objects('location', ['location_view', 'location_click'], 30, 10);
         $top_notify_courses = self::get_top_objects('course', ['course_notify_subscribe'], 30, 10);
+        $top_course_categories = self::get_top_course_categories(['course_view', 'course_popup_click', 'course_click'], 30, 10);
 
         echo '<div class="wrap">';
         echo '<h1>LearningCity Analytics</h1>';
@@ -423,6 +499,7 @@ final class LearningCity_Analytics {
         self::card('Course Views (incl. Popup)', $course_views_combined);
         self::card('Location Views', $location_views);
         self::card('Course Link Clicks', $course_clicks);
+        self::card('Course Learning Link Clicks', $course_learning_link_clicks);
         self::card('Location Link Clicks', $location_clicks);
         self::card('Search Popup Opens', $search_popup_opens);
         self::card('Search Keywords', $search_logs);
@@ -450,6 +527,20 @@ final class LearningCity_Analytics {
                 '<strong>' . absint($row->total) . '</strong>',
             ];
         }, ['Course', 'Count']);
+
+        echo '<h2 style="margin-top:24px;">หมวดคอร์สที่คนสนใจสูงสุด (30 วัน)</h2>';
+        self::render_simple_table($top_course_categories, function ($row) {
+            $term_id = absint($row->term_id ?? 0);
+            $name = (string) ($row->name ?? '');
+            $link = $term_id > 0 ? get_term_link($term_id, 'course_category') : '';
+            $label = $name !== '' ? $name : ('Category #' . $term_id);
+            if (is_wp_error($link)) $link = '';
+            $name_html = $link ? '<a href="' . esc_url($link) . '" target="_blank" rel="noopener">' . esc_html($label) . '</a>' : esc_html($label);
+            return [
+                $name_html,
+                '<strong>' . absint($row->total) . '</strong>',
+            ];
+        }, ['Course Category', 'Count']);
 
         echo '<h2 style="margin-top:24px;">แหล่งเรียนรู้ที่ถูกสนใจสูงสุด (30 วัน)</h2>';
         self::render_simple_table($top_locations, function ($row) {

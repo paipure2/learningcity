@@ -1,4 +1,12 @@
 @layer layouts {
+  .site-status-banner {
+    @apply sticky top-0 z-40 bg-amber-300 border-b border-amber-400/60;
+
+    p {
+      @apply text-center text-fs12 sm:text-fs14 font-semibold text-black sm:py-1.5 py-1 px-4 leading-tight;
+    }
+  }
+
   header {
     @apply relative;
 

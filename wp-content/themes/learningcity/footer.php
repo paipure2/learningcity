@@ -268,6 +268,14 @@
       try {
         localStorage.setItem(PDPA_KEY, "accepted");
       } catch (e) {}
+      if (typeof window.gtag === "function") {
+        window.gtag("consent", "update", {
+          ad_storage: "granted",
+          analytics_storage: "granted",
+          ad_user_data: "granted",
+          ad_personalization: "granted"
+        });
+      }
       bar.classList.remove("is-open");
     });
   })();

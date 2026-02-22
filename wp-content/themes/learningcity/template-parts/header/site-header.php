@@ -9,6 +9,9 @@ $blm_pages = get_posts([
 ]);
 $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
 ?>
+ <div class="site-status-banner" role="status" aria-live="polite">
+    <p>ขณะนี้เว็บไซต์อยู่ในช่วง Soft Launch ข้อมูลบางส่วนอาจยังไม่สมบูรณ์หรือมีการเปลี่ยนแปลงได้</p>
+ </div>
  <header>
     <div class="container">
        <div class="header">

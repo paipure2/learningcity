@@ -26,6 +26,7 @@ $ctx = [
 
   'desc' => get_field('course_description', $post_id),
   'learning_link' => get_field('learning_link', $post_id),
+  'images' => get_field('images', $post_id),
 
   'grouped_sessions' => function_exists('course_get_grouped_sessions_by_location') ? course_get_grouped_sessions_by_location($post_id) : [],
 ];
@@ -65,6 +66,8 @@ set_query_var('mode', 'single');
                   get_template_part('template-parts/course/stats');
                   get_template_part('template-parts/course/description');
                   get_template_part('template-parts/course/sessions-accordion');
+                  get_template_part('template-parts/course/gallery');
+                  get_template_part('template-parts/course/edit-button');
                 ?>
 
               </div>

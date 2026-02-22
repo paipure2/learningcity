@@ -44,6 +44,7 @@ $ctx = [
 
   'desc' => get_field('course_description', $course_id),
   'learning_link' => get_field('learning_link', $course_id),
+  'images' => get_field('images', $course_id),
 
   'grouped_sessions' => function_exists('course_get_grouped_sessions_by_location') ? course_get_grouped_sessions_by_location($course_id) : [],
 ];
@@ -57,6 +58,8 @@ get_template_part('template-parts/course/hero');
 get_template_part('template-parts/course/stats');
 get_template_part('template-parts/course/description');
 get_template_part('template-parts/course/sessions-accordion');
+get_template_part('template-parts/course/gallery');
+get_template_part('template-parts/course/edit-button');
 
 get_template_part('template-parts/course/modal-style');
 

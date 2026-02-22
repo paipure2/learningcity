@@ -583,6 +583,135 @@ add_action('wp_enqueue_scripts', function () {
 }, 20);
 
 /* =========================================================
+ * [ADMIN] Analytics count per post (course/location)
+ * ========================================================= */
+add_action('init', function () {
+
+    $get_analytics_count = function ($post_id, array $event_types) {
+        global $wpdb;
+        static $cache = [];
+
+        $post_id = (int) $post_id;
+        if ($post_id <= 0 || empty($event_types)) return 0;
+
+        $normalized_events = array_values(array_filter(array_map('sanitize_key', $event_types)));
+        if (empty($normalized_events)) return 0;
+
+        $cache_key = $post_id . '|' . implode(',', $normalized_events);
+        if (isset($cache[$cache_key])) return (int) $cache[$cache_key];
+
+        $table = $wpdb->prefix . 'lc_analytics_events';
+        $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+        if ($table_exists !== $table) {
+            $cache[$cache_key] = 0;
+            return 0;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($normalized_events), '%s'));
+        $sql = "SELECT COUNT(*) FROM {$table}
+                WHERE object_id = %d
+                  AND event_type IN ({$placeholders})";
+        $params = array_merge([$post_id], $normalized_events);
+        $count = (int) $wpdb->get_var($wpdb->prepare($sql, $params));
+
+        $cache[$cache_key] = $count;
+        return $count;
+    };
+
+    add_filter('manage_course_posts_columns', function ($columns) {
+        $columns['course_interest_views'] = 'ยอดคอร์สวิวรวม';
+        $columns['course_learning_link_clicks'] = 'คลิกปุ่มเริ่มต้นเรียน';
+        return $columns;
+    });
+
+    add_filter('manage_edit-course_sortable_columns', function ($columns) {
+        $columns['course_interest_views'] = 'course_interest_views';
+        $columns['course_learning_link_clicks'] = 'course_learning_link_clicks';
+        return $columns;
+    });
+
+    add_action('manage_course_posts_custom_column', function ($column, $post_id) use ($get_analytics_count) {
+        if ($column === 'course_interest_views') {
+            echo absint($get_analytics_count($post_id, ['course_view', 'course_popup_click']));
+            return;
+        }
+        if ($column === 'course_learning_link_clicks') {
+            echo absint($get_analytics_count($post_id, ['course_learning_link_click']));
+        }
+    }, 10, 2);
+
+    add_filter('manage_location_posts_columns', function ($columns) {
+        $columns['location_views_count'] = 'ยอด Location Views';
+        return $columns;
+    });
+
+    add_filter('manage_edit-location_sortable_columns', function ($columns) {
+        $columns['location_views_count'] = 'location_views_count';
+        return $columns;
+    });
+
+    add_action('manage_location_posts_custom_column', function ($column, $post_id) use ($get_analytics_count) {
+        if ($column !== 'location_views_count') return;
+        echo absint($get_analytics_count($post_id, ['location_view']));
+    }, 10, 2);
+}, 25);
+
+add_action('pre_get_posts', function ($query) {
+    if (!is_admin() || !$query->is_main_query()) return;
+
+    $post_type = $query->get('post_type');
+    $orderby = (string) $query->get('orderby');
+
+    if ($post_type === 'course' && $orderby === 'course_interest_views') {
+        $query->set('lc_analytics_sort_key', 'course_interest_views');
+    }
+    if ($post_type === 'course' && $orderby === 'course_learning_link_clicks') {
+        $query->set('lc_analytics_sort_key', 'course_learning_link_clicks');
+    }
+
+    if ($post_type === 'location' && $orderby === 'location_views_count') {
+        $query->set('lc_analytics_sort_key', 'location_views_count');
+    }
+});
+
+add_filter('posts_clauses', function ($clauses, $query) {
+    if (!is_admin() || !$query->is_main_query()) return $clauses;
+
+    $sort_key = (string) $query->get('lc_analytics_sort_key');
+    if ($sort_key === '') return $clauses;
+
+    global $wpdb;
+
+    $table = $wpdb->prefix . 'lc_analytics_events';
+    $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+    if ($table_exists !== $table) return $clauses;
+
+    $events_sql = '';
+    if ($sort_key === 'course_interest_views') {
+        $events_sql = "'course_view','course_popup_click'";
+    } elseif ($sort_key === 'course_learning_link_clicks') {
+        $events_sql = "'course_learning_link_click'";
+    } elseif ($sort_key === 'location_views_count') {
+        $events_sql = "'location_view'";
+    } else {
+        return $clauses;
+    }
+
+    $join_alias = 'lc_analytics_count';
+    $clauses['join'] .= " LEFT JOIN (
+        SELECT object_id, COUNT(*) AS cnt
+        FROM {$table}
+        WHERE event_type IN ({$events_sql})
+        GROUP BY object_id
+    ) {$join_alias} ON {$join_alias}.object_id = {$wpdb->posts}.ID ";
+
+    $order = strtoupper((string) $query->get('order')) === 'ASC' ? 'ASC' : 'DESC';
+    $clauses['orderby'] = "COALESCE({$join_alias}.cnt, 0) {$order}, {$wpdb->posts}.ID DESC";
+
+    return $clauses;
+}, 20, 2);
+
+/* =========================================================
  * [ADMIN COURSE] Bulk set / auto-detect course category
  * ========================================================= */
 if (!function_exists('lc_normalize_text_for_match')) {
@@ -1715,6 +1844,66 @@ add_action('lc_bma_sync_every_30_minutes', function () {
   }
 });
 
+function lc_tag_has_post_entries($query = null) {
+  $tag_id = 0;
+
+  if ($query instanceof WP_Query) {
+    $tag_id = (int) $query->get('tag_id');
+    if ($tag_id <= 0) {
+      $slug = sanitize_title((string) $query->get('tag'));
+      if ($slug !== '') {
+        $term = get_term_by('slug', $slug, 'post_tag');
+        if ($term instanceof WP_Term) {
+          $tag_id = (int) $term->term_id;
+        }
+      }
+    }
+  } elseif (is_tag()) {
+    $term = get_queried_object();
+    if ($term instanceof WP_Term && $term->taxonomy === 'post_tag') {
+      $tag_id = (int) $term->term_id;
+    }
+  }
+
+  if ($tag_id <= 0) return false;
+
+  static $cache = [];
+  if (array_key_exists($tag_id, $cache)) {
+    return $cache[$tag_id];
+  }
+
+  $ids = get_posts([
+    'post_type'              => 'post',
+    'post_status'            => 'publish',
+    'posts_per_page'         => 1,
+    'fields'                 => 'ids',
+    'no_found_rows'          => true,
+    'ignore_sticky_posts'    => true,
+    'update_post_meta_cache' => false,
+    'update_post_term_cache' => false,
+    'tax_query'              => [
+      [
+        'taxonomy' => 'post_tag',
+        'field'    => 'term_id',
+        'terms'    => [$tag_id],
+      ],
+    ],
+  ]);
+
+  $cache[$tag_id] = !empty($ids);
+  return $cache[$tag_id];
+}
+
+function lc_is_course_tag_context($query = null) {
+  if ($query instanceof WP_Query) {
+    if (!$query->is_tag()) return false;
+    return !lc_tag_has_post_entries($query);
+  }
+
+  if (!is_tag()) return false;
+  return !lc_tag_has_post_entries();
+}
+
 // Default filter on archives
 add_action('pre_get_posts', function ($q) {
   if (is_admin() || !$q->is_main_query()) return;
@@ -1726,7 +1915,7 @@ add_action('pre_get_posts', function ($q) {
     $q->is_tax('course_provider') ||
     $q->is_tax('skill-level') ||
     $q->is_tax('audience') ||
-    $q->is_tag()
+    lc_is_course_tag_context($q)
   );
 
   if (!$is_course_context) return;
@@ -1746,7 +1935,7 @@ function lc_is_course_archive_context() {
     is_tax('course_provider') ||
     is_tax('audience') ||
     is_tax('skill-level') ||
-    is_tag()
+    lc_is_course_tag_context()
   );
 }
 
@@ -2093,6 +2282,7 @@ add_action('wp_enqueue_scripts', function () {
     null,
     true
   );
+  wp_script_add_data('theme-app', 'type', 'module');
 
   $wanted = ['job', 'language', 'digital'];
 
@@ -2820,7 +3010,18 @@ add_action('add_meta_boxes', function ($post_type) {
     remove_meta_box('sib_push_meta_box', $post_type, 'normal');
     remove_meta_box('sib_push_meta_box', $post_type, 'side');
     remove_meta_box('sib_push_meta_box', $post_type, 'advanced');
+    remove_meta_box('smackcsv_product_id', $post_type, 'normal');
+    remove_meta_box('smackcsv_product_id', $post_type, 'side');
+    remove_meta_box('smackcsv_product_id', $post_type, 'advanced');
 }, 999);
+
+// Fallback: remove again at do_meta_boxes stage (runs after meta boxes are assembled).
+add_action('do_meta_boxes', function ($post_type) {
+    if (!$post_type) return;
+    remove_meta_box('smackcsv_product_id', $post_type, 'normal');
+    remove_meta_box('smackcsv_product_id', $post_type, 'side');
+    remove_meta_box('smackcsv_product_id', $post_type, 'advanced');
+}, 999, 1);
 
 add_action('admin_head', function () {
     $screen = function_exists('get_current_screen') ? get_current_screen() : null;
@@ -2828,7 +3029,21 @@ add_action('admin_head', function () {
 
     echo '<style>
       #sib_push_meta_box { display: none !important; }
+      #smackcsv_product_id { display: none !important; }
     </style>';
+}, 999);
+
+// Final fallback for editors with dynamic metabox rendering.
+add_action('admin_footer', function () {
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->base !== 'post') return;
+    echo '<script>
+      (function(){
+        var box = document.getElementById("smackcsv_product_id");
+        if (!box) return;
+        box.remove();
+      })();
+    </script>';
 }, 999);
 
 add_action('template_redirect', function () {

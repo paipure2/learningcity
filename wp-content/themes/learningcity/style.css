@@ -345,6 +345,12 @@ body.wpc_show_open_close_button .wpc-filters-widget-content:not(.wpc-opened) {
   transition: opacity 0.24s ease, visibility 0s linear 0s;
 }
 
+/* Keep Fancybox above custom modals (e.g. course AJAX modal uses high z-index) */
+.fancybox__container {
+  position: fixed !important;
+  z-index: 6001 !important;
+}
+
 .lc-modal-search__head {
   margin-bottom: 20px;
 }

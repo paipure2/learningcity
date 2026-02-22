@@ -46,8 +46,8 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
 
 <div id="lcStatusModal" class="hidden fixed inset-0" style="z-index:2147483647;">
   <div class="absolute inset-0 bg-[#0b1726]/55 backdrop-blur-[2px]" data-status-backdrop="1"></div>
-  <div class="absolute inset-0 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[760px] border border-[#d8e2ec]" style="height:min(760px, calc(100vh - 32px));">
+  <div class="absolute inset-0 flex items-center justify-center p-4 lc-responsive-modal-wrap">
+  <div class="lc-responsive-modal-card bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[760px] border border-[#d8e2ec]" style="height:min(760px, calc(100vh - 32px));">
     <div class="px-5 py-4 border-b border-[#e8eef5] flex items-center justify-between bg-[#f8fbff]">
       <div>
         <div class="font-bold text-[20px] leading-tight text-[#132239]">Editor Panel</div>
@@ -67,6 +67,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
             <button type="button" class="whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 border-slate-300" data-status-tab="pending">รอตรวจสอบ (0)</button>
             <button type="button" class="whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 border-slate-300" data-status-tab="approved">อนุมัติ (0)</button>
             <button type="button" class="whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 border-slate-300" data-status-tab="rejected">ไม่อนุมัติ (0)</button>
+            <button type="button" class="whitespace-nowrap px-3 py-1.5 rounded-full border text-sm font-semibold text-slate-700 border-slate-300" data-status-tab="cancelled">ยกเลิก (0)</button>
           </div>
         </div>
         <div class="w-full md:w-[240px] md:flex-none">
@@ -87,6 +88,45 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   </div>
 </div>
 <style>
+  .lc-responsive-modal-wrap{padding:16px;align-items:center;justify-content:center}
+  #lcStatusModal .lc-responsive-modal-card,
+  #lcCourseEditModal .lc-responsive-modal-card{
+    height:min(760px,calc(100dvh - 24px)) !important;
+    max-height:calc(100dvh - 24px);
+  }
+  @supports not (height: 100dvh){
+    #lcStatusModal .lc-responsive-modal-card,
+    #lcCourseEditModal .lc-responsive-modal-card{
+      height:min(760px,calc(100vh - 24px)) !important;
+      max-height:calc(100vh - 24px);
+    }
+  }
+  @media (max-width: 768px){
+    .lc-responsive-modal-wrap{
+      align-items:flex-start;
+      padding:8px;
+      padding-top:max(8px, env(safe-area-inset-top));
+      padding-bottom:max(8px, env(safe-area-inset-bottom));
+    }
+    #lcStatusModal .lc-responsive-modal-card,
+    #lcCourseEditModal .lc-responsive-modal-card{
+      width:100%;
+      max-width:none;
+      border-radius:14px;
+      height:calc(100dvh - 16px) !important;
+      max-height:calc(100dvh - 16px);
+    }
+    #lcStatusBody .lc-status-row-head{
+      flex-direction:column;
+      align-items:flex-start !important;
+      gap:8px !important;
+    }
+    #lcStatusBody .lc-status-row-badges{
+      order:-1;
+      width:100%;
+      justify-content:flex-start !important;
+    }
+  }
   #lcCourseEditModal .lc-inline-tab{height:34px;padding:0 12px;border-radius:999px;border:1px solid #cfd9e5;background:#fff;color:#334155;font-weight:700;font-size:14px;cursor:pointer}
   #lcCourseEditModal .lc-inline-tab.is-active{background:#00744b;color:#fff;border-color:#00744b}
   #lcCourseEditModal .lc-course-panel{display:none}
@@ -128,19 +168,28 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   #lcCourseEditModal .lc-inline-session-item{border:1px solid #dbe4ee;border-radius:10px;background:#fff;padding:0}
   #lcCourseEditModal .lc-inline-session-head{padding:10px 12px;cursor:pointer;font-weight:700;color:#0f172a;list-style:none}
   #lcCourseEditModal .lc-inline-session-head::-webkit-details-marker{display:none}
-  #lcCourseEditModal .lc-inline-session-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  #lcCourseEditModal .lc-inline-session-name{font-weight:800}
+  #lcCourseEditModal .lc-inline-session-head-row{display:flex;align-items:center;justify-content:flex-start;gap:8px}
+  #lcCourseEditModal .lc-inline-session-name{font-weight:800;flex:1;min-width:0;text-align:left}
   #lcCourseEditModal .lc-inline-session-id{font-size:90%;font-weight:600;color:#64748b}
+  #lcCourseEditModal .lc-inline-session-chevron{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;color:#64748b;font-size:14px;line-height:1;transition:transform .18s ease}
+  #lcCourseEditModal .lc-inline-session-item[open] .lc-inline-session-chevron{transform:rotate(180deg)}
   #lcCourseEditModal .lc-inline-session-body{padding:0 10px 10px}
-  #lcCourseEditModal .lc-inline-session-remove{height:30px;padding:0 10px;border-radius:999px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer}
+  #lcCourseEditModal .lc-inline-session-remove{height:30px;padding:0 10px;border-radius:999px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:auto}
   #lcCourseEditModal .lc-inline-session-remove.toggle.is-active{background:#fee2e2}
   #lcCourseEditModal .lc-inline-session-item.is-remove{border-color:#dc2626;background:#fff1f2}
   #lcCourseEditModal .lc-inline-session-item.is-remove .lc-inline-session-body{display:none}
+  #lcCourseEditModal .lc-course-input-locked{background:#f1f5f9 !important;border-color:#d1d5db !important;color:#64748b;cursor:not-allowed}
+  #lcCourseEditModal .lc-course-lock-label{color:#64748b}
+  #lcCourseEditModal .lc-course-locked-check{opacity:.7;cursor:not-allowed}
+  @media (max-width: 768px){
+    #lcCourseEditModal .lc-inline-session-head-row{flex-wrap:wrap;align-items:flex-start}
+    #lcCourseEditModal .lc-inline-session-head-row .lc-inline-session-remove{width:auto;min-width:56px;max-width:100%;height:32px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto}
+  }
 </style>
 <div id="lcCourseEditModal" class="hidden fixed inset-0" style="z-index:2147483647;">
   <div class="absolute inset-0 bg-[#0b1726]/55 backdrop-blur-[2px]" data-course-edit-backdrop="1"></div>
-  <div class="absolute inset-0 flex items-center justify-center p-4">
-    <div class="lc-course-card relative bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[760px] border border-[#d8e2ec]" style="height:min(760px, calc(100vh - 32px));">
+  <div class="absolute inset-0 flex items-center justify-center p-4 lc-responsive-modal-wrap">
+    <div class="lc-course-card lc-responsive-modal-card relative bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[760px] border border-[#d8e2ec]" style="height:min(760px, calc(100vh - 32px));">
       <div class="lc-course-head px-5 py-4 border-b border-[#e8eef5] bg-[#f8fbff]">
         <div class="flex items-center justify-between gap-3">
           <div>
@@ -159,7 +208,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         <section class="lc-course-panel is-active space-y-4" data-course-panel="course">
           <div>
             <label class="text-sm font-semibold text-[#1f2f46]">ชื่อคอร์ส</label>
-            <input id="lcCourseEditTitle" type="text" class="mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm focus:border-[#00744b] focus:ring-0" />
+            <input id="lcCourseEditTitle" type="text" class="lc-course-input-locked mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm focus:border-[#00744b] focus:ring-0" readonly disabled />
           </div>
           <div>
             <label class="text-sm font-semibold text-[#1f2f46]">คำอธิบายคอร์ส</label>
@@ -171,17 +220,17 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="text-sm font-semibold text-[#1f2f46]">จำนวนนาทีที่เรียน</label>
-              <input id="lcCourseEditTotalMinutes" type="number" min="0" step="1" class="mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm focus:border-[#00744b] focus:ring-0" />
+              <label class="text-sm font-semibold lc-course-lock-label text-[#1f2f46]">จำนวนนาทีที่เรียน</label>
+              <input id="lcCourseEditTotalMinutes" type="number" min="0" step="1" class="lc-course-input-locked mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm focus:border-[#00744b] focus:ring-0" readonly disabled />
             </div>
             <div>
-              <label class="text-sm font-semibold text-[#1f2f46]">ราคา</label>
-              <input id="lcCourseEditPrice" type="number" min="0" step="0.01" class="mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm focus:border-[#00744b] focus:ring-0" />
+              <label class="text-sm font-semibold lc-course-lock-label text-[#1f2f46]">ราคา</label>
+              <input id="lcCourseEditPrice" type="number" min="0" step="0.01" class="lc-course-input-locked mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm focus:border-[#00744b] focus:ring-0" readonly disabled />
             </div>
           </div>
           <div>
-            <label class="inline-flex items-center gap-2 text-sm font-semibold text-[#1f2f46]">
-              <input id="lcCourseEditHasCertificate" type="checkbox" class="rounded border-[#cfd9e5] text-[#00744b] focus:ring-[#00744b]">
+            <label class="inline-flex items-center gap-2 text-sm font-semibold lc-course-lock-label text-[#1f2f46]">
+              <input id="lcCourseEditHasCertificate" type="checkbox" class="lc-course-locked-check rounded border-[#cfd9e5] text-[#00744b] focus:ring-[#00744b]" disabled>
               มีใบรับรองไหม
             </label>
           </div>
@@ -329,7 +378,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   let statusFilter = "all";
   let statusTypeFilter = "all";
   let statusRows = [];
-  let statusCounts = { all: 0, pending: 0, approved: 0, rejected: 0 };
+  let statusCounts = { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
   let statusTypeCounts = { all: 0, location: 0, course: 0 };
   let requesterEmail = "";
   let activeDetailRequestId = 0;
@@ -491,6 +540,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       pending: `รอตรวจสอบ (${Number(statusCounts.pending || 0)})`,
       approved: `อนุมัติ (${Number(statusCounts.approved || 0)})`,
       rejected: `ไม่อนุมัติ (${Number(statusCounts.rejected || 0)})`,
+      cancelled: `ยกเลิก (${Number(statusCounts.cancelled || 0)})`,
     };
     statusTabs.querySelectorAll("[data-status-tab]").forEach((btn) => {
       if (!(btn instanceof HTMLButtonElement)) return;
@@ -526,6 +576,77 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     statusTypeSelectEl.value = statusTypeFilter;
   };
 
+  const openStatusConfirmModal = ({ title = "", message = "", confirmText = "ยืนยัน", cancelText = "ยกเลิก", danger = false } = {}) => {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement("div");
+      backdrop.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:2147483647;padding:16px;";
+      const card = document.createElement("div");
+      card.style.cssText = "width:min(520px,calc(100vw - 32px));background:#fff;border:1px solid #dbe4ee;border-radius:14px;box-shadow:0 18px 44px rgba(15,23,42,.25);overflow:hidden;";
+      card.innerHTML = `
+        <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-size:20px;font-weight:800;color:#0f172a;">${String(title || "ยืนยันการทำรายการ")}</div>
+        <div style="padding:14px 16px;font-size:15px;line-height:1.6;color:#334155;white-space:pre-wrap;">${String(message || "")}</div>
+        <div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" data-confirm-cancel="1" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50">${String(cancelText || "ยกเลิก")}</button>
+          <button type="button" data-confirm-ok="1" class="px-4 py-2 rounded-lg border font-semibold text-white ${danger ? "border-rose-700 bg-rose-700 hover:bg-rose-800" : "border-[#00744b] bg-[#00744b] hover:bg-[#006642]"}">${String(confirmText || "ยืนยัน")}</button>
+        </div>
+      `;
+      backdrop.appendChild(card);
+      document.body.appendChild(backdrop);
+
+      const close = (ok) => {
+        backdrop.remove();
+        resolve(!!ok);
+      };
+      const onEsc = (event) => {
+        if (event.key === "Escape") {
+          document.removeEventListener("keydown", onEsc);
+          close(false);
+        }
+      };
+      document.addEventListener("keydown", onEsc);
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) {
+          document.removeEventListener("keydown", onEsc);
+          close(false);
+        }
+      });
+      card.querySelector("[data-confirm-cancel='1']")?.addEventListener("click", () => {
+        document.removeEventListener("keydown", onEsc);
+        close(false);
+      });
+      card.querySelector("[data-confirm-ok='1']")?.addEventListener("click", () => {
+        document.removeEventListener("keydown", onEsc);
+        close(true);
+      });
+    });
+  };
+
+  const deletePendingRequest = async (requestId) => {
+    const rid = Number(requestId || 0);
+    if (!rid) return;
+    const ok = await openStatusConfirmModal({
+      title: "ยืนยันการยกเลิกคำขอ",
+      message: `ต้องการยกเลิกคำขอ #${rid} ใช่หรือไม่?\nยกเลิกได้เฉพาะภายใน 15 นาทีหลังส่งคำขอ`,
+      confirmText: "ยกเลิกคำขอ",
+      cancelText: "ยกเลิก",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const fd = new FormData();
+      fd.append("action", "lc_delete_location_edit_request");
+      fd.append("nonce", String(nonce || ""));
+      fd.append("request_id", String(rid));
+      const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      const json = await res.json();
+      if (!json?.success) throw new Error(json?.data?.message || "ยกเลิกคำขอไม่สำเร็จ");
+      statusNewRequestIds.delete(rid);
+      await fetchStatusFeed();
+    } catch (err) {
+      window.alert(String(err?.message || "ยกเลิกคำขอไม่สำเร็จ"));
+    }
+  };
+
   const renderStatusRows = () => {
     if (!statusBody) return;
     if (statusFiltersWrap) statusFiltersWrap.classList.remove("hidden");
@@ -551,26 +672,31 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       const locationTitle = esc(decodeHtmlEntities(row?.location_title || "-"));
       const typeLabel = esc(row?.target_type_label || (String(row?.target_type || "location") === "course" ? "คอร์ส" : "สถานที่"));
       const status = String(row?.status || "pending");
+      const canDelete = status === "pending";
+      const canDeleteNow = !!row?.can_delete && status === "pending";
       const statusLabel = esc(row?.status_label || "");
       const submitted = esc(row?.submitted_at || "-");
       const isNew = statusNewRequestIds.has(rid);
       const statusBadgeClass = status === "approved"
         ? "background:#ecfdf3;color:#166534;"
-        : (status === "rejected" ? "background:#fef2f2;color:#991b1b;" : "background:#fff7ed;color:#9a3412;");
+        : (status === "rejected" ? "background:#fef2f2;color:#991b1b;" : (status === "cancelled" ? "background:#f1f5f9;color:#475569;" : "background:#fff7ed;color:#9a3412;"));
       return `
-        <button type="button" data-open-request="${rid}" style="width:100%;text-align:left;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff;margin-bottom:10px;cursor:pointer;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-            <div>
+        <div style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff;margin-bottom:10px;">
+          <div class="lc-status-row-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+            <div class="lc-status-row-main">
               <div style="font-weight:800;color:#0f172a;">${locationTitle}</div>
               <div style="font-size:12px;color:#64748b;margin-top:2px;">${typeLabel} · คำขอ #${rid} · ส่งเมื่อ ${submitted}</div>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;">
+            <div class="lc-status-row-badges" style="display:flex;align-items:center;gap:6px;">
               ${isNew ? '<span style="display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:800;background:#dcfce7;color:#166534;border:1px solid #86efac;">NEW</span>' : ''}
               <span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;${statusBadgeClass}">${statusLabel}</span>
             </div>
           </div>
-          <div style="margin-top:8px;font-size:13px;color:#0f766e;font-weight:700;">ดูรายละเอียดการแก้ไข →</div>
-        </button>
+          <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <button type="button" data-open-request="${rid}" style="border:0;background:transparent;padding:0;font-size:13px;color:#0f766e;font-weight:700;cursor:pointer;">ดูรายละเอียดการแก้ไข →</button>
+            ${canDelete ? `<button type="button" data-delete-request="${rid}" ${canDeleteNow ? "" : "disabled"} title="${canDeleteNow ? "" : "ยกเลิกได้ภายใน 15 นาทีหลังส่งคำขอ"}" style="height:28px;padding:0 10px;border-radius:999px;border:1px solid #fca5a5;background:#fff1f2;color:#b91c1c;font-size:12px;font-weight:700;cursor:${canDeleteNow ? "pointer" : "not-allowed"};opacity:${canDeleteNow ? "1" : ".55"};">ยกเลิกคำขอ</button>` : ""}
+          </div>
+        </div>
       `;
     }).join("");
   };
@@ -591,13 +717,17 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     const rid = Number(row?.request_id || 0);
     const locationTitle = esc(decodeHtmlEntities(row?.location_title || "-"));
     const status = String(row?.status || "pending");
+    const canDelete = status === "pending";
+    const canDeleteNow = !!row?.can_delete && status === "pending";
     const statusLabel = esc(row?.status_label || "");
     const submitted = esc(row?.submitted_at || "-");
     const rejected = esc(row?.reject_reason || "");
+    const cancelledBy = esc(row?.cancelled_by || "");
+    const cancelledAt = esc(row?.cancelled_at || "");
     const details = Array.isArray(row?.change_details) ? row.change_details : [];
     const statusBadgeClass = status === "approved"
       ? "background:#ecfdf3;color:#166534;"
-      : (status === "rejected" ? "background:#fef2f2;color:#991b1b;" : "background:#fff7ed;color:#9a3412;");
+      : (status === "rejected" ? "background:#fef2f2;color:#991b1b;" : (status === "cancelled" ? "background:#f1f5f9;color:#475569;" : "background:#fff7ed;color:#9a3412;"));
     const detailRows = details.length ? details.map((item) => {
       const type = String(item?.type || "text");
       const label = esc(item?.label || "ข้อมูล");
@@ -634,7 +764,10 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
 
     statusDetailBody.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
-        <button type="button" id="lcStatusBackBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">← ย้อนกลับ</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button type="button" id="lcStatusBackBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">← ย้อนกลับ</button>
+          ${canDelete ? `<button type="button" id="lcStatusDeleteBtn" ${canDeleteNow ? "" : "disabled"} title="${canDeleteNow ? "" : "ยกเลิกได้ภายใน 15 นาทีหลังส่งคำขอ"}" class="px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 text-sm font-semibold hover:bg-rose-50" style="${canDeleteNow ? "" : "opacity:.55;cursor:not-allowed;"}">ยกเลิกคำขอ</button>` : ""}
+        </div>
         <span style="display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;${statusBadgeClass}">${statusLabel}</span>
       </div>
       <div style="margin-bottom:10px;">
@@ -642,10 +775,17 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         <div style="font-size:12px;color:#64748b;margin-top:2px;">คำขอ #${rid} · ส่งเมื่อ ${submitted}</div>
       </div>
       ${status === "rejected" && rejected ? `<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#fff1f2;border:1px solid #fecdd3;font-size:13px;color:#9f1239;"><strong>เหตุผลที่ไม่อนุมัติ:</strong> ${rejected}</div>` : ""}
+      ${status === "pending" && !canDeleteNow ? `<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;font-size:13px;color:#9a3412;">ยกเลิกได้ภายใน 15 นาทีหลังส่งคำขอ</div>` : ""}
+      ${status === "cancelled" ? `<div style="margin-bottom:10px;padding:8px 10px;border-radius:8px;background:#f8fafc;border:1px solid #cbd5e1;font-size:13px;color:#475569;"><strong>ยกเลิกโดย:</strong> ${cancelledBy || "-"}${cancelledAt ? ` · <strong>เมื่อ:</strong> ${cancelledAt}` : ""}</div>` : ""}
       <div style="display:grid;gap:8px;">${detailRows}</div>
     `;
     const backBtn = el("lcStatusBackBtn");
     backBtn?.addEventListener("click", () => renderStatusRows());
+    const deleteBtn = el("lcStatusDeleteBtn");
+    deleteBtn?.addEventListener("click", async () => {
+      await deletePendingRequest(rid);
+      renderStatusRows();
+    });
   };
 
   const openStatusDetail = async (requestId) => {
@@ -685,7 +825,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       const json = await res.json();
       if (!json?.success) throw new Error(json?.data?.message || "โหลดสถานะไม่สำเร็จ");
       statusRows = Array.isArray(json?.data?.rows) ? json.data.rows : [];
-      statusCounts = (json?.data?.counts && typeof json.data.counts === "object") ? json.data.counts : { all: 0, pending: 0, approved: 0, rejected: 0 };
+      statusCounts = (json?.data?.counts && typeof json.data.counts === "object") ? json.data.counts : { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
       statusTypeCounts = (json?.data?.type_counts && typeof json.data.type_counts === "object") ? json.data.type_counts : { all: 0, location: 0, course: 0 };
       requesterEmail = String(json?.data?.requester_email || "").trim();
       if (statusRequesterEmailEl) {
@@ -865,11 +1005,12 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     const timePeriod = esc(row?.time_period || "");
     const details = esc(row?.session_details || "");
     const badge = isNew ? '<span class="lc-inline-session-id"> (ใหม่)</span>' : `<span class="lc-inline-session-id"> (#${sid})</span>`;
-    const removeText = isNew ? "ลบ Session ใหม่" : "ลบ Session นี้";
+    const removeText = "ลบ";
     return `
       <details class="lc-inline-session-item" data-course-session-row="${keyId}" data-course-session-new="${isNew ? "1" : "0"}" data-course-location-id="${locationId}">
         <summary class="lc-inline-session-head">
           <div class="lc-inline-session-head-row">
+            <span class="lc-inline-session-chevron" aria-hidden="true">▾</span>
             <span class="lc-inline-session-name">${locationTitle}${badge}</span>
             <button type="button" class="lc-inline-session-remove toggle" data-course-session-delete="1">${removeText}</button>
           </div>
@@ -930,6 +1071,13 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         const raw = String(contextJson.data?.course?.has_certificate ?? "").toLowerCase();
         courseEditHasCertificateEl.checked = raw === "1" || raw === "true" || raw === "yes";
       }
+      [courseEditTitleEl, courseEditTotalMinutesEl, courseEditPriceEl, courseEditHasCertificateEl].forEach((field) => {
+        if (!(field instanceof HTMLElement)) return;
+        field.setAttribute("disabled", "disabled");
+        if (field instanceof HTMLInputElement && field.type !== "checkbox") {
+          field.setAttribute("readonly", "readonly");
+        }
+      });
       if (courseEditNewImagesEl) {
         courseEditNewImagesEl.value = "";
         courseEditNewImagesEl._lcPendingFiles = [];
@@ -1024,7 +1172,16 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     setStatusTypeTabUI();
     renderStatusRows();
   });
-  statusBody?.addEventListener("click", (e) => {
+  statusBody?.addEventListener("click", async (e) => {
+    const deleteBtn = e.target instanceof Element ? e.target.closest("[data-delete-request]") : null;
+    if (deleteBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rid = Number(deleteBtn.getAttribute("data-delete-request") || 0);
+      if (!rid) return;
+      await deletePendingRequest(rid);
+      return;
+    }
     const btn = e.target instanceof Element ? e.target.closest("[data-open-request]") : null;
     if (!btn) return;
     const rid = Number(btn.getAttribute("data-open-request") || 0);
@@ -1142,7 +1299,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     const willDelete = !row.classList.contains("is-remove");
     row.classList.toggle("is-remove", willDelete);
     btn.classList.toggle("is-active", willDelete);
-    btn.textContent = willDelete ? "ยกเลิกลบ Session" : "ลบ Session นี้";
+    btn.textContent = willDelete ? "ยกเลิก" : "ลบ";
     refreshCourseSessionSearchIndex();
     applyCourseSessionSearch();
   });
@@ -1203,12 +1360,8 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       setCourseEditMsg("error", "ไม่พบข้อมูลคอร์ส");
       return;
     }
-    const title = String(courseEditTitleEl?.value || "").trim();
     const courseDescription = normalizeLineBreaks(String(courseEditDescriptionEl?.value || ""));
     const learningLink = String(courseEditLearningLinkEl?.value || "").trim();
-    const totalMinutes = String(courseEditTotalMinutesEl?.value || "").trim();
-    const price = String(courseEditPriceEl?.value || "").trim();
-    const hasCertificate = !!courseEditHasCertificateEl?.checked;
     const newImages = Array.isArray(courseEditNewImagesEl?._lcPendingFiles) ? courseEditNewImagesEl._lcPendingFiles : Array.from(courseEditNewImagesEl?.files || []);
     const requestNote = normalizeLineBreaks(String(courseEditNoteEl?.value || ""));
     const sessionRows = Array.from(courseEditSessionListEl?.querySelectorAll(".lc-inline-session-item[data-course-session-row]") || []);
@@ -1238,25 +1391,11 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       })
       .filter((row) => Number(row.location_id) > 0);
     const normalize = (v) => String(v || "").trim();
-    const normalizeNumber = (v) => {
-      const raw = String(v ?? "").trim();
-      if (raw === "") return "";
-      const n = Number(raw);
-      return Number.isFinite(n) ? String(n) : raw;
-    };
-    const normalizeBool = (v) => {
-      const raw = String(v ?? "").trim().toLowerCase();
-      return raw === "1" || raw === "true" || raw === "yes" ? "1" : "0";
-    };
     const beforeCourse = courseEditContext?.course || {};
     const beforeSessionsMap = new Map((Array.isArray(courseEditContext?.sessions) ? courseEditContext.sessions : []).map((s) => [Number(s?.id || 0), s]));
     const courseChanged =
-      normalize(title) !== normalize(beforeCourse?.title) ||
       normalize(courseDescription) !== normalize(beforeCourse?.course_description) ||
-      normalize(learningLink) !== normalize(beforeCourse?.learning_link) ||
-      normalizeNumber(totalMinutes) !== normalizeNumber(beforeCourse?.total_minutes) ||
-      normalizeNumber(price) !== normalizeNumber(beforeCourse?.price) ||
-      normalizeBool(hasCertificate ? "1" : "0") !== normalizeBool(beforeCourse?.has_certificate);
+      normalize(learningLink) !== normalize(beforeCourse?.learning_link);
     const changedSessions = sessions.filter((row) => {
       const before = beforeSessionsMap.get(Number(row.id || 0));
       if (!before) return false;
@@ -1285,12 +1424,8 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       fd.append("action", "lc_submit_course_edit_request");
       fd.append("nonce", String(nonce || ""));
       fd.append("course_id", String(courseId));
-      fd.append("title", title);
       fd.append("course_description", courseDescription);
       fd.append("learning_link", learningLink);
-      fd.append("total_minutes", totalMinutes);
-      fd.append("price", price);
-      fd.append("has_certificate", hasCertificate ? "1" : "0");
       fd.append("request_note", requestNote);
       fd.append("sessions", JSON.stringify(changedSessions));
       fd.append("delete_session_ids", JSON.stringify(deleteSessionIds));

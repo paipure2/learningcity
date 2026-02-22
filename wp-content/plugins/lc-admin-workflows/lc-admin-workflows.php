@@ -328,10 +328,6 @@ add_action('admin_enqueue_scripts', function ($hook) {
         $(function(){
           const $coursesBox = $("#lc_location_courses_list");
 
-          const $reportsBox = $("#acf-group_lc_location_reports").length
-            ? $("#acf-group_lc_location_reports")
-            : $('#poststuff .postbox[id*="group_lc_location_reports"]');
-
           const $contentBox = $("#postdivrich, #postdiv");
           const $permalinkBox = $("#edit-slug-box");
           const $titleDiv = $("#titlediv");
@@ -340,7 +336,6 @@ add_action('admin_enqueue_scripts', function ($hook) {
             '<div class="lc-location-tabs">' +
               '<button type="button" class="lc-location-tab-btn is-active" data-tab="details">Location Details</button>' +
               '<button type="button" class="lc-location-tab-btn" data-tab="courses">Courses ใน Location นี้</button>' +
-              '<button type="button" class="lc-location-tab-btn" data-tab="reports">Location Reports</button>' +
             '</div>'
           );
 
@@ -363,16 +358,10 @@ add_action('admin_enqueue_scripts', function ($hook) {
               if ($coursesBox.length) {
                 $coursesBox.show();
               }
-            } else if (tab === "reports") {
-              $allBoxes.hide();
-              $contentBox.hide();
-              $pinnedAlways.show();
-              if ($reportsBox.length) $reportsBox.show();
             } else {
               $allBoxes.show();
               $contentBox.show();
               $coursesBox.hide();
-              if ($reportsBox.length) $reportsBox.hide();
             }
 
             $tabs.find(".lc-location-tab-btn")

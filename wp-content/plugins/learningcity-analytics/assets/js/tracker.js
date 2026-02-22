@@ -23,8 +23,8 @@
 
     if (navigator.sendBeacon) {
       try {
-        navigator.sendBeacon(cfg.ajaxUrl, fd);
-        return;
+        var queued = navigator.sendBeacon(cfg.ajaxUrl, fd);
+        if (queued) return;
       } catch (e) {
         // fallback to fetch below
       }
@@ -110,6 +110,17 @@
       if (!link) return;
 
       try {
+        if (link.hasAttribute('data-course-learning-link')) {
+          var linkedCourseId = parseInt(link.getAttribute('data-course-id') || '0', 10) || getPostIdFromPath(window.location.pathname || '');
+          send({
+            event_type: 'course_learning_link_click',
+            object_type: 'course',
+            object_id: linkedCourseId,
+            context: 'learning_link',
+          });
+          return;
+        }
+
         var url = new URL(link.getAttribute('href'), window.location.origin);
         var path = url.pathname || '';
 
