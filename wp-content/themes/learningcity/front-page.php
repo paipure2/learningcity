@@ -1174,7 +1174,16 @@
                           <?php foreach ($col_items as $item_index => $item) :
                             $item_text = isset($item['text']) ? trim((string) $item['text']) : '';
                             $item_highlight = isset($item['highlight']) ? trim((string) $item['highlight']) : '';
-                            $item_has_popup = !empty($item['has_popup']);
+                            $item_action = isset($item['action_type']) ? sanitize_key((string) $item['action_type']) : '';
+                            if (!in_array($item_action, array('none', 'popup', 'link'), true)) {
+                              $item_action = !empty($item['has_popup']) ? 'popup' : 'none'; // legacy fallback
+                            }
+                            $item_action_url = isset($item['action_url']) ? trim((string) $item['action_url']) : '';
+                            if ($item_action === 'link' && $item_action_url === '') {
+                              $item_action = 'none';
+                            }
+                            $item_has_popup = ($item_action === 'popup');
+                            $item_has_link = ($item_action === 'link' && $item_action_url !== '');
 
                             if ($item_text === '' && $item_highlight === '') {
                               continue;
@@ -1201,15 +1210,31 @@
                               );
                             }
                           ?>
-                            <div class="item" style="background-color:<?php echo esc_attr($col_config['item_bg']); ?>;"<?php echo $modal_id ? ' data-modal-id="' . esc_attr($modal_id) . '"' : ''; ?>>
+                            <?php if ($item_has_link) : ?>
+                              <a
+                                class="item"
+                                style="background-color:<?php echo esc_attr($col_config['item_bg']); ?>;color:inherit;text-decoration:none;"
+                                href="<?php echo esc_url($item_action_url); ?>"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                            <?php else : ?>
+                              <div class="item" style="background-color:<?php echo esc_attr($col_config['item_bg']); ?>;"<?php echo $modal_id ? ' data-modal-id="' . esc_attr($modal_id) . '"' : ''; ?>>
+                            <?php endif; ?>
                               <?php echo nl2br(esc_html($item_text)); ?>
                               <?php if ($item_highlight !== '') : ?>
                                 <span><?php echo esc_html($item_highlight); ?></span>
                               <?php endif; ?>
                               <?php if ($item_has_popup) : ?>
                                 <i class="icon icon-plus" aria-hidden="true"></i>
+                              <?php elseif ($item_has_link) : ?>
+                                <i class="icon icon-open-link" aria-hidden="true"></i>
                               <?php endif; ?>
-                            </div>
+                            <?php if ($item_has_link) : ?>
+                              </a>
+                            <?php else : ?>
+                              </div>
+                            <?php endif; ?>
                           <?php endforeach; ?>
                         </div>
                       </div>

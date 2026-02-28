@@ -142,6 +142,7 @@ function blm_get_courses_for_location($location_id) {
   $courses = [];
   foreach (array_keys($course_ids) as $cid) {
     if (get_post_type($cid) !== 'course' || get_post_status($cid) !== 'publish') continue;
+    if (function_exists('lc_is_course_visible_for_public') && !lc_is_course_visible_for_public($cid)) continue;
 
     $price = function_exists('get_field') ? get_field('price', $cid) : null;
     $minutes = function_exists('get_field') ? get_field('total_minutes', $cid) : null;
@@ -932,7 +933,10 @@ add_action('rest_api_init', function () {
           return new WP_REST_Response(['error' => 'not_found'], 404);
         }
 
-        $cache_key = blm_location_full_cache_key($id);
+        $can_view_hidden_courses = function_exists('lc_current_user_can_view_hidden_courses')
+          ? (bool) lc_current_user_can_view_hidden_courses()
+          : false;
+        $cache_key = blm_location_full_cache_key($id) . ($can_view_hidden_courses ? '_editor' : '_public');
         $cached = get_transient($cache_key);
         if ($cached) return new WP_REST_Response($cached, 200);
 

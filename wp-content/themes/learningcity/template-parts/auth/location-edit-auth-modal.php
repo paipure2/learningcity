@@ -658,6 +658,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       return !!hasSession;
     },
     async logout() {
+      let didLogout = false;
       try {
         const fd = new FormData();
         fd.append("action", "lc_logout_location_edit_session");
@@ -665,7 +666,10 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
         let json = null;
         try { json = await res.json(); } catch (_) {}
-        hasSession = !!json?.success ? false : hasSession;
+        if (json?.success) {
+          hasSession = false;
+          didLogout = true;
+        }
       } catch (err) {
         // keep previous state when request fails
       } finally {
@@ -673,6 +677,9 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         syncStatusFab();
         closeStatusModal();
         closeCourseEditModal();
+        if (didLogout) {
+          window.location.reload();
+        }
       }
     },
   };
@@ -1768,6 +1775,11 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       syncTriggerLabels();
       syncStatusFab();
       setMsg("success", "");
+      const shouldReloadAfterLogin = !(pendingCourseTrigger && Number(pendingCourseTrigger.courseId || 0) > 0);
+      if (shouldReloadAfterLogin) {
+        window.location.reload();
+        return;
+      }
       if (pendingCourseTrigger && Number(pendingCourseTrigger.courseId || 0) > 0) {
         const { courseId, courseTitle } = pendingCourseTrigger;
         pendingCourseTrigger = null;

@@ -548,8 +548,12 @@
       transition: all 0.2s ease-out;
     }
 
-    &:hover .icon {
+    &:hover .icon-plus {
       rotate: 90deg;
+    }
+
+    &:hover .icon-open-link {
+      rotate: 0deg;
     }
 
     span {

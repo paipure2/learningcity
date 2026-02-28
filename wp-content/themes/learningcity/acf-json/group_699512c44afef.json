@@ -193,7 +193,7 @@
                                 },
                                 {
                                     "key": "field_ps_c1_item_tab_popup",
-                                    "label": "Popup",
+                                    "label": "Action",
                                     "name": "",
                                     "aria-label": "",
                                     "type": "tab",
@@ -212,12 +212,12 @@
                                     "parent_repeater": "field_ps_col1_items"
                                 },
                                 {
-                                    "key": "field_ps_c1_item_has_popup",
-                                    "label": "มีป๊อปอัป",
-                                    "name": "has_popup",
+                                    "key": "field_ps_c1_item_action_type",
+                                    "label": "Action",
+                                    "name": "action_type",
                                     "aria-label": "",
-                                    "type": "true_false",
-                                    "instructions": "",
+                                    "type": "select",
+                                    "instructions": "เลือกรูปแบบการคลิกของรายการนี้",
                                     "required": false,
                                     "conditional_logic": false,
                                     "wrapper": {
@@ -225,12 +225,18 @@
                                         "class": "",
                                         "id": ""
                                     },
+                                    "choices": {
+                                        "none": "ไม่มี",
+                                        "popup": "Popup",
+                                        "link": "Link to Open Policy"
+                                    },
+                                    "default_value": "none",
+                                    "return_format": "value",
+                                    "multiple": 0,
+                                    "allow_null": 0,
                                     "ui": 1,
-                                    "ui_on_text": "มี",
-                                    "ui_off_text": "ไม่มี",
-                                    "default_value": 0,
-                                    "message": "",
-                                    "style": "",
+                                    "ajax": 0,
+                                    "placeholder": "",
                                     "parent_repeater": "field_ps_col1_items"
                                 },
                                 {
@@ -244,9 +250,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c1_item_has_popup",
+                                                "field": "field_ps_c1_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -273,9 +279,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c1_item_has_popup",
+                                                "field": "field_ps_c1_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -290,6 +296,32 @@
                                     "maxlength": "",
                                     "placeholder": "",
                                     "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col1_items"
+                                },
+                                {
+                                    "key": "field_ps_c1_action_url",
+                                    "label": "URL (Link to Open Policy)",
+                                    "name": "action_url",
+                                    "aria-label": "",
+                                    "type": "url",
+                                    "instructions": "กรอกลิงก์เมื่อเลือก Action = Link to Open Policy",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c1_item_action_type",
+                                                "operator": "==",
+                                                "value": "link"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "placeholder": "https://example.com/policy",
                                     "parent_repeater": "field_ps_col1_items"
                                 }
                             ]
@@ -474,7 +506,7 @@
                                 },
                                 {
                                     "key": "field_ps_c2_item_tab_popup",
-                                    "label": "Popup",
+                                    "label": "Action",
                                     "name": "",
                                     "aria-label": "",
                                     "type": "tab",
@@ -493,12 +525,12 @@
                                     "parent_repeater": "field_ps_col2_items"
                                 },
                                 {
-                                    "key": "field_ps_c2_item_has_popup",
-                                    "label": "มีป๊อปอัป",
-                                    "name": "has_popup",
+                                    "key": "field_ps_c2_item_action_type",
+                                    "label": "Action",
+                                    "name": "action_type",
                                     "aria-label": "",
-                                    "type": "true_false",
-                                    "instructions": "",
+                                    "type": "select",
+                                    "instructions": "เลือกรูปแบบการคลิกของรายการนี้",
                                     "required": false,
                                     "conditional_logic": false,
                                     "wrapper": {
@@ -506,12 +538,18 @@
                                         "class": "",
                                         "id": ""
                                     },
+                                    "choices": {
+                                        "none": "ไม่มี",
+                                        "popup": "Popup",
+                                        "link": "Link to Open Policy"
+                                    },
+                                    "default_value": "none",
+                                    "return_format": "value",
+                                    "multiple": 0,
+                                    "allow_null": 0,
                                     "ui": 1,
-                                    "ui_on_text": "มี",
-                                    "ui_off_text": "ไม่มี",
-                                    "default_value": 0,
-                                    "message": "",
-                                    "style": "",
+                                    "ajax": 0,
+                                    "placeholder": "",
                                     "parent_repeater": "field_ps_col2_items"
                                 },
                                 {
@@ -525,9 +563,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c2_item_has_popup",
+                                                "field": "field_ps_c2_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -554,9 +592,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c2_item_has_popup",
+                                                "field": "field_ps_c2_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -571,6 +609,32 @@
                                     "maxlength": "",
                                     "placeholder": "",
                                     "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col2_items"
+                                },
+                                {
+                                    "key": "field_ps_c2_action_url",
+                                    "label": "URL (Link to Open Policy)",
+                                    "name": "action_url",
+                                    "aria-label": "",
+                                    "type": "url",
+                                    "instructions": "กรอกลิงก์เมื่อเลือก Action = Link to Open Policy",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c2_item_action_type",
+                                                "operator": "==",
+                                                "value": "link"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "placeholder": "https://example.com/policy",
                                     "parent_repeater": "field_ps_col2_items"
                                 }
                             ]
@@ -755,7 +819,7 @@
                                 },
                                 {
                                     "key": "field_ps_c3_item_tab_popup",
-                                    "label": "Popup",
+                                    "label": "Action",
                                     "name": "",
                                     "aria-label": "",
                                     "type": "tab",
@@ -774,12 +838,12 @@
                                     "parent_repeater": "field_ps_col3_items"
                                 },
                                 {
-                                    "key": "field_ps_c3_item_has_popup",
-                                    "label": "มีป๊อปอัป",
-                                    "name": "has_popup",
+                                    "key": "field_ps_c3_item_action_type",
+                                    "label": "Action",
+                                    "name": "action_type",
                                     "aria-label": "",
-                                    "type": "true_false",
-                                    "instructions": "",
+                                    "type": "select",
+                                    "instructions": "เลือกรูปแบบการคลิกของรายการนี้",
                                     "required": false,
                                     "conditional_logic": false,
                                     "wrapper": {
@@ -787,12 +851,18 @@
                                         "class": "",
                                         "id": ""
                                     },
+                                    "choices": {
+                                        "none": "ไม่มี",
+                                        "popup": "Popup",
+                                        "link": "Link to Open Policy"
+                                    },
+                                    "default_value": "none",
+                                    "return_format": "value",
+                                    "multiple": 0,
+                                    "allow_null": 0,
                                     "ui": 1,
-                                    "ui_on_text": "มี",
-                                    "ui_off_text": "ไม่มี",
-                                    "default_value": 0,
-                                    "message": "",
-                                    "style": "",
+                                    "ajax": 0,
+                                    "placeholder": "",
                                     "parent_repeater": "field_ps_col3_items"
                                 },
                                 {
@@ -806,9 +876,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c3_item_has_popup",
+                                                "field": "field_ps_c3_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -835,9 +905,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c3_item_has_popup",
+                                                "field": "field_ps_c3_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -852,6 +922,32 @@
                                     "maxlength": "",
                                     "placeholder": "",
                                     "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col3_items"
+                                },
+                                {
+                                    "key": "field_ps_c3_action_url",
+                                    "label": "URL (Link to Open Policy)",
+                                    "name": "action_url",
+                                    "aria-label": "",
+                                    "type": "url",
+                                    "instructions": "กรอกลิงก์เมื่อเลือก Action = Link to Open Policy",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c3_item_action_type",
+                                                "operator": "==",
+                                                "value": "link"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "placeholder": "https://example.com/policy",
                                     "parent_repeater": "field_ps_col3_items"
                                 }
                             ]
@@ -1036,7 +1132,7 @@
                                 },
                                 {
                                     "key": "field_ps_c4_item_tab_popup",
-                                    "label": "Popup",
+                                    "label": "Action",
                                     "name": "",
                                     "aria-label": "",
                                     "type": "tab",
@@ -1055,12 +1151,12 @@
                                     "parent_repeater": "field_ps_col4_items"
                                 },
                                 {
-                                    "key": "field_ps_c4_item_has_popup",
-                                    "label": "มีป๊อปอัป",
-                                    "name": "has_popup",
+                                    "key": "field_ps_c4_item_action_type",
+                                    "label": "Action",
+                                    "name": "action_type",
                                     "aria-label": "",
-                                    "type": "true_false",
-                                    "instructions": "",
+                                    "type": "select",
+                                    "instructions": "เลือกรูปแบบการคลิกของรายการนี้",
                                     "required": false,
                                     "conditional_logic": false,
                                     "wrapper": {
@@ -1068,12 +1164,18 @@
                                         "class": "",
                                         "id": ""
                                     },
+                                    "choices": {
+                                        "none": "ไม่มี",
+                                        "popup": "Popup",
+                                        "link": "Link to Open Policy"
+                                    },
+                                    "default_value": "none",
+                                    "return_format": "value",
+                                    "multiple": 0,
+                                    "allow_null": 0,
                                     "ui": 1,
-                                    "ui_on_text": "มี",
-                                    "ui_off_text": "ไม่มี",
-                                    "default_value": 0,
-                                    "message": "",
-                                    "style": "",
+                                    "ajax": 0,
+                                    "placeholder": "",
                                     "parent_repeater": "field_ps_col4_items"
                                 },
                                 {
@@ -1087,9 +1189,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c4_item_has_popup",
+                                                "field": "field_ps_c4_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -1116,9 +1218,9 @@
                                     "conditional_logic": [
                                         [
                                             {
-                                                "field": "field_ps_c4_item_has_popup",
+                                                "field": "field_ps_c4_item_action_type",
                                                 "operator": "==",
-                                                "value": "1"
+                                                "value": "popup"
                                             }
                                         ]
                                     ],
@@ -1133,6 +1235,32 @@
                                     "maxlength": "",
                                     "placeholder": "",
                                     "acfe_textarea_code": 0,
+                                    "parent_repeater": "field_ps_col4_items"
+                                },
+                                {
+                                    "key": "field_ps_c4_action_url",
+                                    "label": "URL (Link to Open Policy)",
+                                    "name": "action_url",
+                                    "aria-label": "",
+                                    "type": "url",
+                                    "instructions": "กรอกลิงก์เมื่อเลือก Action = Link to Open Policy",
+                                    "required": false,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_ps_c4_item_action_type",
+                                                "operator": "==",
+                                                "value": "link"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "",
+                                        "class": "",
+                                        "id": ""
+                                    },
+                                    "default_value": "",
+                                    "placeholder": "https://example.com/policy",
                                     "parent_repeater": "field_ps_col4_items"
                                 }
                             ]
@@ -1177,5 +1305,5 @@
     "acfe_form": 0,
     "acfe_meta": "",
     "acfe_note": "",
-    "modified": 1771763925
+    "modified": 1772257643
 }

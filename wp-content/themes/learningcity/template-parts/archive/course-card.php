@@ -1,6 +1,10 @@
 <?php
 $post_id = get_the_ID();
 
+if (function_exists('lc_is_course_visible_for_public') && !lc_is_course_visible_for_public($post_id)) {
+    return;
+}
+
 // Default: show only courses that are open now (or always open/no-session+link logic).
 // Can be overridden by query_var('lc_archive_open_only') = false in AJAX/custom filter mode.
 $open_only = get_query_var('lc_archive_open_only', true);

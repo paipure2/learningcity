@@ -94,9 +94,9 @@
                     <div class="items -ml-2 flex flex-col gap-0">
 
                         <?php
-                        $providers = get_terms([
+                        $providers = function_exists('lc_get_visible_course_provider_terms') ? lc_get_visible_course_provider_terms() : get_terms([
                             'taxonomy'   => 'course_provider',
-                            'hide_empty' => false,
+                            'hide_empty' => true,
                         ]);
 
                         if (!empty($providers) && !is_wp_error($providers)) :

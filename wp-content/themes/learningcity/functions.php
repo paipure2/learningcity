@@ -175,6 +175,9 @@ if (!function_exists('load_course_modal')) {
     if ($course_post->post_type !== 'course') {
       wp_send_json_error(['message' => 'invalid post type'], 400);
     }
+    if (function_exists('lc_is_course_visible_for_public') && !lc_is_course_visible_for_public($course_id)) {
+      wp_send_json_error(['message' => 'course not found'], 404);
+    }
 
     $tpl = locate_template('template-parts/components/modal-course-ajax.php');
     if (!$tpl) {
@@ -1904,6 +1907,167 @@ function lc_is_course_tag_context($query = null) {
   return !lc_tag_has_post_entries();
 }
 
+/**
+ * Provider-based public visibility:
+ * - Visitors: hide courses under course_provider terms with show_course = false
+ * - Editors/admin/OTP editor session: can still view hidden courses
+ */
+function lc_current_user_can_view_hidden_courses() {
+  if (current_user_can('administrator') || current_user_can('editor') || current_user_can('edit_others_posts')) {
+    return true;
+  }
+
+  $token = isset($_COOKIE['lc_loc_edit_token']) ? sanitize_text_field((string) $_COOKIE['lc_loc_edit_token']) : '';
+  if ($token === '') return false;
+
+  $session = get_option('lc_loc_edit_session_' . md5($token), null);
+  if (!is_array($session)) return false;
+
+  $expires_at = isset($session['expires_at']) ? (int) $session['expires_at'] : 0;
+  if ($expires_at > 0 && $expires_at < time()) return false;
+
+  return true;
+}
+
+function lc_is_course_provider_hidden($term_id) {
+  $term_id = (int) $term_id;
+  if ($term_id <= 0) return false;
+
+  static $cache = [];
+  if (array_key_exists($term_id, $cache)) return $cache[$term_id];
+
+  $raw = get_term_meta($term_id, 'show_course', true);
+  if (($raw === '' || $raw === null) && function_exists('get_field')) {
+    $raw = get_field('show_course', 'course_provider_' . $term_id);
+  }
+
+  if ($raw === '' || $raw === null) {
+    $cache[$term_id] = false; // unset = visible
+    return false;
+  }
+
+  if (is_bool($raw)) {
+    $cache[$term_id] = !$raw;
+    return $cache[$term_id];
+  }
+
+  $v = strtolower(trim((string) $raw));
+  $cache[$term_id] = in_array($v, ['0', 'false', 'off', 'no'], true);
+  return $cache[$term_id];
+}
+
+function lc_get_hidden_course_provider_term_ids() {
+  static $cache = null;
+  if (is_array($cache)) return $cache;
+
+  $ids = get_terms([
+    'taxonomy'   => 'course_provider',
+    'hide_empty' => false,
+    'fields'     => 'ids',
+  ]);
+  if (is_wp_error($ids) || empty($ids)) {
+    $cache = [];
+    return $cache;
+  }
+
+  $hidden = [];
+  foreach ($ids as $term_id) {
+    $term_id = (int) $term_id;
+    if ($term_id > 0 && lc_is_course_provider_hidden($term_id)) {
+      $hidden[] = $term_id;
+    }
+  }
+
+  $cache = $hidden;
+  return $cache;
+}
+
+function lc_add_hidden_provider_constraint_to_tax_query($tax_query) {
+  if (lc_current_user_can_view_hidden_courses()) return $tax_query;
+
+  $hidden_provider_ids = lc_get_hidden_course_provider_term_ids();
+  if (empty($hidden_provider_ids)) return $tax_query;
+
+  if (!is_array($tax_query)) $tax_query = [];
+  if (empty($tax_query['relation'])) $tax_query['relation'] = 'AND';
+
+  $tax_query[] = [
+    'taxonomy'         => 'course_provider',
+    'field'            => 'term_id',
+    'terms'            => array_map('intval', $hidden_provider_ids),
+    'operator'         => 'NOT IN',
+    'include_children' => false,
+  ];
+
+  return $tax_query;
+}
+
+function lc_is_course_visible_for_public($course_id) {
+  $course_id = (int) $course_id;
+  if ($course_id <= 0) return false;
+  if (lc_current_user_can_view_hidden_courses()) return true;
+
+  $provider_terms = get_the_terms($course_id, 'course_provider');
+  if (empty($provider_terms) || is_wp_error($provider_terms)) return true;
+
+  foreach ($provider_terms as $term) {
+    $term_id = isset($term->term_id) ? (int) $term->term_id : 0;
+    if ($term_id > 0 && lc_is_course_provider_hidden($term_id)) return false;
+  }
+
+  return true;
+}
+
+function lc_get_visible_course_provider_terms() {
+  static $cache = [];
+
+  $can_view_hidden = lc_current_user_can_view_hidden_courses();
+  $cache_key = $can_view_hidden ? 'editor' : 'public';
+  if (isset($cache[$cache_key])) return $cache[$cache_key];
+
+  $args = [
+    'post_type'              => 'course',
+    'post_status'            => 'publish',
+    'posts_per_page'         => -1,
+    'fields'                 => 'ids',
+    'no_found_rows'          => true,
+    'update_post_meta_cache' => false,
+    'update_post_term_cache' => false,
+  ];
+
+  if (!$can_view_hidden) {
+    $args['tax_query'] = lc_add_hidden_provider_constraint_to_tax_query([]);
+  }
+
+  $course_ids = get_posts($args);
+  if (empty($course_ids)) {
+    $cache[$cache_key] = [];
+    return [];
+  }
+
+  $term_ids = wp_get_object_terms($course_ids, 'course_provider', ['fields' => 'ids']);
+  if (is_wp_error($term_ids) || empty($term_ids)) {
+    $cache[$cache_key] = [];
+    return [];
+  }
+
+  $terms = get_terms([
+    'taxonomy'   => 'course_provider',
+    'hide_empty' => false,
+    'include'    => array_map('intval', $term_ids),
+    'orderby'    => 'name',
+    'order'      => 'ASC',
+  ]);
+
+  if (is_wp_error($terms) || !is_array($terms)) {
+    $cache[$cache_key] = [];
+    return [];
+  }
+
+  $cache[$cache_key] = $terms;
+  return $terms;
+}
+
 // Default filter on archives
 add_action('pre_get_posts', function ($q) {
   if (is_admin() || !$q->is_main_query()) return;
@@ -1926,6 +2090,7 @@ add_action('pre_get_posts', function ($q) {
   }
   $open_ids = lc_get_open_course_ids_runtime();
   $q->set('post__in', empty($open_ids) ? [0] : $open_ids);
+  $q->set('tax_query', lc_add_hidden_provider_constraint_to_tax_query($q->get('tax_query')));
 }, 20);
 
 function lc_is_course_archive_context() {
@@ -1938,6 +2103,19 @@ function lc_is_course_archive_context() {
     lc_is_course_tag_context()
   );
 }
+
+add_action('template_redirect', function () {
+  if (is_admin()) return;
+  if (lc_current_user_can_view_hidden_courses()) return;
+
+  if (is_singular('course')) {
+    $course_id = (int) get_queried_object_id();
+    if ($course_id > 0 && !lc_is_course_visible_for_public($course_id)) {
+      wp_safe_redirect(get_post_type_archive_link('course') ?: home_url('/'));
+      exit;
+    }
+  }
+}, 9);
 
 function lc_get_open_course_ids_runtime() {
   $cache_key = 'lc_open_course_ids_runtime_v2';
@@ -2073,6 +2251,7 @@ function lc_course_filter_build_query_args($payload = []) {
   if (count($tax_query) > 1) {
     $args['tax_query'] = $tax_query;
   }
+  $args['tax_query'] = lc_add_hidden_provider_constraint_to_tax_query($args['tax_query'] ?? []);
 
   if ($open_only) {
     $open_ids = lc_get_open_course_ids_runtime();
@@ -2088,6 +2267,12 @@ function lc_course_filter_build_query_args($payload = []) {
 function lc_course_filter_get_facet_options($payload = []) {
   $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
   $allowed_context_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
+  $can_view_hidden = lc_current_user_can_view_hidden_courses();
+  $visible_provider_ids = null;
+  if (!$can_view_hidden) {
+    $visible_provider_terms = lc_get_visible_course_provider_terms();
+    $visible_provider_ids = array_map('intval', wp_list_pluck($visible_provider_terms, 'term_id'));
+  }
 
   $context_taxonomy = isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '';
   if (!in_array($context_taxonomy, $allowed_context_taxonomies, true)) {
@@ -2155,7 +2340,19 @@ function lc_course_filter_get_facet_options($payload = []) {
       if (!$exists) {
         $selected_term = get_term_by('slug', $selected[$taxonomy], $taxonomy);
         if ($selected_term && !is_wp_error($selected_term)) {
-          $terms[] = $selected_term;
+          $can_append_selected = true;
+          if ($taxonomy === 'course_provider' && !$can_view_hidden) {
+            $selected_term_id = (int) $selected_term->term_id;
+            if (
+              lc_is_course_provider_hidden($selected_term_id) ||
+              !in_array($selected_term_id, (array) $visible_provider_ids, true)
+            ) {
+              $can_append_selected = false;
+            }
+          }
+          if ($can_append_selected) {
+            $terms[] = $selected_term;
+          }
         }
       }
     }

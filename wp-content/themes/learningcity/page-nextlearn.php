@@ -163,6 +163,25 @@
                       $orderby = isset($settings['orderby']) ? (string) $settings['orderby'] : 'name';
                       $order = isset($settings['order']) ? (string) $settings['order'] : 'ASC';
                       $exclude_terms = isset($settings['exclude_terms']) && is_array($settings['exclude_terms']) ? array_values(array_filter(array_map('intval', $settings['exclude_terms']))) : array();
+                      $can_view_hidden_provider = function_exists('lc_current_user_can_view_hidden_courses')
+                        ? lc_current_user_can_view_hidden_courses()
+                        : current_user_can('edit_others_posts');
+                      $visible_provider_ids = array();
+                      $visible_provider_slugs = array();
+                      if (
+                        $taxonomy === 'course_provider' &&
+                        !$can_view_hidden_provider &&
+                        function_exists('lc_get_visible_course_provider_terms')
+                      ) {
+                        $visible_provider_terms = lc_get_visible_course_provider_terms();
+                        foreach ($visible_provider_terms as $provider_term) {
+                          if (!$provider_term instanceof WP_Term) {
+                            continue;
+                          }
+                          $visible_provider_ids[(int) $provider_term->term_id] = true;
+                          $visible_provider_slugs[(string) $provider_term->slug] = true;
+                        }
+                      }
 
                       $manual_rows = isset($settings['manual_items']) && is_array($settings['manual_items']) ? $settings['manual_items'] : array();
                       $manual_cards = array();
@@ -205,15 +224,49 @@
                       $manual_cards = array_values(array_filter($manual_cards, static function ($card) {
                         return !empty($card['title']) && !empty($card['url']) && !is_wp_error($card['url']);
                       }));
+                      if ($taxonomy === 'course_provider' && !$can_view_hidden_provider) {
+                        $manual_cards = array_values(array_filter($manual_cards, static function ($card) use ($visible_provider_ids, $visible_provider_slugs) {
+                          $term_id = isset($card['term_id']) ? (int) $card['term_id'] : 0;
+                          if ($term_id > 0) {
+                            return isset($visible_provider_ids[$term_id]);
+                          }
+                          $url = isset($card['url']) ? (string) $card['url'] : '';
+                          if ($url === '') {
+                            return false;
+                          }
+                          $path = wp_parse_url($url, PHP_URL_PATH);
+                          if (!is_string($path) || $path === '') {
+                            return false;
+                          }
+                          $segments = array_values(array_filter(explode('/', trim($path, '/'))));
+                          $provider_pos = array_search('course_provider', $segments, true);
+                          if ($provider_pos === false || !isset($segments[$provider_pos + 1])) {
+                            return false;
+                          }
+                          $slug = sanitize_title(rawurldecode((string) $segments[$provider_pos + 1]));
+                          if ($slug === '') {
+                            return false;
+                          }
+                          return isset($visible_provider_slugs[$slug]);
+                        }));
+                      }
 
-                      $terms = get_terms(array(
+                      $term_args = array(
                         'taxonomy' => $taxonomy,
                         'hide_empty' => $hide_empty,
                         'orderby' => $orderby,
                         'order' => $order,
                         'exclude' => $exclude_terms,
                         'number' => $limit,
-                      ));
+                      );
+                      if ($taxonomy === 'course_provider' && !$can_view_hidden_provider) {
+                        $term_args['hide_empty'] = false;
+                        $term_args['include'] = array_map('intval', array_keys($visible_provider_ids));
+                        if (empty($term_args['include'])) {
+                          $term_args['include'] = array(0);
+                        }
+                      }
+                      $terms = get_terms($term_args);
                       $taxonomy_cards = array();
                       if (is_array($terms) && !is_wp_error($terms)) {
                         foreach ($terms as $term) {
