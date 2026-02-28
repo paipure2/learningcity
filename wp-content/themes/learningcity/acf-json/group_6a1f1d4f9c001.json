@@ -1,441 +1,619 @@
 {
-  "key": "group_6a1f1d4f9c001",
-  "title": "Nextlearn Page Builder",
-  "fields": [
-    {
-      "key": "field_nl_sections",
-      "label": "Section Order",
-      "name": "nextlearn_sections",
-      "type": "flexible_content",
-      "instructions": "ลากเพื่อสลับลำดับ section และเพิ่ม Term Slider ได้หลายบล็อก",
-      "required": 0,
-      "conditional_logic": 0,
-      "wrapper": { "width": "", "class": "", "id": "" },
-      "layouts": [
+    "key": "group_6a1f1d4f9c001",
+    "title": "Nextlearn Page Builder",
+    "fields": [
         {
-          "key": "layout_nl_hero_fixed",
-          "name": "hero_fixed",
-          "label": "Hero (Fixed)",
-          "display": "block",
-          "sub_fields": []
-        },
-        {
-          "key": "layout_nl_highlight",
-          "name": "highlight",
-          "label": "Highlight",
-          "display": "block",
-          "sub_fields": []
-        },
-        {
-          "key": "layout_nl_recommended",
-          "name": "recommended",
-          "label": "Recommended",
-          "display": "block",
-          "sub_fields": [
-            {
-              "key": "field_nl_rec_title",
-              "label": "หัวข้อ Section",
-              "name": "section_title",
-              "type": "text",
-              "default_value": "คอร์สแนะนำ",
-              "wrapper": { "width": "33", "class": "", "id": "" }
+            "key": "field_nl_sections",
+            "label": "Section Order",
+            "name": "nextlearn_sections",
+            "type": "flexible_content",
+            "instructions": "ลากเพื่อสลับลำดับ section และเพิ่ม Term Slider ได้หลายบล็อก",
+            "required": 0,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
             },
-            {
-              "key": "field_nl_rec_mode",
-              "label": "รูปแบบคอร์สแนะนำ",
-              "name": "recommended_mode",
-              "type": "select",
-              "choices": {
-                "random": "สุ่มอัตโนมัติ",
-                "popular": "ยอดนิยม",
-                "handpick": "เลือกเองทั้งหมด",
-                "mixed": "เลือกเอง + ระบบเติมให้ครบ"
-              },
-              "default_value": "random",
-              "return_format": "value",
-              "wrapper": { "width": "33", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_rec_limit",
-              "label": "จำนวนคอร์ส",
-              "name": "limit",
-              "type": "number",
-              "default_value": 6,
-              "min": 1,
-              "step": 1,
-              "wrapper": { "width": "34", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_rec_popular_days",
-              "label": "ช่วงเวลายอดนิยม (วัน)",
-              "name": "popular_days",
-              "type": "number",
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "popular" }
-                ],
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "mixed" },
-                  { "field": "field_nl_rec_fallback_mode", "operator": "==", "value": "popular" }
-                ]
-              ],
-              "default_value": 30,
-              "min": 1,
-              "step": 1,
-              "wrapper": { "width": "33", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_rec_fallback_mode",
-              "label": "โหมดเติมอัตโนมัติ",
-              "name": "fallback_mode",
-              "type": "select",
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "mixed" }
-                ]
-              ],
-              "choices": {
-                "popular": "ยอดนิยม",
-                "random": "สุ่ม"
-              },
-              "default_value": "random",
-              "return_format": "value",
-              "wrapper": { "width": "33", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_rec_popular_metric",
-              "label": "เกณฑ์ยอดนิยม",
-              "name": "popular_metric",
-              "type": "select",
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "popular" }
-                ],
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "mixed" },
-                  { "field": "field_nl_rec_fallback_mode", "operator": "==", "value": "popular" }
-                ]
-              ],
-              "choices": {
-                "engagement": "รวม View + Click + Popup",
-                "views": "เฉพาะ View"
-              },
-              "default_value": "engagement",
-              "return_format": "value",
-              "wrapper": { "width": "34", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_rec_handpicked_courses",
-              "label": "คอร์สที่เลือกเอง",
-              "name": "handpicked_courses",
-              "type": "relationship",
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "handpick" }
-                ],
-                [
-                  { "field": "field_nl_rec_mode", "operator": "==", "value": "mixed" }
-                ]
-              ],
-              "post_type": ["course"],
-              "taxonomy": "",
-              "filters": ["search"],
-              "elements": "",
-              "min": "",
-              "max": "",
-              "return_format": "id"
-            }
-          ]
-        },
-        {
-          "key": "layout_nl_nearby_fixed",
-          "name": "nearby_fixed",
-          "label": "Nearby (Fixed)",
-          "display": "block",
-          "sub_fields": []
-        },
-        {
-          "key": "layout_nl_term_slider",
-          "name": "term_slider",
-          "label": "Term Slider",
-          "display": "block",
-          "sub_fields": [
-            {
-              "key": "field_nl_ts_title",
-              "label": "Section Title",
-              "name": "section_title",
-              "type": "text",
-              "wrapper": { "width": "50", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_taxonomy",
-              "label": "Taxonomy",
-              "name": "taxonomy",
-              "type": "select",
-              "choices": {
-                "course_category": "Course Category",
-                "audience": "Audience",
-                "course_provider": "Course Provider"
-              },
-              "default_value": "course_category",
-              "return_format": "value",
-              "wrapper": { "width": "50", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_source_mode",
-              "label": "Source Mode",
-              "name": "source_mode",
-              "type": "select",
-              "choices": {
-                "mixed": "Mixed (Manual + Taxonomy)",
-                "manual": "Manual Only",
-                "taxonomy_auto": "Taxonomy Only"
-              },
-              "default_value": "mixed",
-              "return_format": "value",
-              "wrapper": { "width": "33", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_limit",
-              "label": "Limit",
-              "name": "limit",
-              "type": "number",
-              "default_value": 10,
-              "min": 1,
-              "step": 1,
-              "wrapper": { "width": "33", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_hide_empty",
-              "label": "Hide Empty",
-              "name": "hide_empty",
-              "type": "true_false",
-              "default_value": 0,
-              "ui": 1,
-              "ui_on_text": "On",
-              "ui_off_text": "Off",
-              "wrapper": { "width": "34", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_orderby",
-              "label": "Order By",
-              "name": "orderby",
-              "type": "select",
-              "choices": {
-                "name": "Name",
-                "count": "Count",
-                "term_id": "Term ID"
-              },
-              "default_value": "name",
-              "return_format": "value",
-              "wrapper": { "width": "50", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_order",
-              "label": "Order",
-              "name": "order",
-              "type": "select",
-              "choices": {
-                "ASC": "ASC",
-                "DESC": "DESC"
-              },
-              "default_value": "ASC",
-              "return_format": "value",
-              "wrapper": { "width": "50", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_exclude_terms_category",
-              "label": "Exclude Course Categories",
-              "name": "exclude_terms_category",
-              "type": "taxonomy",
-              "taxonomy": "course_category",
-              "field_type": "multi_select",
-              "return_format": "id",
-              "add_term": 0,
-              "save_terms": 0,
-              "load_terms": 0,
-              "allow_null": 1,
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_ts_taxonomy", "operator": "==", "value": "course_category" }
-                ]
-              ],
-              "wrapper": { "width": "", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_exclude_terms_audience",
-              "label": "Exclude Audience Terms",
-              "name": "exclude_terms_audience",
-              "type": "taxonomy",
-              "taxonomy": "audience",
-              "field_type": "multi_select",
-              "return_format": "id",
-              "add_term": 0,
-              "save_terms": 0,
-              "load_terms": 0,
-              "allow_null": 1,
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_ts_taxonomy", "operator": "==", "value": "audience" }
-                ]
-              ],
-              "wrapper": { "width": "", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_exclude_terms_provider",
-              "label": "Exclude Provider Terms",
-              "name": "exclude_terms_provider",
-              "type": "taxonomy",
-              "taxonomy": "course_provider",
-              "field_type": "multi_select",
-              "return_format": "id",
-              "add_term": 0,
-              "save_terms": 0,
-              "load_terms": 0,
-              "allow_null": 1,
-              "conditional_logic": [
-                [
-                  { "field": "field_nl_ts_taxonomy", "operator": "==", "value": "course_provider" }
-                ]
-              ],
-              "wrapper": { "width": "", "class": "", "id": "" }
-            },
-            {
-              "key": "field_nl_ts_manual_items",
-              "label": "Manual Items",
-              "name": "manual_items",
-              "type": "repeater",
-              "layout": "table",
-              "button_label": "Add Card",
-              "sub_fields": [
+            "layouts": [
                 {
-                  "key": "field_nl_ts_manual_title",
-                  "label": "Title",
-                  "name": "title",
-                  "type": "text",
-                  "wrapper": { "width": "16", "class": "", "id": "" }
+                    "key": "layout_nl_hero_fixed",
+                    "name": "hero_fixed",
+                    "label": "Hero (Fixed)",
+                    "display": "block",
+                    "sub_fields": []
                 },
                 {
-                  "key": "field_nl_ts_manual_image",
-                  "label": "Image",
-                  "name": "image",
-                  "type": "image",
-                  "return_format": "array",
-                  "library": "all",
-                  "preview_size": "medium",
-                  "wrapper": { "width": "16", "class": "", "id": "" }
+                    "key": "layout_nl_highlight",
+                    "name": "highlight",
+                    "label": "Highlight",
+                    "display": "block",
+                    "sub_fields": []
                 },
                 {
-                  "key": "field_nl_ts_manual_link_type",
-                  "label": "Link Type",
-                  "name": "link_type",
-                  "type": "select",
-                  "choices": {
-                    "custom_url": "Custom URL",
-                    "taxonomy_term": "Taxonomy Term"
-                  },
-                  "default_value": "custom_url",
-                  "return_format": "value",
-                  "wrapper": { "width": "16", "class": "", "id": "" }
-                },
-                {
-                  "key": "field_nl_ts_manual_term_category",
-                  "label": "Course Category Term",
-                  "name": "term_category",
-                  "type": "taxonomy",
-                  "taxonomy": "course_category",
-                  "field_type": "select",
-                  "allow_null": 1,
-                  "return_format": "id",
-                  "add_term": 0,
-                  "save_terms": 0,
-                  "load_terms": 0,
-                  "conditional_logic": [
-                    [
-                      { "field": "field_nl_ts_manual_link_type", "operator": "==", "value": "taxonomy_term" },
-                      { "field": "field_nl_ts_taxonomy", "operator": "==", "value": "course_category" }
+                    "key": "layout_nl_recommended",
+                    "name": "recommended",
+                    "label": "Recommended",
+                    "display": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_nl_rec_title",
+                            "label": "หัวข้อ Section",
+                            "name": "section_title",
+                            "type": "text",
+                            "default_value": "คอร์สแนะนำ",
+                            "wrapper": {
+                                "width": "33",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_rec_mode",
+                            "label": "รูปแบบคอร์สแนะนำ",
+                            "name": "recommended_mode",
+                            "type": "select",
+                            "choices": {
+                                "random": "สุ่มอัตโนมัติ",
+                                "popular": "ยอดนิยม",
+                                "handpick": "เลือกเองทั้งหมด",
+                                "mixed": "เลือกเอง + ระบบเติมให้ครบ"
+                            },
+                            "default_value": "random",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "33",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_rec_limit",
+                            "label": "จำนวนคอร์ส",
+                            "name": "limit",
+                            "type": "number",
+                            "default_value": 6,
+                            "min": 1,
+                            "step": 1,
+                            "wrapper": {
+                                "width": "34",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_rec_popular_days",
+                            "label": "ช่วงเวลายอดนิยม (วัน)",
+                            "name": "popular_days",
+                            "type": "number",
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "popular"
+                                    }
+                                ],
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "mixed"
+                                    },
+                                    {
+                                        "field": "field_nl_rec_fallback_mode",
+                                        "operator": "==",
+                                        "value": "popular"
+                                    }
+                                ]
+                            ],
+                            "default_value": 30,
+                            "min": 1,
+                            "step": 1,
+                            "wrapper": {
+                                "width": "33",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_rec_fallback_mode",
+                            "label": "โหมดเติมอัตโนมัติ",
+                            "name": "fallback_mode",
+                            "type": "select",
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "mixed"
+                                    }
+                                ]
+                            ],
+                            "choices": {
+                                "popular": "ยอดนิยม",
+                                "random": "สุ่ม"
+                            },
+                            "default_value": "random",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "33",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_rec_popular_metric",
+                            "label": "เกณฑ์ยอดนิยม",
+                            "name": "popular_metric",
+                            "type": "select",
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "popular"
+                                    }
+                                ],
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "mixed"
+                                    },
+                                    {
+                                        "field": "field_nl_rec_fallback_mode",
+                                        "operator": "==",
+                                        "value": "popular"
+                                    }
+                                ]
+                            ],
+                            "choices": {
+                                "engagement": "รวม View + Click + Popup",
+                                "views": "เฉพาะ View"
+                            },
+                            "default_value": "engagement",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "34",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_rec_handpicked_courses",
+                            "label": "คอร์สที่เลือกเอง",
+                            "name": "handpicked_courses",
+                            "type": "relationship",
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "handpick"
+                                    }
+                                ],
+                                [
+                                    {
+                                        "field": "field_nl_rec_mode",
+                                        "operator": "==",
+                                        "value": "mixed"
+                                    }
+                                ]
+                            ],
+                            "post_type": [
+                                "course"
+                            ],
+                            "taxonomy": "",
+                            "filters": [
+                                "search"
+                            ],
+                            "elements": "",
+                            "min": "",
+                            "max": "",
+                            "return_format": "id"
+                        }
                     ]
-                  ],
-                  "wrapper": { "width": "17", "class": "", "id": "" }
                 },
                 {
-                  "key": "field_nl_ts_manual_term_audience",
-                  "label": "Audience Term",
-                  "name": "term_audience",
-                  "type": "taxonomy",
-                  "taxonomy": "audience",
-                  "field_type": "select",
-                  "allow_null": 1,
-                  "return_format": "id",
-                  "add_term": 0,
-                  "save_terms": 0,
-                  "load_terms": 0,
-                  "conditional_logic": [
-                    [
-                      { "field": "field_nl_ts_manual_link_type", "operator": "==", "value": "taxonomy_term" },
-                      { "field": "field_nl_ts_taxonomy", "operator": "==", "value": "audience" }
-                    ]
-                  ],
-                  "wrapper": { "width": "17", "class": "", "id": "" }
+                    "key": "layout_nl_nearby_fixed",
+                    "name": "nearby_fixed",
+                    "label": "Nearby (Fixed)",
+                    "display": "block",
+                    "sub_fields": []
                 },
                 {
-                  "key": "field_nl_ts_manual_term_provider",
-                  "label": "Provider Term",
-                  "name": "term_provider",
-                  "type": "taxonomy",
-                  "taxonomy": "course_provider",
-                  "field_type": "select",
-                  "allow_null": 1,
-                  "return_format": "id",
-                  "add_term": 0,
-                  "save_terms": 0,
-                  "load_terms": 0,
-                  "conditional_logic": [
-                    [
-                      { "field": "field_nl_ts_manual_link_type", "operator": "==", "value": "taxonomy_term" },
-                      { "field": "field_nl_ts_taxonomy", "operator": "==", "value": "course_provider" }
+                    "key": "layout_nl_term_slider",
+                    "name": "term_slider",
+                    "label": "Term Slider",
+                    "display": "block",
+                    "sub_fields": [
+                        {
+                            "key": "field_nl_ts_title",
+                            "label": "Section Title",
+                            "name": "section_title",
+                            "type": "text",
+                            "wrapper": {
+                                "width": "50",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_taxonomy",
+                            "label": "Taxonomy",
+                            "name": "taxonomy",
+                            "type": "select",
+                            "choices": {
+                                "course_category": "Course Category",
+                                "audience": "Audience",
+                                "course_provider": "Course Provider"
+                            },
+                            "default_value": "course_category",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "50",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_source_mode",
+                            "label": "Source Mode",
+                            "name": "source_mode",
+                            "type": "select",
+                            "choices": {
+                                "mixed": "Mixed (Manual + Taxonomy)",
+                                "manual": "Manual Only",
+                                "taxonomy_auto": "Taxonomy Only"
+                            },
+                            "default_value": "mixed",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "33",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_limit",
+                            "label": "Limit",
+                            "name": "limit",
+                            "type": "number",
+                            "default_value": 10,
+                            "min": 1,
+                            "step": 1,
+                            "wrapper": {
+                                "width": "33",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_hide_empty",
+                            "label": "Hide Empty",
+                            "name": "hide_empty",
+                            "type": "true_false",
+                            "default_value": 0,
+                            "ui": 1,
+                            "ui_on_text": "On",
+                            "ui_off_text": "Off",
+                            "wrapper": {
+                                "width": "34",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_orderby",
+                            "label": "Order By",
+                            "name": "orderby",
+                            "type": "select",
+                            "choices": {
+                                "name": "Name",
+                                "count": "Count",
+                                "term_id": "Term ID"
+                            },
+                            "default_value": "name",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "50",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_order",
+                            "label": "Order",
+                            "name": "order",
+                            "type": "select",
+                            "choices": {
+                                "ASC": "ASC",
+                                "DESC": "DESC"
+                            },
+                            "default_value": "ASC",
+                            "return_format": "value",
+                            "wrapper": {
+                                "width": "50",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_exclude_terms_category",
+                            "label": "Exclude Course Categories",
+                            "name": "exclude_terms_category",
+                            "type": "taxonomy",
+                            "taxonomy": "course_category",
+                            "field_type": "multi_select",
+                            "return_format": "id",
+                            "add_term": 0,
+                            "save_terms": 0,
+                            "load_terms": 0,
+                            "allow_null": 1,
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_ts_taxonomy",
+                                        "operator": "==",
+                                        "value": "course_category"
+                                    }
+                                ]
+                            ],
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_exclude_terms_audience",
+                            "label": "Exclude Audience Terms",
+                            "name": "exclude_terms_audience",
+                            "type": "taxonomy",
+                            "taxonomy": "audience",
+                            "field_type": "multi_select",
+                            "return_format": "id",
+                            "add_term": 0,
+                            "save_terms": 0,
+                            "load_terms": 0,
+                            "allow_null": 1,
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_ts_taxonomy",
+                                        "operator": "==",
+                                        "value": "audience"
+                                    }
+                                ]
+                            ],
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_exclude_terms_provider",
+                            "label": "Exclude Provider Terms",
+                            "name": "exclude_terms_provider",
+                            "type": "taxonomy",
+                            "taxonomy": "course_provider",
+                            "field_type": "multi_select",
+                            "return_format": "id",
+                            "add_term": 0,
+                            "save_terms": 0,
+                            "load_terms": 0,
+                            "allow_null": 1,
+                            "conditional_logic": [
+                                [
+                                    {
+                                        "field": "field_nl_ts_taxonomy",
+                                        "operator": "==",
+                                        "value": "course_provider"
+                                    }
+                                ]
+                            ],
+                            "wrapper": {
+                                "width": "",
+                                "class": "",
+                                "id": ""
+                            }
+                        },
+                        {
+                            "key": "field_nl_ts_manual_items",
+                            "label": "Manual Items",
+                            "name": "manual_items",
+                            "type": "repeater",
+                            "layout": "table",
+                            "button_label": "Add Card",
+                            "sub_fields": [
+                                {
+                                    "key": "field_nl_ts_manual_title",
+                                    "label": "Title",
+                                    "name": "title",
+                                    "type": "text",
+                                    "wrapper": {
+                                        "width": "16",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                },
+                                {
+                                    "key": "field_nl_ts_manual_image",
+                                    "label": "Image",
+                                    "name": "image",
+                                    "type": "image",
+                                    "return_format": "array",
+                                    "library": "all",
+                                    "preview_size": "medium",
+                                    "wrapper": {
+                                        "width": "16",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                },
+                                {
+                                    "key": "field_nl_ts_manual_link_type",
+                                    "label": "Link Type",
+                                    "name": "link_type",
+                                    "type": "select",
+                                    "choices": {
+                                        "custom_url": "Custom URL",
+                                        "taxonomy_term": "Taxonomy Term"
+                                    },
+                                    "default_value": "custom_url",
+                                    "return_format": "value",
+                                    "wrapper": {
+                                        "width": "16",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                },
+                                {
+                                    "key": "field_nl_ts_manual_term_category",
+                                    "label": "Course Category Term",
+                                    "name": "term_category",
+                                    "type": "taxonomy",
+                                    "taxonomy": "course_category",
+                                    "field_type": "select",
+                                    "allow_null": 1,
+                                    "return_format": "id",
+                                    "add_term": 0,
+                                    "save_terms": 0,
+                                    "load_terms": 0,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_nl_ts_manual_link_type",
+                                                "operator": "==",
+                                                "value": "taxonomy_term"
+                                            },
+                                            {
+                                                "field": "field_nl_ts_taxonomy",
+                                                "operator": "==",
+                                                "value": "course_category"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "17",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                },
+                                {
+                                    "key": "field_nl_ts_manual_term_audience",
+                                    "label": "Audience Term",
+                                    "name": "term_audience",
+                                    "type": "taxonomy",
+                                    "taxonomy": "audience",
+                                    "field_type": "select",
+                                    "allow_null": 1,
+                                    "return_format": "id",
+                                    "add_term": 0,
+                                    "save_terms": 0,
+                                    "load_terms": 0,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_nl_ts_manual_link_type",
+                                                "operator": "==",
+                                                "value": "taxonomy_term"
+                                            },
+                                            {
+                                                "field": "field_nl_ts_taxonomy",
+                                                "operator": "==",
+                                                "value": "audience"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "17",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                },
+                                {
+                                    "key": "field_nl_ts_manual_term_provider",
+                                    "label": "Provider Term",
+                                    "name": "term_provider",
+                                    "type": "taxonomy",
+                                    "taxonomy": "course_provider",
+                                    "field_type": "select",
+                                    "allow_null": 1,
+                                    "return_format": "id",
+                                    "add_term": 0,
+                                    "save_terms": 0,
+                                    "load_terms": 0,
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_nl_ts_manual_link_type",
+                                                "operator": "==",
+                                                "value": "taxonomy_term"
+                                            },
+                                            {
+                                                "field": "field_nl_ts_taxonomy",
+                                                "operator": "==",
+                                                "value": "course_provider"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "18",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                },
+                                {
+                                    "key": "field_nl_ts_manual_custom_url",
+                                    "label": "Custom URL",
+                                    "name": "custom_url",
+                                    "type": "url",
+                                    "conditional_logic": [
+                                        [
+                                            {
+                                                "field": "field_nl_ts_manual_link_type",
+                                                "operator": "==",
+                                                "value": "custom_url"
+                                            }
+                                        ]
+                                    ],
+                                    "wrapper": {
+                                        "width": "50",
+                                        "class": "",
+                                        "id": ""
+                                    }
+                                }
+                            ]
+                        }
                     ]
-                  ],
-                  "wrapper": { "width": "18", "class": "", "id": "" }
-                },
-                {
-                  "key": "field_nl_ts_manual_custom_url",
-                  "label": "Custom URL",
-                  "name": "custom_url",
-                  "type": "url",
-                  "conditional_logic": [
-                    [
-                      { "field": "field_nl_ts_manual_link_type", "operator": "==", "value": "custom_url" }
-                    ]
-                  ],
-                  "wrapper": { "width": "50", "class": "", "id": "" }
                 }
-              ]
-            }
-          ]
+            ],
+            "button_label": "Add Section"
         }
-      ],
-      "button_label": "Add Section"
-    }
-  ],
-  "location": [
-    [
-      {
-        "param": "post_type",
-        "operator": "==",
-        "value": "page"
-      }
-    ]
-  ],
-  "menu_order": 0,
-  "position": "normal",
-  "style": "default",
-  "label_placement": "top",
-  "instruction_placement": "label",
-  "hide_on_screen": "",
-  "active": true,
-  "description": "",
-  "show_in_rest": 0,
-  "acfe_autosync": ["json"],
-  "modified": 1771696802
+    ],
+    "location": [
+        [
+            {
+                "param": "page_template",
+                "operator": "==",
+                "value": "page-nextlearn.php"
+            }
+        ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": "",
+    "active": true,
+    "description": "",
+    "show_in_rest": 0,
+    "acfe_autosync": [
+        "json"
+    ],
+    "modified": 1771764847
 }

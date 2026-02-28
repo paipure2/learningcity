@@ -739,6 +739,47 @@
 <?php get_template_part('template-parts/components/modal-category'); ?>
 <?php get_template_part('template-parts/components/modal-search'); ?>
 <?php if (!empty($nextlearn_widget_generated_modals)) : ?>
+  <style id="lc-popup-richtext-nextlearn-style">
+    .lc-popup-richtext { line-height: 1.75; word-break: break-word; }
+    .lc-popup-richtext > *:first-child { margin-top: 0; }
+    .lc-popup-richtext > *:last-child { margin-bottom: 0; }
+    .lc-popup-richtext p { margin: 0 0 0.9rem; }
+    .lc-popup-richtext h1,
+    .lc-popup-richtext h2,
+    .lc-popup-richtext h3,
+    .lc-popup-richtext h4,
+    .lc-popup-richtext h5,
+    .lc-popup-richtext h6 {
+      margin: 1.1rem 0 0.5rem;
+      line-height: 1.35;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .lc-popup-richtext h1 { font-size: 2rem; }
+    .lc-popup-richtext h2 { font-size: 1.7rem; }
+    .lc-popup-richtext h3 { font-size: 1.35rem; }
+    .lc-popup-richtext h4 { font-size: 1.15rem; }
+    .lc-popup-richtext ul,
+    .lc-popup-richtext ol { margin: 0.6rem 0 1rem; padding-left: 1.4rem; }
+    .lc-popup-richtext ul { list-style: disc !important; list-style-position: outside; }
+    .lc-popup-richtext ol { list-style: decimal !important; list-style-position: outside; }
+    .lc-popup-richtext li { margin: 0.2rem 0; }
+    .lc-popup-richtext li::marker { color: #00744B; }
+    .lc-popup-richtext hr {
+      margin: 1rem 0;
+      border: 0;
+      border-top: 1px solid rgba(15, 23, 42, 0.14);
+    }
+    .lc-popup-richtext a { color: #00744B; text-decoration: underline; }
+    .lc-popup-richtext strong { font-weight: 700; }
+    .lc-popup-richtext blockquote {
+      margin: 1rem 0;
+      padding: 0.75rem 1rem;
+      border-left: 4px solid #bfe7d2;
+      background: #f6fffb;
+      border-radius: 0.5rem;
+    }
+  </style>
   <?php foreach ($nextlearn_widget_generated_modals as $modal) : ?>
     <div data-modal-content="<?php echo esc_attr($modal['id']); ?>" class="modal lg:items-center items-start lg:p-6 p-0">
       <div class="overlay-modal"></div>
@@ -761,7 +802,12 @@
                   </div>
                 <?php endif; ?>
                 <?php if (!empty($modal['body'])) : ?>
-                  <p class="text-fs16"><?php echo nl2br(esc_html($modal['body'])); ?></p>
+                  <?php $lc_modal_body_has_html = ((string) $modal['body'] !== wp_strip_all_tags((string) $modal['body'])); ?>
+                  <?php if ($lc_modal_body_has_html) : ?>
+                    <div class="text-fs16 leading-relaxed lc-popup-richtext"><?php echo wp_kses_post($modal['body']); ?></div>
+                  <?php else : ?>
+                    <p class="text-fs16"><?php echo nl2br(esc_html($modal['body'])); ?></p>
+                  <?php endif; ?>
                 <?php endif; ?>
                 <?php if (!empty($modal['cta_label']) && !empty($modal['cta_url'])) : ?>
                   <div class="mt-6">

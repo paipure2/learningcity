@@ -1,274 +1,874 @@
 {
-    "key": "group_69521b721924c",
-    "title": "Course fields",
-    "fields": [
-        {
-            "key": "field_6954acce186ed",
-            "label": "รายละเอียดคอร์ส",
-            "name": "course_description",
-            "aria-label": "",
-            "type": "textarea",
-            "instructions": "",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "acfe_textarea_code": 0,
-            "maxlength": "",
-            "allow_in_bindings": 0,
-            "rows": "",
-            "placeholder": "",
-            "new_lines": ""
-        },
-        {
-            "key": "field_6954ace1186ee",
-            "label": "ลิงก์สำหรับเข้าไปเรียน",
-            "name": "learning_link",
-            "aria-label": "",
-            "type": "url",
-            "instructions": "สำหรับคอร์สออนไลน์ ถ้าไม่มีให้เว้นว่าง",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "allow_in_bindings": 0,
-            "placeholder": ""
-        },
-        {
-            "key": "field_69537a1c2ad8c",
-            "label": "จำนวนนาทีเรียน (หน่วยเป็นนาที)",
-            "name": "total_minutes",
-            "aria-label": "",
-            "type": "number",
-            "instructions": "จำนวนนาทีที่เรียน ระบบจำคำนวนเป็นชั่วโมงให้เอง",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "min": "",
-            "max": "",
-            "allow_in_bindings": 1,
-            "placeholder": "ใส่เป็นหน่วยนาที เช่น ถ้า 2 ชั่วโมง ก็ใส่เป็น 180 เฉพาะตัวเลข และใส่ 0 ถ้าหากไม่มีเวลาแน่ชัด",
-            "step": "",
-            "prepend": "",
-            "append": ""
-        },
-        {
-            "key": "field_69521b8048885",
-            "label": "ราคา",
-            "name": "price",
-            "aria-label": "",
-            "type": "number",
-            "instructions": "ถ้าฟรี ให้เว้นว่าง",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "min": "",
-            "max": "",
-            "allow_in_bindings": 0,
-            "placeholder": "",
-            "step": "",
-            "prepend": "",
-            "append": ""
-        },
-        {
-            "key": "field_695605035bc4d",
-            "label": "หมายเหตุราคา",
-            "name": "price_note",
-            "aria-label": "",
-            "type": "text",
-            "instructions": "ถ้าไม่มีให้เว้นว่าง",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "maxlength": "",
-            "allow_in_bindings": 0,
-            "placeholder": "",
-            "prepend": "",
-            "append": ""
-        },
-        {
-            "key": "field_69521b9e48887",
-            "label": "มีใบรับรองไหม",
-            "name": "has_certificate",
-            "aria-label": "",
-            "type": "true_false",
-            "instructions": "",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "message": "",
-            "default_value": 0,
-            "allow_in_bindings": 0,
-            "ui": 0,
-            "ui_on_text": "",
-            "ui_off_text": "",
-            "style": ""
-        },
-        {
-            "key": "field_69537a552ad8d",
-            "label": "หมายเหตุเรื่องใบรับรอง",
-            "name": "certification_note",
-            "aria-label": "",
-            "type": "text",
-            "instructions": "ถ้าไม่มีให้เว้นว่าง",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "maxlength": "",
-            "allow_in_bindings": 0,
-            "placeholder": "",
-            "prepend": "",
-            "append": ""
-        },
-        {
-            "key": "field_696ca5f29916c",
-            "label": "จำนวนชั่วโมงเรียนที่เรียนไปแล้ว (หน่วยเป็นชั่วโมง)",
-            "name": "total_attendance_hours",
-            "aria-label": "",
-            "type": "number",
-            "instructions": "",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "min": "",
-            "max": "",
-            "allow_in_bindings": 0,
-            "placeholder": "",
-            "step": "",
-            "prepend": "",
-            "append": ""
-        },
-        {
-            "key": "field_6994556ece585",
-            "label": "Images",
-            "name": "images",
-            "aria-label": "",
-            "type": "gallery",
-            "instructions": "",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "return_format": "array",
-            "library": "all",
-            "min": "",
-            "max": "",
-            "min_width": "",
-            "min_height": "",
-            "min_size": "",
-            "max_width": "",
-            "max_height": "",
-            "max_size": "",
-            "mime_types": "",
-            "insert": "append",
-            "preview_size": "medium"
-        },
-        {
-            "key": "field_6972cc1310eec",
-            "label": "ไม่จำเป็นต้องแก้",
-            "name": "",
-            "aria-label": "",
-            "type": "accordion",
-            "instructions": "",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "open": 0,
-            "multi_expand": 0,
-            "endpoint": 0
-        },
-        {
-            "key": "field_6953a3cb2b350",
-            "label": "Course UID",
-            "name": "course_uid",
-            "aria-label": "",
-            "type": "text",
-            "instructions": "",
-            "required": 0,
-            "conditional_logic": 0,
-            "wrapper": {
-                "width": "",
-                "class": "",
-                "id": ""
-            },
-            "default_value": "",
-            "maxlength": "",
-            "allow_in_bindings": 0,
-            "placeholder": "",
-            "prepend": "",
-            "append": ""
-        }
-    ],
-    "location": [
+  "key": "group_69521b721924c",
+  "title": "Course fields",
+  "fields": [
+    {
+      "key": "field_lc_course_tab_basic_01",
+      "label": "ข้อมูลพื้นฐาน",
+      "name": "",
+      "aria-label": "",
+      "type": "tab",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "placement": "top",
+      "endpoint": 0,
+      "selected": 1
+    },
+    {
+      "key": "field_lc_course_mode_01",
+      "label": "รูปแบบคอร์ส",
+      "name": "course_mode",
+      "aria-label": "",
+      "type": "button_group",
+      "instructions": "เลือกรูปแบบคอร์สเพื่อแสดงช่องกรอกที่เกี่ยวข้อง (คอร์สเดิมยังไม่จำเป็นต้องเลือก)",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "33",
+        "class": "",
+        "id": ""
+      },
+      "choices": {
+        "online": "ออนไลน์",
+        "onsite_single": "Onsite (สถานที่เดียว)",
+        "onsite_multi": "Onsite (หลาย Session)"
+      },
+      "default_value": "",
+      "return_format": "value",
+      "layout": "horizontal",
+      "allow_null": 1
+    },
+    {
+      "key": "field_6954acce186ed",
+      "label": "รายละเอียดคอร์ส",
+      "name": "course_description",
+      "aria-label": "",
+      "type": "textarea",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "acfe_textarea_code": 0,
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "rows": "",
+      "placeholder": "",
+      "new_lines": ""
+    },
+    {
+      "key": "field_69537a1c2ad8c",
+      "label": "จำนวนนาทีเรียน",
+      "name": "total_minutes",
+      "aria-label": "",
+      "type": "number",
+      "instructions": "กรอกจำนวนเวลาที่เรียนเป็นนาที ระบบจะคำนวณเป็นชั่วโมงให้อัตโนมัติ",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "min": "",
+      "max": "",
+      "allow_in_bindings": 1,
+      "placeholder": "กรอกเป็นนาที เช่น 180 = 3 ชั่วโมง (ใส่เฉพาะตัวเลข)",
+      "step": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_69521b8048885",
+      "label": "ราคา",
+      "name": "price",
+      "aria-label": "",
+      "type": "number",
+      "instructions": "ถ้าฟรี ให้เว้นว่าง",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "min": "",
+      "max": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "step": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_695605035bc4d",
+      "label": "หมายเหตุราคา",
+      "name": "price_note",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "ถ้าไม่มีให้เว้นว่าง",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_69521b9e48887",
+      "label": "มีใบรับรองไหม",
+      "name": "has_certificate",
+      "aria-label": "",
+      "type": "true_false",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "message": "",
+      "default_value": 0,
+      "allow_in_bindings": 0,
+      "ui": 0,
+      "ui_on_text": "",
+      "ui_off_text": "",
+      "style": ""
+    },
+    {
+      "key": "field_69537a552ad8d",
+      "label": "หมายเหตุเรื่องใบรับรอง",
+      "name": "certification_note",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "ถ้าไม่มีให้เว้นว่าง",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_696ca5f29916c",
+      "label": "จำนวนชั่วโมงเรียนที่เรียนไปแล้ว (หน่วยเป็นชั่วโมง)",
+      "name": "total_attendance_hours",
+      "aria-label": "",
+      "type": "number",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "min": "",
+      "max": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "step": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_lc_course_tab_schedule_01",
+      "label": "การสมัคร / เวลาเรียน",
+      "name": "",
+      "aria-label": "",
+      "type": "tab",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "placement": "top",
+      "endpoint": 0,
+      "selected": 0
+    },
+    {
+      "key": "field_6954ace1186ee",
+      "label": "ลิงก์สำหรับเข้าไปเรียน",
+      "name": "learning_link",
+      "aria-label": "",
+      "type": "url",
+      "instructions": "สำหรับคอร์สออนไลน์ ถ้าไม่มีให้เว้นว่าง",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "allow_in_bindings": 0,
+      "placeholder": ""
+    },
+    {
+      "key": "field_lc_onsite_single_source_01",
+      "label": "แหล่งข้อมูลสถานที่ (Onsite สถานที่เดียว)",
+      "name": "onsite_single_venue_source",
+      "aria-label": "",
+      "type": "radio",
+      "instructions": "ใช้สำหรับคอร์ส Onsite (สถานที่เดียว) เท่านั้น",
+      "required": 0,
+      "conditional_logic": [
         [
-            {
-                "param": "post_type",
-                "operator": "==",
-                "value": "course"
-            }
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
         ]
-    ],
-    "menu_order": 0,
-    "position": "normal",
-    "style": "default",
-    "label_placement": "left",
-    "instruction_placement": "label",
-    "hide_on_screen": [
-        "the_content"
-    ],
-    "active": true,
-    "description": "",
-    "show_in_rest": 0,
-    "display_title": "",
-    "acfe_autosync": [
-        "json"
-    ],
-    "acfe_form": 0,
-    "acfe_meta": "",
-    "acfe_note": "",
-    "modified": 1771726433
+      ],
+      "wrapper": {
+        "width": "67",
+        "class": "",
+        "id": ""
+      },
+      "choices": {
+        "location_cpt": "ใช้สถานที่จากระบบ (Location)",
+        "custom_contact": "กรอกสถานที่/ช่องทางติดต่อเอง"
+      },
+      "allow_null": 0,
+      "other_choice": 0,
+      "default_value": "location_cpt",
+      "layout": "horizontal",
+      "return_format": "value",
+      "save_other_choice": 0
+    },
+    {
+      "key": "field_lc_onsite_single_location_01",
+      "label": "สถานที่ (เลือกจากระบบ)",
+      "name": "onsite_single_location",
+      "aria-label": "",
+      "type": "post_object",
+      "instructions": "เลือกสถานที่ 1 แห่งจากรายการสถานที่ในระบบ",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "location_cpt"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "post_type": [
+        "location"
+      ],
+      "post_status": "",
+      "taxonomy": "",
+      "return_format": "id",
+      "multiple": 0,
+      "allow_null": 1,
+      "ui": 1,
+      "bidirectional": 0
+    },
+    {
+      "key": "field_lc_onsite_single_reg_start_01",
+      "label": "วันที่รับสมัครเริ่ม",
+      "name": "onsite_single_reg_start",
+      "aria-label": "",
+      "type": "date_picker",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "25",
+        "class": "",
+        "id": ""
+      },
+      "display_format": "d/m/Y",
+      "return_format": "Ymd",
+      "first_day": 1
+    },
+    {
+      "key": "field_lc_onsite_single_reg_end_01",
+      "label": "วันที่ปิดรับสมัคร",
+      "name": "onsite_single_reg_end",
+      "aria-label": "",
+      "type": "date_picker",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "25",
+        "class": "",
+        "id": ""
+      },
+      "display_format": "d/m/Y",
+      "return_format": "Ymd",
+      "first_day": 1
+    },
+    {
+      "key": "field_lc_onsite_single_start_date_01",
+      "label": "วันเริ่มเรียน",
+      "name": "onsite_single_start_date",
+      "aria-label": "",
+      "type": "date_picker",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "25",
+        "class": "",
+        "id": ""
+      },
+      "display_format": "d/m/Y",
+      "return_format": "Ymd",
+      "first_day": 1
+    },
+    {
+      "key": "field_lc_onsite_single_end_date_01",
+      "label": "วันสิ้นสุด",
+      "name": "onsite_single_end_date",
+      "aria-label": "",
+      "type": "date_picker",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "25",
+        "class": "",
+        "id": ""
+      },
+      "display_format": "d/m/Y",
+      "return_format": "Ymd",
+      "first_day": 1
+    },
+    {
+      "key": "field_lc_onsite_single_time_period_01",
+      "label": "ช่วงเวลาเรียน",
+      "name": "onsite_single_time_period",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_lc_onsite_single_apply_url_01",
+      "label": "ลิงก์สมัคร",
+      "name": "onsite_single_apply_url",
+      "aria-label": "",
+      "type": "url",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "allow_in_bindings": 0,
+      "placeholder": ""
+    },
+    {
+      "key": "field_lc_onsite_single_session_details_01",
+      "label": "ข้อมูลเพิ่มเติม (รายละเอียดรอบเรียน)",
+      "name": "onsite_single_session_details",
+      "aria-label": "",
+      "type": "textarea",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "acfe_textarea_code": 0,
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "rows": 4,
+      "placeholder": "",
+      "new_lines": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_acc_01",
+      "label": "สถานที่ / ติดต่อ (กำหนดเอง)",
+      "name": "",
+      "aria-label": "",
+      "type": "tab",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "placement": "top",
+      "endpoint": 0,
+      "selected": 0
+    },
+    {
+      "key": "field_lc_onsite_single_custom_venue_name_01",
+      "label": "ชื่อสถานที่",
+      "name": "onsite_single_custom_venue_name",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_contact_name_01",
+      "label": "ชื่อผู้ติดต่อ",
+      "name": "onsite_single_custom_contact_name",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_address_01",
+      "label": "ที่อยู่",
+      "name": "onsite_single_custom_address",
+      "aria-label": "",
+      "type": "textarea",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "acfe_textarea_code": 0,
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "rows": 3,
+      "placeholder": "",
+      "new_lines": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_phone_01",
+      "label": "เบอร์ติดต่อ",
+      "name": "onsite_single_custom_contact_phone",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_email_01",
+      "label": "อีเมลติดต่อ",
+      "name": "onsite_single_custom_contact_email",
+      "aria-label": "",
+      "type": "email",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_reg_url_01",
+      "label": "ลิงก์สมัคร",
+      "name": "onsite_single_custom_registration_url",
+      "aria-label": "",
+      "type": "url",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "allow_in_bindings": 0,
+      "placeholder": ""
+    },
+    {
+      "key": "field_lc_onsite_single_custom_maps_url_01",
+      "label": "ลิงก์ Google Maps",
+      "name": "onsite_single_custom_maps_url",
+      "aria-label": "",
+      "type": "url",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": [
+        [
+          {
+            "field": "field_lc_course_mode_01",
+            "operator": "==",
+            "value": "onsite_single"
+          },
+          {
+            "field": "field_lc_onsite_single_source_01",
+            "operator": "==",
+            "value": "custom_contact"
+          }
+        ]
+      ],
+      "wrapper": {
+        "width": "50",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "allow_in_bindings": 0,
+      "placeholder": ""
+    },
+    {
+      "key": "field_lc_course_tab_media_01",
+      "label": "สื่อและภาพ",
+      "name": "",
+      "aria-label": "",
+      "type": "tab",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "placement": "top",
+      "endpoint": 0,
+      "selected": 0
+    },
+    {
+      "key": "field_6994556ece585",
+      "label": "รูปภาพ",
+      "name": "images",
+      "aria-label": "",
+      "type": "gallery",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "return_format": "array",
+      "library": "all",
+      "min": "",
+      "max": "",
+      "min_width": "",
+      "min_height": "",
+      "min_size": "",
+      "max_width": "",
+      "max_height": "",
+      "max_size": "",
+      "mime_types": "",
+      "insert": "append",
+      "preview_size": "medium"
+    },
+    {
+      "key": "field_6972cc1310eec",
+      "label": "ไม่จำเป็นต้องแก้",
+      "name": "",
+      "aria-label": "",
+      "type": "accordion",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "open": 0,
+      "multi_expand": 0,
+      "endpoint": 0
+    },
+    {
+      "key": "field_6953a3cb2b350",
+      "label": "รหัสคอร์ส (UID)",
+      "name": "course_uid",
+      "aria-label": "",
+      "type": "text",
+      "instructions": "",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "placeholder": "",
+      "prepend": "",
+      "append": ""
+    }
+  ],
+  "location": [
+    [
+      {
+        "param": "post_type",
+        "operator": "==",
+        "value": "course"
+      }
+    ]
+  ],
+  "menu_order": 0,
+  "position": "normal",
+  "style": "default",
+  "label_placement": "left",
+  "instruction_placement": "label",
+  "hide_on_screen": [
+    "the_content"
+  ],
+  "active": true,
+  "description": "",
+  "show_in_rest": 0,
+  "display_title": "",
+  "acfe_autosync": [
+    "json"
+  ],
+  "acfe_form": 0,
+  "acfe_meta": "",
+  "acfe_note": "",
+  "modified": 1771746938
 }

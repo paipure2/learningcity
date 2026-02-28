@@ -231,7 +231,7 @@
                     "label": "รายละเอียด Popup",
                     "name": "popup_body",
                     "aria-label": "",
-                    "type": "textarea",
+                    "type": "wysiwyg",
                     "instructions": "",
                     "required": 0,
                     "conditional_logic": [
@@ -248,13 +248,14 @@
                         "class": "",
                         "id": ""
                     },
-                    "rows": 4,
-                    "new_lines": "",
                     "default_value": "",
                     "maxlength": "",
                     "placeholder": "",
-                    "acfe_textarea_code": 0,
-                    "parent_repeater": "field_hl_items"
+                    "parent_repeater": "field_hl_items",
+                    "tabs": "all",
+                    "toolbar": "basic",
+                    "media_upload": 0,
+                    "delay": 0
                 },
                 {
                     "key": "field_hl_item_popup_image",
@@ -453,9 +454,9 @@
     "location": [
         [
             {
-                "param": "options_page",
+                "param": "page_type",
                 "operator": "==",
-                "value": "lc-home-widget"
+                "value": "front_page"
             }
         ]
     ],
@@ -477,5 +478,5 @@
     "acfe_form": 0,
     "acfe_meta": "",
     "acfe_note": "",
-    "modified": 1771426532
+    "modified": 1771765516
 }

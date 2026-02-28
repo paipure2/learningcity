@@ -142,7 +142,7 @@
                                 },
                                 {
                                     "key": "field_ps_c1_item_highlight",
-                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "label": "ตัวเลข/คำเน้น (ถ้ามี)",
                                     "name": "highlight",
                                     "aria-label": "",
                                     "type": "text",
@@ -423,7 +423,7 @@
                                 },
                                 {
                                     "key": "field_ps_c2_item_highlight",
-                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "label": "ตัวเลข/คำเน้น (ถ้ามี)",
                                     "name": "highlight",
                                     "aria-label": "",
                                     "type": "text",
@@ -704,7 +704,7 @@
                                 },
                                 {
                                     "key": "field_ps_c3_item_highlight",
-                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "label": "ตัวเลข/คำเน้น (ถ้ามี)",
                                     "name": "highlight",
                                     "aria-label": "",
                                     "type": "text",
@@ -985,7 +985,7 @@
                                 },
                                 {
                                     "key": "field_ps_c4_item_highlight",
-                                    "label": "ตัวเลข\/คำเน้น (ถ้ามี)",
+                                    "label": "ตัวเลข/คำเน้น (ถ้ามี)",
                                     "name": "highlight",
                                     "aria-label": "",
                                     "type": "text",
@@ -1153,9 +1153,9 @@
     "location": [
         [
             {
-                "param": "options_page",
+                "param": "page_type",
                 "operator": "==",
-                "value": "lc-home-policy"
+                "value": "front_page"
             }
         ]
     ],
@@ -1177,5 +1177,5 @@
     "acfe_form": 0,
     "acfe_meta": "",
     "acfe_note": "",
-    "modified": 1771426532
+    "modified": 1771763925
 }

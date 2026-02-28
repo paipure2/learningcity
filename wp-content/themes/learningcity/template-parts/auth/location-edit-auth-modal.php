@@ -24,6 +24,10 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
             <div id="lcGlobalLoginOtpWrap" class="hidden">
                 <label class="text-sm font-semibold text-[#1f2f46]">OTP</label>
                 <input id="lcGlobalLoginOtp" inputmode="numeric" maxlength="6" class="mt-2 w-full rounded-xl border border-[#cfd9e5] px-3 py-2.5 text-sm tracking-[0.15em] focus:border-[#00744b] focus:ring-0" placeholder="กรอกรหัส 6 หลัก">
+                <div id="lcGlobalLoginOtpMeta" class="mt-2 hidden flex items-center justify-between gap-3 text-xs">
+                  <div id="lcGlobalLoginOtpCountdown" class="text-slate-500"></div>
+                  <button type="button" id="lcGlobalLoginResendOtp" class="text-[#00744b] font-semibold disabled:text-slate-400 disabled:cursor-not-allowed" disabled>ส่ง OTP ใหม่</button>
+                </div>
             </div>
             <div id="lcGlobalLoginError" class="hidden text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2"></div>
             <div id="lcGlobalLoginSuccess" class="hidden text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2"></div>
@@ -134,6 +138,20 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   #lcCourseEditModal .lc-inline-note{min-height:22px;font-size:13px}
   #lcCourseEditModal .lc-inline-note.ok{color:#166534}
   #lcCourseEditModal .lc-inline-note.err{color:#b91c1c}
+  .lc-debug-msg{display:flex;align-items:flex-start;gap:8px;line-height:1.35;flex-wrap:wrap;width:100%;max-width:100%}
+  .lc-debug-msg-text{flex:1;min-width:0}
+  .lc-debug-actions{display:flex;flex-wrap:wrap;gap:8px;flex:1 0 100%;margin-top:2px}
+  .lc-debug-fix-btn{height:30px;padding:0 10px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font-size:12px;font-weight:700;cursor:pointer}
+  .lc-debug-fix-btn.primary{border-color:#0b8664;background:#0b8664;color:#fff}
+  .lc-debug-help{flex:none;width:20px;height:20px;border-radius:999px;border:1px solid #94a3b8;background:#fff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .lc-debug-help:hover{background:#f8fafc}
+  .lc-debug-tip{display:inline-block;flex:0 0 auto;min-width:0;max-width:100%;margin:0;padding:0}
+  .lc-debug-tip[open]{display:block;flex:1 0 100%;width:100%;max-width:100%}
+  .lc-debug-tip[open] summary{margin-left:auto;display:inline-flex}
+  .lc-debug-tip summary{list-style:none}
+  .lc-debug-tip summary::-webkit-details-marker{display:none}
+  .lc-debug-pop{display:block;position:static;z-index:30;width:100%;max-width:100%;box-sizing:border-box;max-height:260px;overflow:auto;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 12px;box-shadow:0 12px 28px rgba(15,23,42,.2);margin-top:6px}
+  .lc-debug-pop pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
   #lcCourseEditModal .lc-inline-btn{height:38px;padding:0 14px;border-radius:12px;border:1px solid #cfd9e5;background:#fff;color:#0f172a;font-weight:700;font-size:14px;cursor:pointer}
   #lcCourseEditModal .lc-inline-btn.primary{border-color:#00744b;background:#00744b;color:#fff}
   #lcCourseEditModal .lc-inline-success-screen{display:none;flex:1;align-items:center;justify-content:center;padding:24px}
@@ -325,9 +343,12 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   const cancelBtn = el("lcGlobalLoginCancel");
   const reqBtn = el("lcGlobalLoginRequestOtp");
   const verifyBtn = el("lcGlobalLoginVerifyOtp");
+  const resendBtn = el("lcGlobalLoginResendOtp");
   const emailEl = el("lcGlobalLoginEmail");
   const otpEl = el("lcGlobalLoginOtp");
   const otpWrap = el("lcGlobalLoginOtpWrap");
+  const otpMetaEl = el("lcGlobalLoginOtpMeta");
+  const otpCountdownEl = el("lcGlobalLoginOtpCountdown");
   const errEl = el("lcGlobalLoginError");
   const okEl = el("lcGlobalLoginSuccess");
   const statusFabBtn = el("lcStatusFabBtn");
@@ -384,7 +405,11 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   let activeDetailRequestId = 0;
   let pendingCourseTrigger = null;
   let courseEditContext = null;
+  let activeCourseModalTarget = { courseId: 0, courseTitle: "" };
   let courseNewSessionSeq = 0;
+  let otpChallengeId = "";
+  let otpResendUntilTs = 0;
+  let otpResendTimer = null;
   const statusNewRequestIds = new Set();
 
   [modal, statusModal, statusFabBtn, courseEditModal].forEach((node) => {
@@ -394,16 +419,111 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     }
   });
 
-  const setMsg = (type, msg) => {
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ch] || ch));
+  const normalizeDebugPayload = (debug, fallback = {}) => {
+    const raw = (debug && typeof debug === "object") ? debug : {};
+    const ctx = (raw.context && typeof raw.context === "object") ? raw.context : {};
+    return {
+      error_id: String(raw.error_id || fallback.error_id || ""),
+      code: String(raw.code || fallback.code || ""),
+      stage: String(raw.stage || fallback.stage || ""),
+      action: String(raw.action || fallback.action || ""),
+      http_status: Number(raw.http_status || fallback.http_status || 0) || 0,
+      time_utc: String(raw.time_utc || fallback.time_utc || ""),
+      context: ctx,
+    };
+  };
+  const debugToTooltipText = (debug) => {
+    const d = normalizeDebugPayload(debug);
+    const lines = [];
+    if (d.error_id) lines.push(`error_id: ${d.error_id}`);
+    if (d.code) lines.push(`code: ${d.code}`);
+    if (d.stage) lines.push(`stage: ${d.stage}`);
+    if (d.action) lines.push(`action: ${d.action}`);
+    if (d.http_status) lines.push(`http: ${d.http_status}`);
+    if (d.time_utc) lines.push(`time: ${d.time_utc}`);
+    if (d.context && typeof d.context === "object") {
+      Object.entries(d.context).forEach(([k, v]) => {
+        lines.push(`${k}: ${String(v ?? "")}`);
+      });
+    }
+    return lines.join("\n");
+  };
+  const renderMessageWithDebug = (boxEl, type, msg, debug) => {
+    if (!boxEl) return;
+    boxEl.textContent = "";
+    if (!msg) return;
+    const wrap = document.createElement("div");
+    wrap.className = "lc-debug-msg";
+    const text = document.createElement("span");
+    text.className = "lc-debug-msg-text";
+    text.textContent = String(msg || "");
+    wrap.appendChild(text);
+    const tip = debugToTooltipText(debug);
+    const d = normalizeDebugPayload(debug);
+    const actionButtons = [];
+    if (d.http_status === 403 && ["load_course_context", "status_feed", "status_detail", "status_dashboard", "submit_course_request", "submit_location_request"].includes(d.stage)) {
+      actionButtons.push({ action: "reload-page", label: "รีเฟรชหน้า", primary: true });
+      actionButtons.push({ action: "open-editor-login", label: "เข้าสู่ระบบผู้แก้ไขใหม่" });
+    }
+    if (["load_course_context", "submit_course_request"].includes(d.stage)) {
+      actionButtons.unshift({ action: "retry-course-edit", label: "ลองโหลดคอร์สใหม่", primary: d.stage === "load_course_context" });
+    }
+    if (d.stage === "otp_verify" && (d.code === "otp_challenge_mismatch" || d.http_status === 403)) {
+      actionButtons.push({ action: "request-otp-again", label: "ขอ OTP ใหม่", primary: true });
+    }
+    if (actionButtons.length) {
+      const actions = document.createElement("div");
+      actions.className = "lc-debug-actions";
+      actionButtons.forEach((item) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `lc-debug-fix-btn${item.primary ? " primary" : ""}`;
+        btn.dataset.debugFixAction = item.action;
+        btn.textContent = item.label;
+        actions.appendChild(btn);
+      });
+      wrap.appendChild(actions);
+    }
+    if (tip) {
+      const details = document.createElement("details");
+      details.className = "lc-debug-tip";
+      const summary = document.createElement("summary");
+      summary.className = "lc-debug-help";
+      summary.setAttribute("aria-label", "รายละเอียดข้อผิดพลาด");
+      summary.textContent = "?";
+      const pop = document.createElement("div");
+      pop.className = "lc-debug-pop";
+      const pre = document.createElement("pre");
+      pre.textContent = tip;
+      pop.appendChild(pre);
+      details.appendChild(summary);
+      details.appendChild(pop);
+      wrap.appendChild(details);
+    }
+    boxEl.appendChild(wrap);
+  };
+  const buildAjaxError = async (res, fallbackMessage, fallbackDebug = {}) => {
+    let json = null;
+    try { json = await res.json(); } catch (_) {}
+    const message = String(json?.data?.message || fallbackMessage || `HTTP ${res?.status || 0}`);
+    const err = new Error(message);
+    err.lcDebug = normalizeDebugPayload(json?.data?.debug, {
+      ...fallbackDebug,
+      http_status: Number(res?.status || fallbackDebug?.http_status || 0),
+    });
+    return err;
+  };
+  const setMsg = (type, msg, debug = null) => {
     if (errEl) errEl.classList.add("hidden");
     if (okEl) okEl.classList.add("hidden");
     if (!msg) return;
     if (type === "error" && errEl) {
-      errEl.textContent = msg;
+      renderMessageWithDebug(errEl, type, msg, debug);
       errEl.classList.remove("hidden");
     }
     if (type === "success" && okEl) {
-      okEl.textContent = msg;
+      renderMessageWithDebug(okEl, type, msg, debug);
       okEl.classList.remove("hidden");
     }
   };
@@ -417,13 +537,47 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   };
   const normalizeLineBreaks = (value) => String(value ?? "").replace(/\r\n?/g, "\n");
 
-  const setCourseEditMsg = (type, msg) => {
+  const setCourseEditMsg = (type, msg, debug = null) => {
     if (!courseEditErrorEl) return;
     courseEditErrorEl.className = "lc-inline-note mt-2";
     courseEditErrorEl.textContent = "";
     if (!msg) return;
-    courseEditErrorEl.textContent = msg;
+    renderMessageWithDebug(courseEditErrorEl, type, msg, debug);
     courseEditErrorEl.classList.add(type === "error" ? "err" : "ok");
+  };
+
+  const stopOtpCountdown = () => {
+    if (otpResendTimer) {
+      window.clearInterval(otpResendTimer);
+      otpResendTimer = null;
+    }
+  };
+
+  const renderOtpCountdown = () => {
+    const now = Date.now();
+    const remaining = Math.max(0, Math.ceil((otpResendUntilTs - now) / 1000));
+    if (otpMetaEl) otpMetaEl.classList.toggle("hidden", !otpWrap || otpWrap.classList.contains("hidden"));
+    if (otpCountdownEl) {
+      otpCountdownEl.textContent = remaining > 0
+        ? `ส่ง OTP ใหม่ได้ใน ${remaining} วินาที`
+        : "สามารถส่ง OTP ใหม่ได้แล้ว";
+    }
+    if (resendBtn) {
+      resendBtn.disabled = remaining > 0;
+    }
+    if (remaining <= 0) {
+      stopOtpCountdown();
+    }
+  };
+
+  const startOtpCountdown = (seconds) => {
+    const sec = Math.max(0, Number(seconds || 0));
+    stopOtpCountdown();
+    otpResendUntilTs = Date.now() + (sec * 1000);
+    renderOtpCountdown();
+    if (sec > 0) {
+      otpResendTimer = window.setInterval(renderOtpCountdown, 1000);
+    }
   };
 
   const setCourseEditTab = (tab) => {
@@ -466,8 +620,13 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     document.body.style.overflow = "hidden";
     activeLocationId = Number(locationId || 0);
     if (otpWrap) otpWrap.classList.add("hidden");
+    if (otpMetaEl) otpMetaEl.classList.add("hidden");
     reqBtn?.classList.remove("hidden");
     verifyBtn?.classList.add("hidden");
+    resendBtn?.classList.add("hidden");
+    resendBtn && (resendBtn.disabled = true);
+    otpChallengeId = "";
+    stopOtpCountdown();
     setMsg("", "");
   };
 
@@ -480,6 +639,9 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     }
     if (emailEl) emailEl.value = "";
     if (otpEl) otpEl.value = "";
+    otpChallengeId = "";
+    stopOtpCountdown();
+    if (otpMetaEl) otpMetaEl.classList.add("hidden");
     setMsg("", "");
   };
 
@@ -501,7 +663,8 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         fd.append("action", "lc_logout_location_edit_session");
         fd.append("nonce", String(nonce || ""));
         const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
-        const json = await res.json();
+        let json = null;
+        try { json = await res.json(); } catch (_) {}
         hasSession = !!json?.success ? false : hasSession;
       } catch (err) {
         // keep previous state when request fails
@@ -517,6 +680,43 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   window.lcOpenLocationEditAccessModal = function (locationId) {
     api.open({ locationId: Number(locationId || 0) });
   };
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    const fixBtn = target.closest("[data-debug-fix-action]");
+    if (fixBtn instanceof HTMLButtonElement) {
+      const action = String(fixBtn.dataset.debugFixAction || "");
+      if (action === "reload-page") {
+        window.location.reload();
+        return;
+      }
+      if (action === "open-editor-login") {
+        try { window.lcLocationEditAuth?.open?.({ locationId: 0 }); } catch (_) {}
+        return;
+      }
+      if (action === "request-otp-again") {
+        if (resendBtn && !resendBtn.classList.contains("hidden") && !resendBtn.disabled) {
+          resendBtn.click();
+          return;
+        }
+        if (reqBtn && !reqBtn.classList.contains("hidden")) {
+          reqBtn.click();
+          return;
+        }
+      }
+      if (action === "retry-course-edit") {
+        const cid = Number(activeCourseModalTarget?.courseId || 0);
+        if (!cid) return;
+        openCourseEditModal(cid, String(activeCourseModalTarget?.courseTitle || "")).catch(() => {});
+        return;
+      }
+    }
+    const insideTip = target.closest(".lc-debug-tip");
+    document.querySelectorAll(".lc-debug-tip[open]").forEach((node) => {
+      if (insideTip && node === insideTip) return;
+      node.removeAttribute("open");
+    });
+  });
 
   const syncTriggerLabels = () => {
     triggers.forEach((btn) => {
@@ -638,12 +838,17 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       fd.append("nonce", String(nonce || ""));
       fd.append("request_id", String(rid));
       const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      if (!res.ok) throw await buildAjaxError(res, "ยกเลิกคำขอไม่สำเร็จ", { stage: "request_cancel" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.data?.message || "ยกเลิกคำขอไม่สำเร็จ");
+      if (!json?.success) {
+        const err = new Error(json?.data?.message || "ยกเลิกคำขอไม่สำเร็จ");
+        err.lcDebug = normalizeDebugPayload(json?.data?.debug, { stage: "request_cancel" });
+        throw err;
+      }
       statusNewRequestIds.delete(rid);
       await fetchStatusFeed();
     } catch (err) {
-      window.alert(String(err?.message || "ยกเลิกคำขอไม่สำเร็จ"));
+      setMsg("error", String(err?.message || "ยกเลิกคำขอไม่สำเร็จ"), err?.lcDebug || null);
     }
   };
 
@@ -804,11 +1009,18 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       fd.append("nonce", String(nonce || ""));
       fd.append("request_id", String(activeDetailRequestId));
       const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      if (!res.ok) throw await buildAjaxError(res, "โหลดรายละเอียดไม่สำเร็จ", { stage: "status_detail" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.data?.message || "โหลดรายละเอียดไม่สำเร็จ");
+      if (!json?.success) {
+        const err = new Error(json?.data?.message || "โหลดรายละเอียดไม่สำเร็จ");
+        err.lcDebug = normalizeDebugPayload(json?.data?.debug, { stage: "status_detail" });
+        throw err;
+      }
       renderStatusDetail(json.data || {});
     } catch (err) {
-      statusDetailBody.innerHTML = `<div class="text-sm text-rose-700">โหลดรายละเอียดไม่สำเร็จ</div><div style="margin-top:8px;"><button type="button" id="lcStatusBackBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">← ย้อนกลับ</button></div>`;
+      const tip = debugToTooltipText(err?.lcDebug || null);
+      const tipBtn = tip ? ` <details class="lc-debug-tip" style="margin-left:6px;vertical-align:middle;"><summary class="lc-debug-help">?</summary><div class="lc-debug-pop"><pre>${escapeHtml(tip)}</pre></div></details>` : "";
+      statusDetailBody.innerHTML = `<div class="text-sm text-rose-700">โหลดรายละเอียดไม่สำเร็จ${tipBtn}</div><div style="margin-top:8px;"><button type="button" id="lcStatusBackBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50">← ย้อนกลับ</button></div>`;
       const backBtn = el("lcStatusBackBtn");
       backBtn?.addEventListener("click", () => renderStatusRows());
     }
@@ -822,8 +1034,13 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       fd.append("action", "lc_fetch_location_edit_status_feed");
       fd.append("nonce", String(nonce || ""));
       const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      if (!res.ok) throw await buildAjaxError(res, "โหลดสถานะไม่สำเร็จ", { stage: "status_feed" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.data?.message || "โหลดสถานะไม่สำเร็จ");
+      if (!json?.success) {
+        const err = new Error(json?.data?.message || "โหลดสถานะไม่สำเร็จ");
+        err.lcDebug = normalizeDebugPayload(json?.data?.debug, { stage: "status_feed" });
+        throw err;
+      }
       statusRows = Array.isArray(json?.data?.rows) ? json.data.rows : [];
       statusCounts = (json?.data?.counts && typeof json.data.counts === "object") ? json.data.counts : { all: 0, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
       statusTypeCounts = (json?.data?.type_counts && typeof json.data.type_counts === "object") ? json.data.type_counts : { all: 0, location: 0, course: 0 };
@@ -835,7 +1052,9 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       setStatusTypeTabUI();
       renderStatusRows();
     } catch (err) {
-      statusBody.innerHTML = `<div class="text-sm text-rose-700">โหลดสถานะไม่สำเร็จ</div>`;
+      const tip = debugToTooltipText(err?.lcDebug || null);
+      const tipBtn = tip ? ` <details class="lc-debug-tip" style="margin-left:6px;vertical-align:middle;"><summary class="lc-debug-help">?</summary><div class="lc-debug-pop"><pre>${escapeHtml(tip)}</pre></div></details>` : "";
+      statusBody.innerHTML = `<div class="text-sm text-rose-700">โหลดสถานะไม่สำเร็จ${tipBtn}</div>`;
     }
   };
 
@@ -856,6 +1075,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     hideCourseInlineProcessing();
     courseEditModal.classList.add("hidden");
     document.body.style.overflow = "";
+    activeCourseModalTarget = { courseId: 0, courseTitle: "" };
     courseEditContext = null;
     courseNewSessionSeq = 0;
     setCourseEditTab("course");
@@ -1039,6 +1259,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     if (!courseEditModal) return;
     const cid = Number(courseId || 0);
     if (!cid) return;
+    activeCourseModalTarget = { courseId: cid, courseTitle: String(fallbackTitle || "") };
     hideCourseSubmitSuccessInModal();
     hideCourseInlineProcessing();
     setCourseEditTab("course");
@@ -1057,9 +1278,12 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       fd.append("nonce", String(nonce || ""));
       fd.append("course_id", String(cid));
       const contextRes = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      if (!contextRes.ok) throw await buildAjaxError(contextRes, "โหลดข้อมูลคอร์สไม่สำเร็จ", { stage: "load_course_context" });
       const contextJson = await contextRes.json();
       if (!contextJson?.success || !contextJson?.data) {
-        throw new Error(contextJson?.data?.message || "โหลดข้อมูลคอร์สไม่สำเร็จ");
+        const err = new Error(contextJson?.data?.message || "โหลดข้อมูลคอร์สไม่สำเร็จ");
+        err.lcDebug = normalizeDebugPayload(contextJson?.data?.debug, { stage: "load_course_context" });
+        throw err;
       }
       courseEditContext = contextJson.data;
       if (courseEditTitleEl) courseEditTitleEl.value = decodeHtmlEntities(String(contextJson.data?.course?.title || fallbackTitle || ""));
@@ -1090,7 +1314,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     } catch (err) {
       if (courseEditModalSubEl) courseEditModalSubEl.textContent = "โหลดข้อมูลคอร์สไม่สำเร็จ";
       if (courseEditSessionListEl) courseEditSessionListEl.innerHTML = '<div class="text-sm text-rose-700">ไม่สามารถโหลด Session ได้</div>';
-      setCourseEditMsg("error", String(err?.message || "โหลดข้อมูลคอร์สไม่สำเร็จ"));
+      setCourseEditMsg("error", String(err?.message || "โหลดข้อมูลคอร์สไม่สำเร็จ"), err?.lcDebug || null);
     }
   };
   window.lcLocationEditStatus = {
@@ -1112,6 +1336,11 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
   };
 
   const refreshLoginState = async () => {
+    if (!hasSession) {
+      syncTriggerLabels();
+      syncStatusFab();
+      return;
+    }
     try {
       const fd = new FormData();
       fd.append("action", "lc_fetch_location_edit_dashboard");
@@ -1435,8 +1664,13 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         fd.append("new_images[]", file, file.name || "course-image.jpg");
       });
       const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      if (!res.ok) throw await buildAjaxError(res, "ส่งคำขอแก้ไขคอร์สไม่สำเร็จ", { stage: "submit_course_request" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.data?.message || "ส่งคำขอแก้ไขคอร์สไม่สำเร็จ");
+      if (!json?.success) {
+        const err = new Error(json?.data?.message || "ส่งคำขอแก้ไขคอร์สไม่สำเร็จ");
+        err.lcDebug = normalizeDebugPayload(json?.data?.debug, { stage: "submit_course_request" });
+        throw err;
+      }
       const rid = Number(json?.data?.request_id || 0);
       if (rid > 0) statusNewRequestIds.add(rid);
       hideCourseInlineProcessing();
@@ -1444,38 +1678,65 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
       setCourseEditMsg("", "");
     } catch (err) {
       hideCourseInlineProcessing();
-      setCourseEditMsg("error", String(err?.message || "ส่งคำขอแก้ไขคอร์สไม่สำเร็จ"));
+      setCourseEditMsg("error", String(err?.message || "ส่งคำขอแก้ไขคอร์สไม่สำเร็จ"), err?.lcDebug || null);
     } finally {
       courseEditSubmitBtn.removeAttribute("disabled");
     }
   });
 
-  reqBtn?.addEventListener("click", async () => {
+  const requestOtp = async ({ isResend = false } = {}) => {
     const email = String(emailEl?.value || "").trim();
     if (!email) {
       setMsg("error", "กรุณากรอกอีเมล");
       return;
     }
-    reqBtn.setAttribute("disabled", "disabled");
-    setMsg("success", "กำลังส่ง OTP...");
+    const activeBtn = isResend ? resendBtn : reqBtn;
+    activeBtn?.setAttribute("disabled", "disabled");
+    setMsg("success", isResend ? "กำลังส่ง OTP ใหม่..." : "กำลังส่ง OTP...");
     try {
       const fd = new FormData();
       fd.append("action", "lc_request_location_edit_otp");
-      fd.append("nonce", String(nonce || ""));
       fd.append("email", email);
       fd.append("location_id", String(activeLocationId || 0));
       const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd });
+      if (!res.ok) throw await buildAjaxError(res, "ส่ง OTP ไม่สำเร็จ", { stage: "otp_request" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.data?.message || "ส่ง OTP ไม่สำเร็จ");
-      setMsg("success", "ส่ง OTP แล้ว กรุณาตรวจสอบอีเมล");
+      if (!json?.success) {
+        const err = new Error(json?.data?.message || "ส่ง OTP ไม่สำเร็จ");
+        err.lcDebug = normalizeDebugPayload(json?.data?.debug, { stage: "otp_request" });
+        throw err;
+      }
+      otpChallengeId = String(json?.data?.challenge_id || "");
+      const cooldown = Number(json?.data?.resend_cooldown_seconds || 60);
+      setMsg("success", isResend ? "ส่ง OTP ใหม่แล้ว กรุณาตรวจสอบอีเมล" : "ส่ง OTP แล้ว กรุณาตรวจสอบอีเมล");
       otpWrap?.classList.remove("hidden");
+      otpMetaEl?.classList.remove("hidden");
       verifyBtn?.classList.remove("hidden");
       reqBtn.classList.add("hidden");
+      resendBtn?.classList.remove("hidden");
+      startOtpCountdown(cooldown);
     } catch (err) {
-      setMsg("error", String(err?.message || "ส่ง OTP ไม่สำเร็จ"));
+      const wait = Number(err?.lcDebug?.context?.resend_wait_seconds || 0);
+      if (wait > 0) {
+        otpWrap?.classList.remove("hidden");
+        otpMetaEl?.classList.remove("hidden");
+        verifyBtn?.classList.remove("hidden");
+        reqBtn?.classList.add("hidden");
+        resendBtn?.classList.remove("hidden");
+        startOtpCountdown(wait);
+      }
+      setMsg("error", String(err?.message || "ส่ง OTP ไม่สำเร็จ"), err?.lcDebug || null);
     } finally {
-      reqBtn.removeAttribute("disabled");
+      activeBtn?.removeAttribute("disabled");
     }
+  };
+
+  reqBtn?.addEventListener("click", async () => {
+    await requestOtp({ isResend: false });
+  });
+  resendBtn?.addEventListener("click", async () => {
+    if (resendBtn.disabled) return;
+    await requestOtp({ isResend: true });
   });
 
   verifyBtn?.addEventListener("click", async () => {
@@ -1490,13 +1751,18 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
     try {
       const fd = new FormData();
       fd.append("action", "lc_verify_location_edit_otp");
-      fd.append("nonce", String(nonce || ""));
       fd.append("email", email);
       fd.append("otp", otp);
+      fd.append("challenge_id", String(otpChallengeId || ""));
       fd.append("location_id", String(activeLocationId || 0));
       const res = await fetch(String(ajaxUrl || ""), { method: "POST", body: fd });
+      if (!res.ok) throw await buildAjaxError(res, "OTP ไม่ถูกต้อง", { stage: "otp_verify" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.data?.message || "OTP ไม่ถูกต้อง");
+      if (!json?.success) {
+        const err = new Error(json?.data?.message || "OTP ไม่ถูกต้อง");
+        err.lcDebug = normalizeDebugPayload(json?.data?.debug, { stage: "otp_verify" });
+        throw err;
+      }
       hasSession = true;
       closeModal();
       syncTriggerLabels();
@@ -1508,7 +1774,7 @@ $lc_global_has_session = !empty($_COOKIE['lc_loc_edit_token']);
         await openCourseEditModal(Number(courseId || 0), String(courseTitle || ""));
       }
     } catch (err) {
-      setMsg("error", String(err?.message || "OTP ไม่ถูกต้อง"));
+      setMsg("error", String(err?.message || "OTP ไม่ถูกต้อง"), err?.lcDebug || null);
     } finally {
       verifyBtn.removeAttribute("disabled");
     }

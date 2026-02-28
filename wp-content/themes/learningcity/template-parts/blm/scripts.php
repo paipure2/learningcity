@@ -2688,6 +2688,16 @@ if (!defined('ABSPATH')) exit;
       .lc-inline-actions{display:flex;justify-content:flex-end;gap:8px}
       .lc-inline-note{min-height:22px;font-size:13px}
       .lc-inline-note.ok{color:#166534}
+      .lc-debug-msg{display:flex;align-items:flex-start;gap:8px;line-height:1.35;flex-wrap:wrap;width:100%;max-width:100%}
+      .lc-debug-msg-text{flex:1;min-width:0}
+      .lc-debug-help{flex:none;width:20px;height:20px;border-radius:999px;border:1px solid #94a3b8;background:#fff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+      .lc-debug-tip{display:inline-block;flex:0 0 auto;min-width:0;max-width:100%;margin:0;padding:0}
+      .lc-debug-tip[open]{display:block;flex:1 0 100%;width:100%;max-width:100%}
+      .lc-debug-tip[open] summary{margin-left:auto;display:inline-flex}
+      .lc-debug-tip summary{list-style:none}
+      .lc-debug-tip summary::-webkit-details-marker{display:none}
+      .lc-debug-pop{display:block;position:static;z-index:40;width:100%;max-width:100%;box-sizing:border-box;max-height:260px;overflow:auto;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:10px 12px;box-shadow:0 12px 28px rgba(15,23,42,.2);margin-top:6px}
+      .lc-debug-pop pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
       @media (max-width: 768px){
         .lc-inline-wrap{
           align-items:flex-start;
@@ -2911,6 +2921,67 @@ if (!defined('ABSPATH')) exit;
       if (!(card instanceof HTMLElement)) return;
       card.classList.remove("is-processing");
     };
+    const normalizeDebug = (debug, fallback = {}) => {
+      const raw = (debug && typeof debug === "object") ? debug : {};
+      return {
+        error_id: String(raw.error_id || fallback.error_id || ""),
+        code: String(raw.code || fallback.code || ""),
+        stage: String(raw.stage || fallback.stage || ""),
+        action: String(raw.action || fallback.action || ""),
+        http_status: Number(raw.http_status || fallback.http_status || 0) || 0,
+        time_utc: String(raw.time_utc || fallback.time_utc || ""),
+        context: (raw.context && typeof raw.context === "object") ? raw.context : {},
+      };
+    };
+    const debugTipText = (debug) => {
+      const d = normalizeDebug(debug);
+      const lines = [];
+      if (d.error_id) lines.push(`error_id: ${d.error_id}`);
+      if (d.code) lines.push(`code: ${d.code}`);
+      if (d.stage) lines.push(`stage: ${d.stage}`);
+      if (d.action) lines.push(`action: ${d.action}`);
+      if (d.http_status) lines.push(`http: ${d.http_status}`);
+      if (d.time_utc) lines.push(`time: ${d.time_utc}`);
+      Object.entries(d.context || {}).forEach(([k, v]) => lines.push(`${k}: ${String(v ?? "")}`));
+      return lines.join("\n");
+    };
+    const setInlineNote = (kind, msg, debug = null) => {
+      const note = el("lcInlineEditNote");
+      if (!note) return;
+      note.className = `lc-inline-note${kind === "error" ? " err" : kind === "success" ? " ok" : ""}`;
+      note.textContent = "";
+      if (!msg) return;
+      const wrap = document.createElement("div");
+      wrap.className = "lc-debug-msg";
+      const text = document.createElement("span");
+      text.className = "lc-debug-msg-text";
+      text.textContent = String(msg || "");
+      wrap.appendChild(text);
+      const tip = debugTipText(debug);
+      if (tip) {
+        const details = document.createElement("details");
+        details.className = "lc-debug-tip";
+        const summary = document.createElement("summary");
+        summary.className = "lc-debug-help";
+        summary.textContent = "?";
+        const pop = document.createElement("div");
+        pop.className = "lc-debug-pop";
+        const pre = document.createElement("pre");
+        pre.textContent = tip;
+        pop.appendChild(pre);
+        details.appendChild(summary);
+        details.appendChild(pop);
+        wrap.appendChild(details);
+      }
+      note.appendChild(wrap);
+    };
+    const buildInlineAjaxError = async (res, fallbackMessage, fallbackDebug = {}) => {
+      let json = null;
+      try { json = await res.json(); } catch (_) {}
+      const err = new Error(String(json?.data?.message || fallbackMessage || `HTTP ${res?.status || 0}`));
+      err.lcDebug = normalizeDebug(json?.data?.debug, { ...fallbackDebug, http_status: Number(res?.status || 0) });
+      return err;
+    };
 
     const lockInlineBodyScroll = () => {};
     const unlockInlineBodyScroll = () => {};
@@ -2924,8 +2995,7 @@ if (!defined('ABSPATH')) exit;
       if (confirm) confirm.checked = false;
       const note = el("lcInlineEditNote");
       if (note) {
-        note.textContent = "";
-        note.className = "lc-inline-note";
+        window.lcInlineEditModalApi?.setInlineNote?.("", "");
       }
     };
     const setInlineTab = (tab) => {
@@ -3577,7 +3647,7 @@ if (!defined('ABSPATH')) exit;
         detail: { requestId: rid, locationId: Number(selectedId || 0) }
       }));
     });
-    window.lcInlineEditModalApi = { open, close, showSubmitSuccessInModal, hideSubmitSuccessInModal, showInlineProcessing, hideInlineProcessing };
+    window.lcInlineEditModalApi = { open, close, showSubmitSuccessInModal, hideSubmitSuccessInModal, showInlineProcessing, hideInlineProcessing, setInlineNote };
   }
 
   function syncInlineFullEditButton() {
@@ -3602,7 +3672,6 @@ if (!defined('ABSPATH')) exit;
         openLocationEditAccessModal();
         return;
       }
-      const note = el("lcInlineEditNote");
       btn.setAttribute("disabled", "disabled");
       try {
         const fd = new FormData();
@@ -3610,15 +3679,18 @@ if (!defined('ABSPATH')) exit;
         fd.append("nonce", String(LOCATION_EDIT_CONFIG?.nonce || ""));
         fd.append("location_id", String(Number(selectedId || 0)));
         const res = await fetch(String(LOCATION_EDIT_CONFIG?.ajax_url || ""), { method: "POST", body: fd, credentials: "same-origin" });
+        if (!res.ok) throw await buildInlineAjaxError(res, "โหลดข้อมูลแก้ไขไม่สำเร็จ", { stage: "load_location_context" });
         const json = await res.json();
-        if (!json?.success) throw new Error(json?.data?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ");
+        if (!json?.success) {
+          const err = new Error(json?.data?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ");
+          err.lcDebug = normalizeDebug(json?.data?.debug, { stage: "load_location_context" });
+          throw err;
+        }
         inlineLocationContext = json.data || null;
         window.lcInlineEditModalApi?.open(inlineLocationContext || {});
-        if (note) {
-          note.className = "lc-inline-note";
-          note.textContent = "";
-        }
+        window.lcInlineEditModalApi?.setInlineNote?.("", "");
       } catch (err) {
+        window.lcInlineEditModalApi?.setInlineNote?.("error", String(err?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ"), err?.lcDebug || null);
         alert(String(err?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ"));
       } finally {
         btn.removeAttribute("disabled");
@@ -3708,19 +3780,16 @@ if (!defined('ABSPATH')) exit;
     const newSessionChanged = newSessions.length > 0;
     const changed = locationChanged || facilityChanged || sessionChanged || deleteSessionChanged || newSessionChanged || removedImageIds.length > 0 || newFiles.length > 0;
     if (!changed) {
-      note.className = "lc-inline-note err";
-      note.textContent = "ข้อความใหม่เหมือนข้อมูลเดิม";
+      window.lcInlineEditModalApi?.setInlineNote?.("error", "ข้อความใหม่เหมือนข้อมูลเดิม");
       return;
     }
     if (!confirmCheck.checked) {
-      note.className = "lc-inline-note err";
-      note.textContent = "กรุณาติ๊กยืนยันว่าตรวจสอบข้อมูลแล้วก่อนส่ง";
+      window.lcInlineEditModalApi?.setInlineNote?.("error", "กรุณาติ๊กยืนยันว่าตรวจสอบข้อมูลแล้วก่อนส่ง");
       return;
     }
     submitBtn.setAttribute("disabled", "disabled");
     window.lcInlineEditModalApi?.showInlineProcessing?.();
-    note.className = "lc-inline-note";
-    note.textContent = "กำลังส่งคำขอแก้ไข...";
+    window.lcInlineEditModalApi?.setInlineNote?.("success", "กำลังส่งคำขอแก้ไข...");
     try {
       const fd = new FormData();
       fd.append("action", "lc_submit_inline_location_edit");
@@ -3738,17 +3807,19 @@ if (!defined('ABSPATH')) exit;
       fd.append("new_sessions", JSON.stringify(newSessions));
       newFiles.forEach((file) => fd.append("new_images[]", file));
       const res = await fetch(String(LOCATION_EDIT_CONFIG?.ajax_url || ""), { method: "POST", body: fd, credentials: "same-origin" });
+      if (!res.ok) throw await buildInlineAjaxError(res, "ส่งคำขอแก้ไขไม่สำเร็จ", { stage: "submit_location_request" });
       const json = await res.json();
       if (!json?.success) {
-        throw new Error(json?.data?.message || "ส่งคำขอแก้ไขไม่สำเร็จ");
+        const err = new Error(json?.data?.message || "ส่งคำขอแก้ไขไม่สำเร็จ");
+        err.lcDebug = normalizeDebug(json?.data?.debug, { stage: "submit_location_request" });
+        throw err;
       }
       const requestId = Number(json?.data?.request_id || 0);
       window.lcInlineEditModalApi?.hideInlineProcessing?.();
       window.lcInlineEditModalApi?.showSubmitSuccessInModal?.(requestId);
     } catch (err) {
       window.lcInlineEditModalApi?.hideInlineProcessing?.();
-      note.className = "lc-inline-note err";
-      note.textContent = String(err?.message || "ส่งคำขอแก้ไขไม่สำเร็จ");
+      window.lcInlineEditModalApi?.setInlineNote?.("error", String(err?.message || "ส่งคำขอแก้ไขไม่สำเร็จ"), err?.lcDebug || null);
     } finally {
       submitBtn.removeAttribute("disabled");
     }
@@ -3784,6 +3855,16 @@ if (!defined('ABSPATH')) exit;
       alert("ระบบแจ้งแก้ไขนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ");
     });
   })();
+
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    const insideTip = target.closest(".lc-debug-tip");
+    document.querySelectorAll(".lc-debug-tip[open]").forEach((node) => {
+      if (insideTip && node === insideTip) return;
+      node.removeAttribute("open");
+    });
+  });
 
   // ================= PHOTO UPLOAD MODAL =================
   function setPhotoUploadMessage(type, msg) {

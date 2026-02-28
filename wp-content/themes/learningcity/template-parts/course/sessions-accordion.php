@@ -41,6 +41,189 @@ $blm_pages = get_posts([
   'fields'         => 'ids',
 ]);
 $learning_map_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
+
+$course_id = (int) get_the_ID();
+$course_mode = !empty($ctx['course_mode']) ? sanitize_key((string) $ctx['course_mode']) : '';
+if ($course_mode === '' && function_exists('get_field')) {
+  $course_mode = sanitize_key((string) get_field('course_mode', $course_id));
+}
+
+$render_info_card = function($title, $value) {
+  if (!$value) return;
+  ?>
+  <div class="bg-[#DEF6EE] rounded-lg py-2 px-4">
+    <div>
+      <div class="sm:text-fs16 text-fs14 font-semibold"><?php echo esc_html($title); ?></div>
+      <div class="text-fs16 font-normal"><?php echo wp_kses_post($value); ?></div>
+    </div>
+  </div>
+  <?php
+};
+
+// ===== Mode-specific rendering (new flow) =====
+if ($course_mode === 'online') {
+  // Online CTA is already rendered in the description block.
+  return;
+}
+
+if ($course_mode === 'onsite_single') {
+  $source = function_exists('get_field') ? (string) get_field('onsite_single_venue_source', $course_id) : '';
+  $location_id = function_exists('get_field') ? (int) get_field('onsite_single_location', $course_id) : 0;
+
+  $reg_start = function_exists('get_field') ? get_field('onsite_single_reg_start', $course_id, false) : '';
+  $reg_end = function_exists('get_field') ? get_field('onsite_single_reg_end', $course_id, false) : '';
+  $start_date = function_exists('get_field') ? get_field('onsite_single_start_date', $course_id, false) : '';
+  $end_date = function_exists('get_field') ? get_field('onsite_single_end_date', $course_id, false) : '';
+  $time_period = function_exists('get_field') ? (string) get_field('onsite_single_time_period', $course_id) : '';
+  $apply_url = function_exists('get_field') ? (string) get_field('onsite_single_apply_url', $course_id) : '';
+  $session_details = function_exists('get_field') ? (string) get_field('onsite_single_session_details', $course_id) : '';
+
+  $venue_name = '';
+  $address = '';
+  $phone = '';
+  $facebook_link = '';
+  $map_url = '';
+  $contact_name = '';
+  $contact_email = '';
+  $custom_reg_url = '';
+  $location_map_page_url = '';
+  $lat_val = null;
+  $lng_val = null;
+  $district_name = '';
+  $use_system_location = ($source === 'location_cpt' && $location_id > 0);
+
+  if ($use_system_location) {
+    $venue_name = get_the_title($location_id);
+    $address = (string) get_field('address', $location_id);
+    $phone = (string) get_field('phone', $location_id);
+    $facebook_link = (string) get_field('facebook_link', $location_id);
+    $map_url = (string) get_field('map_url', $location_id);
+    $location_map_page_url = add_query_arg(['place' => (int) $location_id], $learning_map_url);
+    $lat_raw = get_post_meta((int) $location_id, 'latitude', true);
+    $lng_raw = get_post_meta((int) $location_id, 'longitude', true);
+    $lat_val = is_numeric($lat_raw) ? (float) $lat_raw : null;
+    $lng_val = is_numeric($lng_raw) ? (float) $lng_raw : null;
+    $district_terms = wp_get_post_terms((int) $location_id, 'district', ['fields' => 'names']);
+    $district_name = (!is_wp_error($district_terms) && !empty($district_terms[0])) ? trim((string) $district_terms[0]) : '';
+    if ($district_name !== '' && mb_strpos($district_name, 'เขต') !== 0) {
+      $district_name = 'เขต' . $district_name;
+    }
+  } else {
+    $venue_name = function_exists('get_field') ? (string) get_field('onsite_single_custom_venue_name', $course_id) : '';
+    $contact_name = function_exists('get_field') ? (string) get_field('onsite_single_custom_contact_name', $course_id) : '';
+    $address = function_exists('get_field') ? (string) get_field('onsite_single_custom_address', $course_id) : '';
+    $phone = function_exists('get_field') ? (string) get_field('onsite_single_custom_contact_phone', $course_id) : '';
+    $contact_email = function_exists('get_field') ? (string) get_field('onsite_single_custom_contact_email', $course_id) : '';
+    $custom_reg_url = function_exists('get_field') ? (string) get_field('onsite_single_custom_registration_url', $course_id) : '';
+    $map_url = function_exists('get_field') ? (string) get_field('onsite_single_custom_maps_url', $course_id) : '';
+  }
+
+  if (trim($apply_url) === '' && trim($custom_reg_url) !== '') $apply_url = $custom_reg_url;
+  $has_location_like = (trim((string)$venue_name) !== '' || trim((string)$address) !== '' || trim((string)$phone) !== '' || trim((string)$contact_name) !== '');
+  $normalize_to_ymd = function($value) {
+    $value = trim((string) $value);
+    if ($value === '') return '';
+    if (preg_match('/^\d{8}$/', $value)) return $value; // Ymd
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return str_replace('-', '', $value); // Y-m-d
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $m)) return $m[3] . $m[2] . $m[1]; // d/m/Y
+    $ts = strtotime($value);
+    return $ts ? date('Ymd', $ts) : '';
+  };
+
+  $today_ymd = current_time('Ymd');
+  $is_open_for_reg = true;
+  if ($reg_start || $reg_end) {
+    $reg_start_ymd = $normalize_to_ymd($reg_start);
+    $reg_end_ymd   = $normalize_to_ymd($reg_end);
+    if ($reg_start_ymd !== '' && $today_ymd < $reg_start_ymd) $is_open_for_reg = false;
+    if ($reg_end_ymd !== '' && $today_ymd > $reg_end_ymd) $is_open_for_reg = false;
+  }
+  ?>
+  <div class="my-10" data-course-session-distance="<?php echo ($use_system_location ? '1' : '0'); ?>">
+    <?php if ($has_location_like && $is_open_for_reg): ?>
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="sm:text-fs24 text-fs22 font-bold">1 สถานที่ที่เปิดสอน</h2>
+        <?php if ($use_system_location): ?>
+          <button type="button" class="px-3 py-2 rounded-lg border text-sm font-semibold hover:bg-slate-50 shrink-0" data-course-distance-use-current>
+            ใช้ตำแหน่งปัจจุบัน
+          </button>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+    <div class="accordion-detail mt-4" data-course-location-list>
+      <?php if ($has_location_like && $is_open_for_reg): ?>
+        <div class="accordion-item"
+          <?php if ($use_system_location): ?>
+            data-location-id="<?php echo (int) $location_id; ?>"
+            data-lat="<?php echo $lat_val !== null ? esc_attr((string) $lat_val) : ''; ?>"
+            data-lng="<?php echo $lng_val !== null ? esc_attr((string) $lng_val) : ''; ?>"
+            data-district-label="<?php echo esc_attr($district_name); ?>"
+          <?php endif; ?>
+        >
+          <div class="accordion-header flex items-center justify-between cursor-pointer">
+            <div>
+              <span class="block sm:text-fs18 text-fs16 font-semibold"><?php echo esc_html($venue_name ?: 'สถานที่จัดอบรม'); ?></span>
+              <?php if ($use_system_location): ?>
+                <span class="block text-fs14 text-primary mt-1" data-distance-badge></span>
+              <?php endif; ?>
+            </div>
+            <div class="border border-primary rounded-full md:py-1.5 md:px-4 flex items-center justify-center gap-2 hover:bg-primary/10 transition-colors duration-300 max-md:w-7 max-md:aspect-square">
+              <span class="md:block hidden text-fs14 font-semibold text-primary accordion-text-expand">รายละเอียด</span>
+              <span class="icon-arrow-accordion w-3"><svg class="w-full h-full" viewBox="0 0 12 7" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M-1.45986e-06 5.87361L6 4.40896e-07L12 5.87361L10.8494 7L6 2.25278L1.15063 7L-1.45986e-06 5.87361Z" fill="#00744B"/></svg></span>
+            </div>
+          </div>
+          <div class="accordion-panel">
+            <div class="py-3">
+              <div class="grid sm:grid-cols-2 grid-cols-1 sm:gap-3 gap-2 pb-3 mt-2">
+                <?php if ($reg_start || $reg_end) $render_info_card('วันที่รับสมัคร', esc_html(lc_thai_short_date($reg_start)) . ($reg_end ? ' - ' . esc_html(lc_thai_short_date($reg_end)) : '')); ?>
+                <?php if ($start_date || $end_date) $render_info_card('วันที่เรียน', esc_html(lc_thai_short_date($start_date)) . ($end_date ? ' - ' . esc_html(lc_thai_short_date($end_date)) : '')); ?>
+                <?php if ($time_period) $render_info_card('ช่วงเวลาเรียน', esc_html($time_period)); ?>
+                <?php if ($session_details) $render_info_card('ข้อมูลเพิ่มเติม', nl2br(esc_html($session_details))); ?>
+              </div>
+
+              <?php if (!empty($apply_url)): ?>
+                <a href="<?php echo esc_url($apply_url); ?>" target="_blank" rel="noopener"
+                  class="my-2 bg-primary rounded-full block text-white text-center text-fs18 font-semibold py-2 px-4 hover:bg-primary-hover transition-colors">
+                  สมัครเรียน
+                </a>
+              <?php endif; ?>
+
+              <?php if ($address || $phone || $facebook_link || $map_url || $contact_name || $contact_email): ?>
+                <div class="mt-1 inline-block">
+                  <div class="sm:text-fs16 text-fs14 font-semibold">สอบถามข้อมูลเพิ่มเติม</div>
+                  <ul class="text-fs14 font-normal mt-2 space-y-2">
+                    <?php if ($contact_name): ?><li>ผู้ติดต่อ: <?php echo esc_html($contact_name); ?></li><?php endif; ?>
+                    <?php if ($address): ?><li>ที่อยู่: <?php echo esc_html($address); ?></li><?php endif; ?>
+                    <?php if ($phone): ?><li>โทร: <a href="tel:<?php echo esc_attr($phone); ?>" class="underline font-semibold"><?php echo esc_html($phone); ?></a></li><?php endif; ?>
+                    <?php if ($contact_email): ?><li>อีเมล: <a href="mailto:<?php echo esc_attr($contact_email); ?>" class="underline font-semibold"><?php echo esc_html($contact_email); ?></a></li><?php endif; ?>
+                    <?php if ($facebook_link): ?><li><a href="<?php echo esc_url($facebook_link); ?>" target="_blank" rel="noopener" class="underline font-semibold">Facebook</a></li><?php endif; ?>
+                    <?php if ($map_url): ?><li><a href="<?php echo esc_url($map_url); ?>" target="_blank" rel="noopener" class="underline font-semibold">เปิด Google Maps</a></li><?php endif; ?>
+                  </ul>
+                  <?php if ($location_map_page_url): ?>
+                    <a href="<?php echo esc_url($location_map_page_url); ?>" target="_blank" rel="noopener"
+                      class="mt-3 inline-flex items-center justify-center gap-2 bg-white text-primary border border-primary/30 rounded-full text-fs14 font-semibold py-2 px-4 hover:bg-slate-50 transition-colors">
+                      ดูสถานที่นี้ในแผนที่แหล่งเรียนรู้
+                    </a>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+      <?php else: ?>
+        <div class="py-6 text-center text-fs16 opacity-70">
+          <?php echo $has_location_like ? 'ขณะนี้ยังไม่มีสถานที่เปิดคอร์สเรียนนี้ กรุณารอรอเปิดรับสมัคร' : 'ขณะนี้ยังไม่มีข้อมูลสถานที่สำหรับคอร์สนี้'; ?>
+        </div>
+        <?php if ($has_location_like): ?>
+          <?php do_action('lcw_render_waitlist_form', $course_id, $mode); ?>
+        <?php endif; ?>
+      <?php endif; ?>
+    </div>
+  </div>
+  <?php
+  return;
+}
 ?>
 
 <div class="my-10" data-course-session-distance="1">

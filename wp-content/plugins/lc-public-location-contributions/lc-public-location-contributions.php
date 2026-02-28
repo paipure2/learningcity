@@ -22,6 +22,7 @@ final class LC_Public_Place_Photo_Upload {
     const NONCE_ACTION_EDIT_SUBMIT = 'lc_location_edit_submit';
     const NONCE_ACTION_EDIT_MODERATE = 'lc_location_edit_moderate';
     const NONCE_ACTION_EDIT_LOGOUT = 'lc_location_edit_logout';
+    const ERROR_LOG_TABLE_SUFFIX = 'lc_error_logs';
     const EDIT_SESSION_TTL = 43200; // 12 hours.
     const OTP_VERIFY_MAX_ATTEMPTS = 5;
     const OTP_VERIFY_LOCK_SECONDS = 900; // 15 minutes.
@@ -83,6 +84,8 @@ final class LC_Public_Place_Photo_Upload {
 
     public static function activate() {
         self::register_submission_cpt();
+        self::register_change_request_cpt();
+        self::maybe_create_error_log_table();
         flush_rewrite_rules();
     }
 
@@ -681,11 +684,11 @@ final class LC_Public_Place_Photo_Upload {
         }
         $session = self::get_editor_session($token);
         if (!$session) {
-            wp_send_json_error(['message' => __('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload'), 403, 'session_expired', 'status_dashboard');
         }
         $requester_email = sanitize_email((string) ($session['email'] ?? ''));
         if ($requester_email === '') {
-            wp_send_json_error(['message' => __('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_email', 'status_dashboard');
         }
         wp_send_json_success(self::build_requester_dashboard_payload($requester_email));
     }
@@ -698,11 +701,11 @@ final class LC_Public_Place_Photo_Upload {
         }
         $session = self::get_editor_session($token);
         if (!$session) {
-            wp_send_json_error(['message' => __('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload'), 403, 'session_expired', 'status_feed');
         }
         $requester_email = sanitize_email((string) ($session['email'] ?? ''));
         if ($requester_email === '') {
-            wp_send_json_error(['message' => __('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_email', 'status_feed');
         }
         wp_send_json_success(self::build_requester_status_feed_payload($requester_email));
     }
@@ -715,13 +718,13 @@ final class LC_Public_Place_Photo_Upload {
         }
         $session = self::get_editor_session($token);
         if (!$session) {
-            wp_send_json_error(['message' => __('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload'), 403, 'session_expired', 'status_detail');
         }
         $requester_email = sanitize_email((string) ($session['email'] ?? ''));
         $request_id = isset($_POST['request_id']) ? (int) $_POST['request_id'] : 0;
         $detail = self::build_requester_status_detail_payload($requester_email, $request_id);
         if (!is_array($detail)) {
-            wp_send_json_error(['message' => __('ไม่พบรายการคำขอนี้', 'lc-public-place-photo-upload')], 404);
+            self::send_json_error_debug(__('ไม่พบรายการคำขอนี้', 'lc-public-place-photo-upload'), 404, 'request_not_found', 'status_detail', ['request_id' => $request_id]);
         }
         wp_send_json_success($detail);
     }
@@ -734,27 +737,27 @@ final class LC_Public_Place_Photo_Upload {
         }
         $session = self::get_editor_session($token);
         if (!$session) {
-            wp_send_json_error(['message' => __('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload'), 403, 'session_expired', 'request_cancel');
         }
         $requester_email = sanitize_email((string) ($session['email'] ?? ''));
         if ($requester_email === '') {
-            wp_send_json_error(['message' => __('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_email', 'request_cancel');
         }
 
         $request_id = isset($_POST['request_id']) ? (int) $_POST['request_id'] : 0;
         if ($request_id <= 0 || !self::is_change_request_post_type(get_post_type($request_id))) {
-            wp_send_json_error(['message' => __('ไม่พบคำขอที่ต้องการยกเลิก', 'lc-public-place-photo-upload')], 404);
+            self::send_json_error_debug(__('ไม่พบคำขอที่ต้องการยกเลิก', 'lc-public-place-photo-upload'), 404, 'request_not_found', 'request_cancel', ['request_id' => $request_id]);
         }
         $owner_email = sanitize_email((string) get_post_meta($request_id, '_lc_requester_email', true));
         if ($owner_email === '' || strtolower($owner_email) !== strtolower($requester_email)) {
-            wp_send_json_error(['message' => __('คุณไม่มีสิทธิ์ยกเลิกคำขอนี้', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('คุณไม่มีสิทธิ์ยกเลิกคำขอนี้', 'lc-public-place-photo-upload'), 403, 'forbidden_request_owner', 'request_cancel', ['request_id' => $request_id]);
         }
         $status = (string) get_post_meta($request_id, '_lc_change_status', true);
         if ($status === '' || !in_array($status, ['pending', 'approved', 'rejected', 'cancelled'], true)) {
             $status = 'pending';
         }
         if (!self::is_request_cancelable($request_id, $status)) {
-            wp_send_json_error(['message' => __('ยกเลิกได้เฉพาะคำขอรอตรวจสอบภายใน 15 นาทีหลังส่งคำขอ', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ยกเลิกได้เฉพาะคำขอรอตรวจสอบภายใน 15 นาทีหลังส่งคำขอ', 'lc-public-place-photo-upload'), 400, 'request_cancel_window_expired', 'request_cancel', ['request_id' => $request_id, 'status' => $status]);
         }
         update_post_meta($request_id, '_lc_change_status', 'cancelled');
         update_post_meta($request_id, '_lc_cancelled_at', current_time('mysql'));
@@ -773,7 +776,7 @@ final class LC_Public_Place_Photo_Upload {
         }
         $session = self::get_editor_session($token);
         if (!$session) {
-            wp_send_json_error(['message' => __('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload'), 403, 'session_expired', 'editable_locations');
         }
 
         $locations = get_posts([
@@ -817,12 +820,12 @@ final class LC_Public_Place_Photo_Upload {
         }
         $session = self::get_editor_session($token);
         if (!$session) {
-            wp_send_json_error(['message' => __('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('เซสชันหมดอายุ กรุณาขอ OTP ใหม่อีกครั้ง', 'lc-public-place-photo-upload'), 403, 'session_expired', 'inline_editor_session');
         }
         $settings = self::get_settings();
         $requester_email = sanitize_email((string) ($session['email'] ?? ''));
         if ($requester_email === '' || !self::is_editor_email_allowed($requester_email, $settings)) {
-            wp_send_json_error(['message' => __('อีเมลนี้ไม่มีสิทธิ์แก้ไขข้อมูลแล้ว', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('อีเมลนี้ไม่มีสิทธิ์แก้ไขข้อมูลแล้ว', 'lc-public-place-photo-upload'), 403, 'editor_email_not_allowed', 'inline_editor_session');
         }
         return [$session, $settings, $requester_email];
     }
@@ -1022,7 +1025,7 @@ final class LC_Public_Place_Photo_Upload {
 
         $location_id = isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0;
         if ($location_id <= 0 || get_post_type($location_id) !== 'location') {
-            wp_send_json_error(['message' => __('ข้อมูลสถานที่ไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อมูลสถานที่ไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_location', 'load_location_context', ['location_id' => $location_id]);
         }
 
         $gallery_meta_key = (string) ($settings['location_gallery_meta_key'] ?? 'images');
@@ -1793,6 +1796,15 @@ final class LC_Public_Place_Photo_Upload {
             [__CLASS__, 'render_system_settings_page']
         );
 
+        add_submenu_page(
+            'lc-location-edit-queue',
+            __('Error Logs', 'lc-public-place-photo-upload'),
+            __('Error Logs', 'lc-public-place-photo-upload'),
+            'manage_options',
+            'lc-error-logs',
+            [__CLASS__, 'render_error_logs_page']
+        );
+
         // Force top-level menu to show badge in case menu rendering strips prior value.
         if ($pending_count > 0) {
             global $menu;
@@ -1919,6 +1931,343 @@ final class LC_Public_Place_Photo_Upload {
 
     public static function render_system_settings_page() {
         self::render_settings_page(false);
+    }
+
+    public static function render_error_logs_page() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'lc-public-place-photo-upload'));
+        }
+
+        self::maybe_create_error_log_table();
+        global $wpdb;
+        $table = self::error_log_table_name();
+
+        $stage = isset($_GET['stage']) ? sanitize_key((string) wp_unslash($_GET['stage'])) : '';
+        $code = isset($_GET['code']) ? sanitize_key((string) wp_unslash($_GET['code'])) : '';
+        $http_status = isset($_GET['http_status']) ? (int) $_GET['http_status'] : 0;
+        $severity = isset($_GET['severity']) ? sanitize_key((string) wp_unslash($_GET['severity'])) : '';
+        if (!in_array($severity, ['', 'info', 'warn', 'error', 'critical'], true)) {
+            $severity = '';
+        }
+        $resolved = isset($_GET['resolved']) ? sanitize_key((string) wp_unslash($_GET['resolved'])) : '';
+        if (!in_array($resolved, ['', 'open', 'resolved', 'ignored'], true)) {
+            $resolved = '';
+        }
+        $search = isset($_GET['s']) ? sanitize_text_field((string) wp_unslash($_GET['s'])) : '';
+        $paged = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
+        $per_page = 50;
+        $offset = ($paged - 1) * $per_page;
+
+        $where = ['1=1'];
+        $params = [];
+        if ($stage !== '') {
+            $where[] = 'stage = %s';
+            $params[] = $stage;
+        }
+        if ($code !== '') {
+            $where[] = 'code = %s';
+            $params[] = $code;
+        }
+        if ($http_status > 0) {
+            $where[] = 'http_status = %d';
+            $params[] = $http_status;
+        }
+        if ($severity !== '') {
+            $where[] = 'severity = %s';
+            $params[] = $severity;
+        }
+        if ($resolved !== '') {
+            $where[] = 'resolved_status = %s';
+            $params[] = $resolved;
+        }
+        if ($search !== '') {
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            $where[] = '(error_id LIKE %s OR code LIKE %s OR stage LIKE %s OR action_name LIKE %s OR message_user LIKE %s OR user_email_masked LIKE %s)';
+            array_push($params, $like, $like, $like, $like, $like, $like);
+        }
+
+        $where_sql = implode(' AND ', $where);
+        $count_sql = "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}";
+        $total_items = (int) ($params ? $wpdb->get_var($wpdb->prepare($count_sql, $params)) : $wpdb->get_var($count_sql));
+
+        $rows_sql = "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY id DESC LIMIT %d OFFSET %d";
+        $rows_params = array_merge($params, [$per_page, $offset]);
+        $rows = $wpdb->get_results($wpdb->prepare($rows_sql, $rows_params), ARRAY_A);
+        $rows = is_array($rows) ? $rows : [];
+
+        $summary_sql = "SELECT
+            COUNT(*) AS total_count,
+            SUM(CASE WHEN http_status = 403 THEN 1 ELSE 0 END) AS count_403,
+            SUM(CASE WHEN http_status = 429 THEN 1 ELSE 0 END) AS count_429,
+            SUM(CASE WHEN http_status >= 500 THEN 1 ELSE 0 END) AS count_500
+            FROM {$table}
+            WHERE created_at_utc >= %s";
+        $summary = $wpdb->get_row($wpdb->prepare($summary_sql, gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), ARRAY_A);
+        $summary = is_array($summary) ? $summary : [];
+
+        $base_url = admin_url('admin.php?page=lc-error-logs');
+        $page_count = max(1, (int) ceil($total_items / $per_page));
+        ?>
+        <div class="wrap">
+            <h1><?php echo esc_html__('Error Logs', 'lc-public-place-photo-upload'); ?></h1>
+            <p><?php echo esc_html__('รวมข้อผิดพลาดจาก AJAX flow (OTP / course / location / status) สำหรับทีม dev และแอดมิน', 'lc-public-place-photo-upload'); ?></p>
+
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0 16px;">
+                <div style="background:#fff;border:1px solid #dbe4ee;border-radius:10px;padding:10px 12px;min-width:160px;">
+                    <div style="font-size:12px;color:#64748b;">24 ชั่วโมงล่าสุด</div>
+                    <div style="font-size:24px;font-weight:800;color:#0f172a;"><?php echo esc_html(number_format_i18n((int) ($summary['total_count'] ?? 0))); ?></div>
+                </div>
+                <div style="background:#fff;border:1px solid #dbe4ee;border-radius:10px;padding:10px 12px;min-width:120px;">
+                    <div style="font-size:12px;color:#64748b;">HTTP 403</div>
+                    <div style="font-size:22px;font-weight:800;color:#b91c1c;"><?php echo esc_html(number_format_i18n((int) ($summary['count_403'] ?? 0))); ?></div>
+                </div>
+                <div style="background:#fff;border:1px solid #dbe4ee;border-radius:10px;padding:10px 12px;min-width:120px;">
+                    <div style="font-size:12px;color:#64748b;">HTTP 429</div>
+                    <div style="font-size:22px;font-weight:800;color:#9a3412;"><?php echo esc_html(number_format_i18n((int) ($summary['count_429'] ?? 0))); ?></div>
+                </div>
+                <div style="background:#fff;border:1px solid #dbe4ee;border-radius:10px;padding:10px 12px;min-width:120px;">
+                    <div style="font-size:12px;color:#64748b;">HTTP 5xx</div>
+                    <div style="font-size:22px;font-weight:800;color:#7c2d12;"><?php echo esc_html(number_format_i18n((int) ($summary['count_500'] ?? 0))); ?></div>
+                </div>
+            </div>
+
+            <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>" style="background:#fff;border:1px solid #dbe4ee;border-radius:10px;padding:12px;margin-bottom:14px;">
+                <input type="hidden" name="page" value="lc-error-logs" />
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+                    <label>
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:4px;">Search</div>
+                        <input type="text" name="s" value="<?php echo esc_attr($search); ?>" placeholder="error_id / code / stage / message" class="regular-text" />
+                    </label>
+                    <label>
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:4px;">Stage</div>
+                        <input type="text" name="stage" value="<?php echo esc_attr($stage); ?>" placeholder="otp_verify" />
+                    </label>
+                    <label>
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:4px;">Code</div>
+                        <input type="text" name="code" value="<?php echo esc_attr($code); ?>" placeholder="session_expired" />
+                    </label>
+                    <label>
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:4px;">HTTP</div>
+                        <input type="number" min="0" max="599" name="http_status" value="<?php echo $http_status > 0 ? esc_attr((string) $http_status) : ''; ?>" style="width:90px;" />
+                    </label>
+                    <label>
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:4px;">Severity</div>
+                        <select name="severity">
+                            <option value="" <?php selected($severity, ''); ?>>ทั้งหมด</option>
+                            <option value="info" <?php selected($severity, 'info'); ?>>info</option>
+                            <option value="warn" <?php selected($severity, 'warn'); ?>>warn</option>
+                            <option value="error" <?php selected($severity, 'error'); ?>>error</option>
+                            <option value="critical" <?php selected($severity, 'critical'); ?>>critical</option>
+                        </select>
+                    </label>
+                    <label>
+                        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:4px;">Status</div>
+                        <select name="resolved">
+                            <option value="" <?php selected($resolved, ''); ?>>ทั้งหมด</option>
+                            <option value="open" <?php selected($resolved, 'open'); ?>>open</option>
+                            <option value="resolved" <?php selected($resolved, 'resolved'); ?>>resolved</option>
+                            <option value="ignored" <?php selected($resolved, 'ignored'); ?>>ignored</option>
+                        </select>
+                    </label>
+                    <button type="submit" class="button button-primary"><?php echo esc_html__('Filter', 'lc-public-place-photo-upload'); ?></button>
+                    <a href="<?php echo esc_url($base_url); ?>" class="button"><?php echo esc_html__('Reset', 'lc-public-place-photo-upload'); ?></a>
+                </div>
+            </form>
+
+            <div style="background:#fff;border:1px solid #dbe4ee;border-radius:10px;overflow:auto;">
+                <table class="widefat striped" style="border:0;table-layout:fixed;min-width:1760px;">
+                    <thead>
+                        <tr>
+                            <th style="width:68px;">ID</th>
+                            <th style="width:190px;">Time (UTC)</th>
+                            <th style="width:110px;">Severity</th>
+                            <th style="width:82px;">HTTP</th>
+                            <th style="width:190px;">Stage</th>
+                            <th style="width:240px;">Code</th>
+                            <th style="width:260px;">Action</th>
+                            <th style="width:340px;">Message</th>
+                            <th style="width:260px;">Requester</th>
+                            <th style="width:130px;">Target</th>
+                            <th style="width:190px;">Debug</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!$rows) : ?>
+                        <tr><td colspan="11"><?php echo esc_html__('No error logs found.', 'lc-public-place-photo-upload'); ?></td></tr>
+                    <?php else : foreach ($rows as $row) :
+                        $context = json_decode((string) ($row['context_json'] ?? ''), true);
+                        $context = is_array($context) ? $context : [];
+                        $target_bits = [];
+                        foreach (['request_id' => 'REQ', 'location_id' => 'LOC', 'course_id' => 'COURSE'] as $k => $label) {
+                            if (!empty($row[$k])) {
+                                $target_bits[] = $label . ':' . (int) $row[$k];
+                            }
+                        }
+                        $target_text = $target_bits ? implode(' ', $target_bits) : '-';
+                        $sev = sanitize_key((string) ($row['severity'] ?? 'error'));
+                        $sev_label = $sev !== '' ? $sev : 'error';
+                        $sev_style = 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;';
+                        if ($sev === 'info') {
+                            $sev_style = 'background:#e0f2fe;color:#075985;border:1px solid #bae6fd;';
+                        } elseif ($sev === 'warn') {
+                            $sev_style = 'background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;';
+                        } elseif ($sev === 'critical') {
+                            $sev_style = 'background:#1f2937;color:#fff;border:1px solid #111827;';
+                        }
+                        $requester_bits = [];
+                        $requester_bits[] = 'WP user: ' . (!empty($row['wp_user_id']) ? ('#' . (int) $row['wp_user_id']) : '-');
+                        $requester_bits[] = 'logged_in: ' . (!empty($row['is_wp_logged_in']) ? '1' : '0');
+                        if (!empty($row['user_email_masked'])) {
+                            $requester_bits[] = 'email: ' . (string) $row['user_email_masked'];
+                        }
+                        if (!empty($row['user_email_hash'])) {
+                            $requester_bits[] = 'email_hash: ' . substr((string) $row['user_email_hash'], 0, 12) . '...';
+                        }
+                        $copy_payload = [
+                            'id' => (int) ($row['id'] ?? 0),
+                            'error_id' => (string) ($row['error_id'] ?? ''),
+                            'time_utc' => (string) ($row['created_at_utc'] ?? ''),
+                            'severity' => (string) ($row['severity'] ?? ''),
+                            'http_status' => (int) ($row['http_status'] ?? 0),
+                            'stage' => (string) ($row['stage'] ?? ''),
+                            'code' => (string) ($row['code'] ?? ''),
+                            'action' => (string) ($row['action_name'] ?? ''),
+                            'message' => (string) ($row['message_user'] ?? ''),
+                            'requester' => [
+                                'wp_user_id' => !empty($row['wp_user_id']) ? (int) $row['wp_user_id'] : null,
+                                'is_wp_logged_in' => !empty($row['is_wp_logged_in']) ? 1 : 0,
+                                'email_masked' => (string) ($row['user_email_masked'] ?? ''),
+                                'email_hash' => (string) ($row['user_email_hash'] ?? ''),
+                            ],
+                            'target' => [
+                                'request_id' => !empty($row['request_id']) ? (int) $row['request_id'] : null,
+                                'location_id' => !empty($row['location_id']) ? (int) $row['location_id'] : null,
+                                'course_id' => !empty($row['course_id']) ? (int) $row['course_id'] : null,
+                            ],
+                            'request' => [
+                                'url' => (string) ($row['page_url'] ?? ''),
+                                'referer' => (string) ($row['referer_url'] ?? ''),
+                                'user_agent' => (string) ($row['user_agent'] ?? ''),
+                            ],
+                            'context' => $context,
+                        ];
+                        $copy_json = wp_json_encode($copy_payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+                        $copy_b64 = is_string($copy_json) ? base64_encode($copy_json) : '';
+                        ?>
+                        <tr>
+                            <td style="vertical-align:top;"><?php echo esc_html((string) (int) ($row['id'] ?? 0)); ?></td>
+                            <td style="vertical-align:top;">
+                                <div><?php echo esc_html((string) ($row['created_at_utc'] ?? '')); ?></div>
+                                <?php if (!empty($row['error_id'])) : ?>
+                                    <div style="font-size:11px;color:#64748b;"><?php echo esc_html((string) $row['error_id']); ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td style="vertical-align:top;"><span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:700;<?php echo esc_attr($sev_style); ?>"><?php echo esc_html($sev_label); ?></span></td>
+                            <td style="vertical-align:top;"><code><?php echo esc_html((string) (int) ($row['http_status'] ?? 0)); ?></code></td>
+                            <td style="vertical-align:top;"><code style="display:inline-block;max-width:100%;white-space:normal;word-break:break-word;line-height:1.35;"><?php echo esc_html((string) ($row['stage'] ?? '')); ?></code></td>
+                            <td style="vertical-align:top;"><code style="display:inline-block;max-width:100%;white-space:normal;word-break:break-word;line-height:1.35;"><?php echo esc_html((string) ($row['code'] ?? '')); ?></code></td>
+                            <td style="vertical-align:top;"><code style="display:inline-block;max-width:100%;white-space:normal;word-break:break-word;line-height:1.35;"><?php echo esc_html((string) ($row['action_name'] ?? '')); ?></code></td>
+                            <td style="vertical-align:top;">
+                                <div style="line-height:1.45;"><?php echo esc_html((string) ($row['message_user'] ?? '')); ?></div>
+                            </td>
+                            <td style="vertical-align:top;">
+                                <div style="font-size:12px;line-height:1.45;color:#475569;white-space:pre-wrap;word-break:break-word;"><?php echo esc_html(implode("\n", $requester_bits)); ?></div>
+                            </td>
+                            <td style="vertical-align:top;white-space:normal;word-break:break-word;"><?php echo esc_html($target_text); ?></td>
+                            <td style="vertical-align:top;">
+                                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+                                    <button type="button" class="button button-small lc-error-copy-row" data-copy-b64="<?php echo esc_attr($copy_b64); ?>"><?php echo esc_html__('Copy', 'lc-public-place-photo-upload'); ?></button>
+                                    <span class="lc-error-copy-status" style="font-size:11px;color:#64748b;display:none;"><?php echo esc_html__('Copied', 'lc-public-place-photo-upload'); ?></span>
+                                </div>
+                                <details style="margin-top:6px;">
+                                    <summary style="cursor:pointer;"><?php echo esc_html__('View', 'lc-public-place-photo-upload'); ?></summary>
+                                    <div style="margin-top:6px;">
+                                        <?php if (!empty($row['page_url'])) : ?><div><strong>URL:</strong> <code><?php echo esc_html((string) $row['page_url']); ?></code></div><?php endif; ?>
+                                        <?php if (!empty($row['referer_url'])) : ?><div><strong>Referer:</strong> <code><?php echo esc_html((string) $row['referer_url']); ?></code></div><?php endif; ?>
+                                        <?php if (!empty($row['user_agent'])) : ?><div><strong>UA:</strong> <code><?php echo esc_html((string) $row['user_agent']); ?></code></div><?php endif; ?>
+                                        <?php if ($context) : ?>
+                                            <pre style="white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;border-radius:8px;padding:8px;max-width:520px;overflow:auto;"><?php echo esc_html(wp_json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)); ?></pre>
+                                        <?php endif; ?>
+                                    </div>
+                                </details>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <?php if ($page_count > 1) :
+                $page_links = paginate_links([
+                    'base' => add_query_arg('paged', '%#%', $base_url),
+                    'format' => '',
+                    'current' => $paged,
+                    'total' => $page_count,
+                    'type' => 'array',
+                    'add_args' => array_filter([
+                        's' => $search,
+                        'stage' => $stage,
+                        'code' => $code,
+                        'http_status' => $http_status > 0 ? $http_status : null,
+                        'severity' => $severity,
+                        'resolved' => $resolved,
+                    ], function($v) { return $v !== null && $v !== ''; }),
+                ]);
+                if (is_array($page_links) && $page_links) : ?>
+                <div class="tablenav"><div class="tablenav-pages" style="margin:12px 0;"><?php echo wp_kses_post(implode(' ', $page_links)); ?></div></div>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+        <script>
+        (function(){
+          const decodeB64 = function(v){
+            try {
+              const bin = window.atob(String(v || ""));
+              if (window.TextDecoder) {
+                const bytes = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                return new TextDecoder('utf-8').decode(bytes);
+              }
+              return decodeURIComponent(Array.prototype.map.call(bin, function(ch){
+                return '%' + ('00' + ch.charCodeAt(0).toString(16)).slice(-2);
+              }).join(''));
+            } catch (e) {
+              return "";
+            }
+          };
+          document.addEventListener('click', async function(event){
+            const btn = event.target instanceof Element ? event.target.closest('.lc-error-copy-row') : null;
+            if (!(btn instanceof HTMLButtonElement)) return;
+            const raw = decodeB64(btn.getAttribute('data-copy-b64'));
+            if (!raw) return;
+            let ok = false;
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(raw);
+                ok = true;
+              }
+            } catch (e) {}
+            if (!ok) {
+              const ta = document.createElement('textarea');
+              ta.value = raw;
+              ta.setAttribute('readonly', 'readonly');
+              ta.style.position = 'fixed';
+              ta.style.opacity = '0';
+              document.body.appendChild(ta);
+              ta.select();
+              try { ok = document.execCommand('copy'); } catch (e) {}
+              ta.remove();
+            }
+            const status = btn.parentElement ? btn.parentElement.querySelector('.lc-error-copy-status') : null;
+            if (status instanceof HTMLElement) {
+              status.style.display = ok ? 'inline' : 'inline';
+              status.textContent = ok ? 'Copied' : 'Copy failed';
+              window.setTimeout(function(){ status.style.display = 'none'; }, 1500);
+            }
+          });
+        })();
+        </script>
+        <?php
     }
 
     public static function render_settings_page($permissions_only = false) {
@@ -2211,19 +2560,19 @@ final class LC_Public_Place_Photo_Upload {
     public static function ajax_submit_inline_location_edit() {
         $settings = self::get_settings();
         if (($settings['location_edit_enabled'] ?? '0') !== '1') {
-            wp_send_json_error(['message' => __('ปิดรับคำขอแก้ไขข้อมูลสถานที่ชั่วคราว', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('ปิดรับคำขอแก้ไขข้อมูลสถานที่ชั่วคราว', 'lc-public-place-photo-upload'), 403, 'location_edit_closed', 'submit_location_request');
         }
         check_ajax_referer(self::NONCE_ACTION_EDIT_ACCESS, 'nonce');
         $session_pack = self::get_inline_editor_session_or_error();
         $settings = is_array($session_pack) && isset($session_pack[1]) && is_array($session_pack[1]) ? $session_pack[1] : self::get_settings();
         $requester_email = is_array($session_pack) && isset($session_pack[2]) ? sanitize_email((string) $session_pack[2]) : '';
         if ($requester_email === '') {
-            wp_send_json_error(['message' => __('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_email', 'submit_location_request');
         }
 
         $location_id = isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0;
         if ($location_id <= 0 || get_post_type($location_id) !== 'location') {
-            wp_send_json_error(['message' => __('ข้อมูลสถานที่ไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อมูลสถานที่ไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_location', 'submit_location_request', ['location_id' => $location_id]);
         }
 
         $mode = isset($_POST['mode']) ? sanitize_key((string) wp_unslash($_POST['mode'])) : 'single_field';
@@ -2286,10 +2635,10 @@ final class LC_Public_Place_Photo_Upload {
             $field = isset($_POST['field']) ? sanitize_key((string) wp_unslash($_POST['field'])) : '';
             $suggestion = isset($_POST['suggestion']) ? sanitize_textarea_field((string) wp_unslash($_POST['suggestion'])) : '';
             if ($field === '' || $suggestion === '') {
-                wp_send_json_error(['message' => __('กรุณากรอกข้อมูลที่ต้องการแก้ไข', 'lc-public-place-photo-upload')], 400);
+                self::send_json_error_debug(__('กรุณากรอกข้อมูลที่ต้องการแก้ไข', 'lc-public-place-photo-upload'), 400, 'missing_suggestion', 'submit_location_request');
             }
             if (!isset($allowed_fields[$field])) {
-                wp_send_json_error(['message' => __('ไม่รองรับช่องข้อมูลนี้', 'lc-public-place-photo-upload')], 400);
+                self::send_json_error_debug(__('ไม่รองรับช่องข้อมูลนี้', 'lc-public-place-photo-upload'), 400, 'unsupported_field', 'submit_location_request', ['field' => $field]);
             }
             $next_location[$field] = $suggestion;
         }
@@ -2422,7 +2771,7 @@ final class LC_Public_Place_Photo_Upload {
         if ($mode === 'full_location') {
             $new_files = self::validate_staff_edit_image_files($_FILES['new_images'] ?? null, $settings);
             if (is_wp_error($new_files)) {
-                wp_send_json_error(['message' => (string) $new_files->get_error_message()], 400);
+                self::send_json_error_debug((string) $new_files->get_error_message(), 400, 'image_validation_failed', 'submit_location_request');
             }
             if (!empty($new_files)) {
                 $allowed_mimes = self::staff_allowed_image_mimes();
@@ -2431,7 +2780,7 @@ final class LC_Public_Place_Photo_Upload {
                     if (is_wp_error($attachment_id) || !$attachment_id) {
                         $file_name = sanitize_file_name((string) ($file['name'] ?? ''));
                         $file_label = $file_name !== '' ? ('"' . $file_name . '"') : 'รูปภาพที่อัปโหลด';
-                        wp_send_json_error(['message' => $file_label . ' อัปโหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'], 400);
+                        self::send_json_error_debug($file_label . ' อัปโหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400, 'image_upload_failed', 'submit_location_request');
                     }
                     $new_image_ids[] = (int) $attachment_id;
                 }
@@ -2439,7 +2788,7 @@ final class LC_Public_Place_Photo_Upload {
         }
 
         if (!$has_changes && !$has_facility_changes && empty($remove_image_ids) && empty($new_image_ids) && !$has_session_changes) {
-            wp_send_json_error(['message' => __('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload'), 400, 'no_changes_detected', 'submit_location_request');
         }
 
         if (!post_type_exists(self::CHANGE_CPT)) {
@@ -2452,7 +2801,7 @@ final class LC_Public_Place_Photo_Upload {
             'post_title' => sprintf('Inline Change - %s - %s', get_the_title($location_id), current_time('mysql')),
         ], true);
         if (is_wp_error($request_id) || !$request_id) {
-            wp_send_json_error(['message' => __('ไม่สามารถสร้างคำขอแก้ไขได้', 'lc-public-place-photo-upload')], 500);
+            self::send_json_error_debug(__('ไม่สามารถสร้างคำขอแก้ไขได้', 'lc-public-place-photo-upload'), 500, 'request_create_failed', 'submit_location_request', ['location_id' => $location_id]);
         }
 
         $payload = [
@@ -2495,18 +2844,18 @@ final class LC_Public_Place_Photo_Upload {
     public static function ajax_submit_course_edit_request() {
         $settings = self::get_settings();
         if (($settings['location_edit_enabled'] ?? '0') !== '1') {
-            wp_send_json_error(['message' => __('ปิดรับคำขอแก้ไขข้อมูลชั่วคราว', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('ปิดรับคำขอแก้ไขข้อมูลชั่วคราว', 'lc-public-place-photo-upload'), 403, 'location_edit_closed', 'submit_course_request');
         }
         check_ajax_referer(self::NONCE_ACTION_EDIT_ACCESS, 'nonce');
         $session_pack = self::get_inline_editor_session_or_error();
         $requester_email = is_array($session_pack) && isset($session_pack[2]) ? sanitize_email((string) $session_pack[2]) : '';
         if ($requester_email === '') {
-            wp_send_json_error(['message' => __('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('อีเมลไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_email', 'submit_course_request');
         }
 
         $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
         if ($course_id <= 0 || get_post_type($course_id) !== 'course') {
-            wp_send_json_error(['message' => __('ข้อมูลคอร์สไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อมูลคอร์สไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_course', 'submit_course_request', ['course_id' => $course_id]);
         }
 
         $current_course = [
@@ -2548,7 +2897,7 @@ final class LC_Public_Place_Photo_Upload {
         $new_image_ids = [];
         $new_files = self::validate_staff_edit_image_files($_FILES['new_images'] ?? null, $settings);
         if (is_wp_error($new_files)) {
-            wp_send_json_error(['message' => (string) $new_files->get_error_message()], 400);
+            self::send_json_error_debug((string) $new_files->get_error_message(), 400, 'image_validation_failed', 'submit_course_request');
         }
         if (!empty($new_files)) {
             $allowed_mimes = self::staff_allowed_image_mimes();
@@ -2557,7 +2906,7 @@ final class LC_Public_Place_Photo_Upload {
                 if (is_wp_error($attachment_id) || !$attachment_id) {
                     $file_name = sanitize_file_name((string) ($file['name'] ?? ''));
                     $file_label = $file_name !== '' ? ('"' . $file_name . '"') : 'รูปภาพที่อัปโหลด';
-                    wp_send_json_error(['message' => $file_label . ' อัปโหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'], 400);
+                    self::send_json_error_debug($file_label . ' อัปโหลดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 400, 'image_upload_failed', 'submit_course_request');
                 }
                 $new_image_ids[] = (int) $attachment_id;
             }
@@ -2676,7 +3025,7 @@ final class LC_Public_Place_Photo_Upload {
             $has_changes = true;
         }
         if (!$has_changes) {
-            wp_send_json_error(['message' => __('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload'), 400, 'no_changes_detected', 'submit_course_request');
         }
 
         if (!post_type_exists(self::CHANGE_CPT)) {
@@ -2688,7 +3037,7 @@ final class LC_Public_Place_Photo_Upload {
             'post_title' => sprintf('Course Change - %s - %s', get_the_title($course_id), current_time('mysql')),
         ], true);
         if (is_wp_error($request_id) || !$request_id) {
-            wp_send_json_error(['message' => __('ไม่สามารถสร้างคำขอแก้ไขได้', 'lc-public-place-photo-upload')], 500);
+            self::send_json_error_debug(__('ไม่สามารถสร้างคำขอแก้ไขได้', 'lc-public-place-photo-upload'), 500, 'request_create_failed', 'submit_course_request', ['course_id' => $course_id]);
         }
 
         $payload = [
@@ -2713,7 +3062,7 @@ final class LC_Public_Place_Photo_Upload {
         $course_diff_rows = self::build_course_change_diff_rows($course_id, $payload);
         if (empty($course_diff_rows)) {
             wp_delete_post((int) $request_id, true);
-            wp_send_json_error(['message' => __('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload'), 400, 'no_changes_detected', 'submit_course_request');
         }
 
         update_post_meta($request_id, '_lc_change_status', 'pending');
@@ -2733,14 +3082,14 @@ final class LC_Public_Place_Photo_Upload {
     public static function ajax_get_course_edit_context() {
         $settings = self::get_settings();
         if (($settings['location_edit_enabled'] ?? '0') !== '1') {
-            wp_send_json_error(['message' => __('ปิดรับคำขอแก้ไขข้อมูลชั่วคราว', 'lc-public-place-photo-upload')], 403);
+            self::send_json_error_debug(__('ปิดรับคำขอแก้ไขข้อมูลชั่วคราว', 'lc-public-place-photo-upload'), 403, 'location_edit_closed', 'load_course_context');
         }
         check_ajax_referer(self::NONCE_ACTION_EDIT_ACCESS, 'nonce');
         self::get_inline_editor_session_or_error();
 
         $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
         if ($course_id <= 0 || get_post_type($course_id) !== 'course') {
-            wp_send_json_error(['message' => __('ข้อมูลคอร์สไม่ถูกต้อง', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('ข้อมูลคอร์สไม่ถูกต้อง', 'lc-public-place-photo-upload'), 400, 'invalid_course', 'load_course_context', ['course_id' => $course_id]);
         }
 
         $sessions = [];
@@ -2861,6 +3210,10 @@ final class LC_Public_Place_Photo_Upload {
 
     private static function otp_verify_lock_key($email, $ip) {
         return 'lc_loc_edit_otp_verify_lock_' . md5(strtolower((string) $email) . '|' . (string) $ip);
+    }
+
+    private static function otp_challenge_id() {
+        return wp_generate_password(24, false, false);
     }
 
     private static function token_key($token) {
@@ -3013,9 +3366,10 @@ final class LC_Public_Place_Photo_Upload {
     public static function ajax_request_location_edit_otp() {
         $settings = self::get_settings();
         if (($settings['location_edit_enabled'] ?? '0') !== '1') {
-            self::ajax_error('location_edit_closed', 403);
+            self::ajax_error('location_edit_closed', 403, 'otp_request');
         }
-        check_ajax_referer(self::NONCE_ACTION_EDIT_ACCESS, 'nonce');
+        // Intentionally do not require WP nonce here because OTP flow is email-based and
+        // should not break when testers login/logout WordPress in another tab.
 
         $email_raw = isset($_POST['email']) ? (string) wp_unslash($_POST['email']) : '';
         $email = self::normalize_email_for_match($email_raw);
@@ -3023,74 +3377,95 @@ final class LC_Public_Place_Photo_Upload {
             self::ajax_error('invalid_email', 400);
         }
         if (!self::is_editor_email_allowed($email, $settings)) {
-            self::ajax_error('editor_email_not_allowed', 403);
+            self::ajax_error('editor_email_not_allowed', 403, 'otp_request');
         }
 
         $rate_key = self::otp_rate_key($email);
-        if (get_transient($rate_key)) {
-            wp_send_json_error(['message' => __('กรุณารอสักครู่ก่อนขอ OTP ใหม่', 'lc-public-place-photo-upload')], 429);
+        $rate_state = get_transient($rate_key);
+        if ($rate_state) {
+            $remaining = 60;
+            if (is_array($rate_state) && !empty($rate_state['until'])) {
+                $remaining = max(1, (int) $rate_state['until'] - time());
+            }
+            self::send_json_error_debug(__('กรุณารอสักครู่ก่อนขอ OTP ใหม่', 'lc-public-place-photo-upload'), 429, 'otp_rate_limited', 'otp_request', [
+                'resend_wait_seconds' => $remaining,
+            ]);
         }
 
         $otp = (string) wp_rand(100000, 999999);
+        $challenge_id = self::otp_challenge_id();
         $ttl_minutes = max(3, min(30, (int) ($settings['otp_ttl_minutes'] ?? 10)));
         $subject = sprintf('[%s] OTP สำหรับแก้ไขข้อมูลสถานที่', wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES));
         $message = "รหัส OTP ของคุณคือ: {$otp}\nรหัสหมดอายุภายใน {$ttl_minutes} นาที";
         $mail_to = sanitize_email($email);
         if ($mail_to === '' || !is_email($mail_to)) {
-            self::ajax_error('invalid_email', 400);
+            self::ajax_error('invalid_email', 400, 'otp_request');
         }
         $send_result = self::send_otp_email($mail_to, $subject, $message, $settings);
         if (is_wp_error($send_result)) {
-            self::ajax_error('otp_send_failed', 500);
+            self::ajax_error('otp_send_failed', 500, 'otp_request');
         }
         set_transient(self::otp_key($email), [
             'otp' => $otp,
+            'challenge_id' => $challenge_id,
             'location_id' => isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0,
             'created_at' => time(),
         ], $ttl_minutes * MINUTE_IN_SECONDS);
-        set_transient($rate_key, 1, 60);
+        set_transient($rate_key, [
+            'until' => time() + 60,
+        ], 60);
 
         wp_send_json_success([
             'message' => __('ส่ง OTP ไปยังอีเมลเรียบร้อยแล้ว', 'lc-public-place-photo-upload'),
+            'challenge_id' => $challenge_id,
+            'resend_cooldown_seconds' => 60,
+            'otp_ttl_minutes' => $ttl_minutes,
         ]);
     }
 
     public static function ajax_verify_location_edit_otp() {
         $settings = self::get_settings();
         if (($settings['location_edit_enabled'] ?? '0') !== '1') {
-            self::ajax_error('location_edit_closed', 403);
+            self::ajax_error('location_edit_closed', 403, 'otp_verify');
         }
-        check_ajax_referer(self::NONCE_ACTION_EDIT_ACCESS, 'nonce');
+        // Intentionally do not require WP nonce here; use OTP + challenge instead.
 
         $email_raw = isset($_POST['email']) ? (string) wp_unslash($_POST['email']) : '';
         $email = self::normalize_email_for_match($email_raw);
         $otp = isset($_POST['otp']) ? preg_replace('/\D+/', '', (string) wp_unslash($_POST['otp'])) : '';
+        $challenge_id = isset($_POST['challenge_id']) ? sanitize_text_field((string) wp_unslash($_POST['challenge_id'])) : '';
         $location_id = isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0;
         if ($email === '' || strpos($email, '@') === false) {
-            self::ajax_error('invalid_email', 400);
+            self::ajax_error('invalid_email', 400, 'otp_verify');
         }
         if ($otp === '') {
-            self::ajax_error('invalid_nonce', 400);
+            self::ajax_error('invalid_nonce', 400, 'otp_verify');
         }
 
         $remote_ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field((string) $_SERVER['REMOTE_ADDR']) : '';
         $verify_lock_key = self::otp_verify_lock_key($email, $remote_ip);
         $verify_attempt_key = self::otp_verify_attempt_key($email, $remote_ip);
         if (get_transient($verify_lock_key)) {
-            wp_send_json_error(['message' => __('กรอก OTP ผิดหลายครั้ง กรุณาขอรหัสใหม่แล้วลองอีกครั้ง', 'lc-public-place-photo-upload')], 429);
+            self::send_json_error_debug(__('กรอก OTP ผิดหลายครั้ง กรุณาขอรหัสใหม่แล้วลองอีกครั้ง', 'lc-public-place-photo-upload'), 429, 'otp_verify_locked', 'otp_verify');
         }
 
         $stored = get_transient(self::otp_key($email));
-        if (!is_array($stored) || (string) ($stored['otp'] ?? '') !== $otp) {
+        if (!is_array($stored)) {
+            self::send_json_error_debug(__('OTP ไม่ถูกต้องหรือหมดอายุแล้ว', 'lc-public-place-photo-upload'), 400, 'otp_invalid_or_expired', 'otp_verify');
+        }
+        if ($challenge_id === '' || (string) ($stored['challenge_id'] ?? '') === '' || !hash_equals((string) ($stored['challenge_id'] ?? ''), (string) $challenge_id)) {
+            self::send_json_error_debug(__('เซสชันการยืนยัน OTP ไม่ตรงกัน กรุณาขอรหัสใหม่', 'lc-public-place-photo-upload'), 400, 'otp_challenge_mismatch', 'otp_verify');
+        }
+        if ((string) ($stored['otp'] ?? '') !== $otp) {
             $attempts = (int) get_transient($verify_attempt_key);
             $attempts++;
             set_transient($verify_attempt_key, $attempts, self::OTP_VERIFY_LOCK_SECONDS);
             if ($attempts >= self::OTP_VERIFY_MAX_ATTEMPTS) {
                 set_transient($verify_lock_key, 1, self::OTP_VERIFY_LOCK_SECONDS);
                 delete_transient(self::otp_key($email));
-                wp_send_json_error(['message' => __('กรอก OTP ผิดหลายครั้ง กรุณาขอรหัสใหม่แล้วลองอีกครั้ง', 'lc-public-place-photo-upload')], 429);
+                self::send_json_error_debug(__('กรอก OTP ผิดหลายครั้ง กรุณาขอรหัสใหม่แล้วลองอีกครั้ง', 'lc-public-place-photo-upload'), 429, 'otp_verify_locked', 'otp_verify');
             }
-            wp_send_json_error(['message' => __('OTP ไม่ถูกต้องหรือหมดอายุแล้ว', 'lc-public-place-photo-upload')], 400);
+            self::send_json_error_debug(__('OTP ไม่ถูกต้องหรือหมดอายุแล้ว', 'lc-public-place-photo-upload'), 400, 'otp_invalid_or_expired', 'otp_verify');
         }
         delete_transient(self::otp_key($email));
         delete_transient($verify_attempt_key);
@@ -3850,7 +4225,11 @@ final class LC_Public_Place_Photo_Upload {
         if ($raw === '') {
             return [];
         }
-        $lines = preg_split('/[\r\n,;]+/', $raw);
+        // Accept literal "\n" sequences and repair a legacy separator bug where newlines
+        // were serialized as the letter "n" between email addresses.
+        $raw = str_replace('\\n', "\n", $raw);
+        $raw = preg_replace('/([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})n(?=[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i', '$1' . "\n", $raw);
+        $lines = preg_split('/[\r\n,;\s]+/', $raw);
         if (!is_array($lines)) {
             return [];
         }
@@ -4022,11 +4401,353 @@ final class LC_Public_Place_Photo_Upload {
         self::redirect_with_status('success');
     }
 
-    private static function ajax_error($code, $http_status = 400) {
+    private static function current_ajax_action_name() {
+        $action = isset($_REQUEST['action']) ? sanitize_key((string) wp_unslash($_REQUEST['action'])) : '';
+        return $action !== '' ? $action : 'unknown_action';
+    }
+
+    private static function make_debug_error_id() {
+        try {
+            $rand = wp_rand(1000, 9999);
+        } catch (Exception $e) {
+            $rand = mt_rand(1000, 9999);
+        }
+        return 'LC-' . gmdate('Ymd-His') . '-' . (string) $rand;
+    }
+
+    private static function sanitize_debug_context($context) {
+        if (!is_array($context)) {
+            return [];
+        }
+        $out = [];
+        foreach ($context as $key => $value) {
+            $safe_key = sanitize_key((string) $key);
+            if ($safe_key === '') {
+                continue;
+            }
+            if (is_scalar($value) || $value === null) {
+                $val = is_bool($value) ? ($value ? 'true' : 'false') : (string) $value;
+                if (preg_match('/(token|otp|nonce|cookie|password|secret|api[_-]?key)/i', $safe_key)) {
+                    $val = '[redacted]';
+                }
+                $out[$safe_key] = function_exists('mb_substr') ? mb_substr($val, 0, 200) : substr($val, 0, 200);
+                continue;
+            }
+            if (is_array($value)) {
+                $out[$safe_key] = '[array:' . count($value) . ']';
+                continue;
+            }
+            $out[$safe_key] = '[' . gettype($value) . ']';
+        }
+        return $out;
+    }
+
+    private static function build_ajax_debug_payload($code, $http_status = 400, $stage = '', $context = []) {
+        $code = sanitize_key((string) $code);
+        $http_status = (int) $http_status;
+        $stage = sanitize_key((string) $stage);
+        if ($stage === '') {
+            $stage = 'ajax';
+        }
+        return [
+            'error_id' => self::make_debug_error_id(),
+            'code' => $code !== '' ? $code : 'unknown_error',
+            'stage' => $stage,
+            'action' => self::current_ajax_action_name(),
+            'http_status' => $http_status,
+            'time_utc' => gmdate('c'),
+            'context' => self::sanitize_debug_context($context),
+        ];
+    }
+
+    private static function error_log_table_name() {
+        global $wpdb;
+        return $wpdb->prefix . self::ERROR_LOG_TABLE_SUFFIX;
+    }
+
+    private static function maybe_create_error_log_table() {
+        global $wpdb;
+        static $ensured = false;
+        if ($ensured) {
+            return;
+        }
+        $table = self::error_log_table_name();
+        $charset_collate = $wpdb->get_charset_collate();
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        $sql = "CREATE TABLE {$table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            created_at_utc datetime NOT NULL,
+            error_id varchar(64) NOT NULL DEFAULT '',
+            code varchar(100) NOT NULL DEFAULT '',
+            stage varchar(100) NOT NULL DEFAULT '',
+            action_name varchar(120) NOT NULL DEFAULT '',
+            http_status smallint(5) unsigned NOT NULL DEFAULT 0,
+            severity varchar(16) NOT NULL DEFAULT 'error',
+            message_user text NULL,
+            request_id bigint(20) unsigned NULL,
+            location_id bigint(20) unsigned NULL,
+            course_id bigint(20) unsigned NULL,
+            wp_user_id bigint(20) unsigned NULL,
+            is_wp_logged_in tinyint(1) unsigned NOT NULL DEFAULT 0,
+            user_email_masked varchar(190) NOT NULL DEFAULT '',
+            user_email_hash char(64) NOT NULL DEFAULT '',
+            page_url text NULL,
+            referer_url text NULL,
+            user_agent varchar(255) NOT NULL DEFAULT '',
+            ip_hash char(64) NOT NULL DEFAULT '',
+            context_json longtext NULL,
+            resolved_status varchar(20) NOT NULL DEFAULT 'open',
+            PRIMARY KEY  (id),
+            KEY error_id (error_id),
+            KEY created_at_utc (created_at_utc),
+            KEY stage (stage),
+            KEY code (code),
+            KEY http_status (http_status),
+            KEY resolved_status (resolved_status),
+            KEY request_id (request_id)
+        ) {$charset_collate};";
+        dbDelta($sql);
+        $ensured = true;
+    }
+
+    private static function maybe_extract_int_from_context($context, $keys) {
+        if (!is_array($context)) {
+            return null;
+        }
+        foreach ((array) $keys as $key) {
+            if (!array_key_exists($key, $context)) {
+                continue;
+            }
+            $val = (int) $context[$key];
+            if ($val > 0) {
+                return $val;
+            }
+        }
+        return null;
+    }
+
+    private static function hash_email_for_log($email) {
+        $email = strtolower(trim((string) $email));
+        if ($email === '' || !is_email($email)) {
+            return '';
+        }
+        return hash('sha256', wp_salt('auth') . '|' . $email);
+    }
+
+    private static function mask_email_for_log($email) {
+        $email = strtolower(trim((string) $email));
+        if ($email === '' || !is_email($email)) {
+            return '';
+        }
+        $parts = explode('@', $email, 2);
+        $local = (string) ($parts[0] ?? '');
+        $domain = (string) ($parts[1] ?? '');
+        if ($domain === '') {
+            return '';
+        }
+        $local_len = function_exists('mb_strlen') ? mb_strlen($local) : strlen($local);
+        $prefix_len = min(3, max(1, $local_len));
+        $prefix = function_exists('mb_substr') ? mb_substr($local, 0, $prefix_len) : substr($local, 0, $prefix_len);
+        return $prefix . '***@' . $domain;
+    }
+
+    private static function current_editor_session_email_for_log() {
+        $token = self::get_editor_token_from_cookie();
+        if (!is_string($token) || $token === '') {
+            return '';
+        }
+        $session = self::get_editor_session($token);
+        if (!is_array($session)) {
+            return '';
+        }
+        $email = sanitize_email((string) ($session['email'] ?? ''));
+        return ($email !== '' && is_email($email)) ? $email : '';
+    }
+
+    private static function requester_email_from_context_for_log($context) {
+        if (!is_array($context)) {
+            return '';
+        }
+        $request_id = isset($context['request_id']) ? (int) $context['request_id'] : 0;
+        if ($request_id <= 0) {
+            return '';
+        }
+        $email = sanitize_email((string) get_post_meta($request_id, '_lc_requester_email', true));
+        return ($email !== '' && is_email($email)) ? $email : '';
+    }
+
+    private static function hash_ip_for_log($ip) {
+        $ip = trim((string) $ip);
+        if ($ip === '') {
+            return '';
+        }
+        return hash('sha256', wp_salt('nonce') . '|' . $ip);
+    }
+
+    private static function severity_from_http_status($http_status) {
+        $http_status = (int) $http_status;
+        if ($http_status >= 500) {
+            return 'critical';
+        }
+        if ($http_status >= 400) {
+            return 'error';
+        }
+        if ($http_status >= 300) {
+            return 'warn';
+        }
+        return 'info';
+    }
+
+    private static function severity_from_error_event($debug_payload = []) {
+        $debug = is_array($debug_payload) ? $debug_payload : [];
+        $code = sanitize_key((string) ($debug['code'] ?? ''));
+        $stage = sanitize_key((string) ($debug['stage'] ?? ''));
+        $http_status = (int) ($debug['http_status'] ?? 0);
+
+        if ($http_status >= 500) {
+            return 'critical';
+        }
+
+        // Expected/normal user-state or validation outcomes.
+        $info_codes = [
+            'otp_rate_limited',
+        ];
+        if (in_array($code, $info_codes, true)) {
+            return 'info';
+        }
+
+        $warn_codes = [
+            'invalid_email',
+            'otp_invalid_or_expired',
+            'otp_verify_locked',
+            'image_validation_failed',
+            'no_changes_detected',
+            'request_cancel_window_expired',
+            'invalid_course',
+            'invalid_location',
+            'missing_suggestion',
+            'unsupported_field',
+            'location_edit_closed',
+            'editor_email_not_allowed',
+        ];
+        if (in_array($code, $warn_codes, true)) {
+            return 'warn';
+        }
+
+        // Some 403s are expected auth-state responses during normal UX.
+        if ($code === 'session_expired') {
+            if (in_array($stage, ['status_dashboard', 'status_feed', 'status_detail', 'editable_locations'], true)) {
+                return 'info';
+            }
+            return 'warn';
+        }
+
+        // Security/integrity issues are more serious than generic 4xx validation.
+        if (in_array($code, ['otp_challenge_mismatch', 'forbidden_request_owner'], true)) {
+            return 'error';
+        }
+
+        // Backend/application failures.
+        if (in_array($code, ['request_create_failed', 'image_upload_failed'], true)) {
+            return 'error';
+        }
+
+        return self::severity_from_http_status($http_status);
+    }
+
+    private static function should_skip_error_log_event($debug_payload = []) {
+        $debug = is_array($debug_payload) ? $debug_payload : [];
+        $code = sanitize_key((string) ($debug['code'] ?? ''));
+        $stage = sanitize_key((string) ($debug['stage'] ?? ''));
+        $http_status = (int) ($debug['http_status'] ?? 0);
+
+        // Expected auth-state probes from frontend should not pollute error logs.
+        if ($http_status === 403 && $code === 'session_expired' && in_array($stage, ['status_dashboard', 'status_feed', 'status_detail'], true)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function log_ajax_error_event($message, $debug_payload = []) {
+        global $wpdb;
+        try {
+            if (self::should_skip_error_log_event($debug_payload)) {
+                return;
+            }
+            self::maybe_create_error_log_table();
+            $table = self::error_log_table_name();
+            $debug = is_array($debug_payload) ? $debug_payload : [];
+            $context = (isset($debug['context']) && is_array($debug['context'])) ? $debug['context'] : [];
+
+            $posted_email = '';
+            if (isset($_POST['email'])) {
+                $posted_email = sanitize_email((string) wp_unslash($_POST['email']));
+            }
+            if ($posted_email === '' && isset($context['email'])) {
+                $posted_email = sanitize_email((string) $context['email']);
+            }
+            if ($posted_email === '') {
+                $posted_email = self::current_editor_session_email_for_log();
+            }
+            if ($posted_email === '') {
+                $posted_email = self::requester_email_from_context_for_log($context);
+            }
+
+            $request_uri = isset($_SERVER['REQUEST_URI']) ? wp_unslash((string) $_SERVER['REQUEST_URI']) : '';
+            $request_uri = $request_uri !== '' ? esc_url_raw($request_uri) : '';
+            $referer = wp_get_referer();
+            $referer = $referer ? esc_url_raw((string) $referer) : '';
+            $ua = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field((string) wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '';
+            $remote_ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field((string) wp_unslash($_SERVER['REMOTE_ADDR'])) : '';
+
+            $wpdb->insert($table, [
+                'created_at_utc' => gmdate('Y-m-d H:i:s'),
+                'error_id' => sanitize_text_field((string) ($debug['error_id'] ?? '')),
+                'code' => sanitize_key((string) ($debug['code'] ?? '')),
+                'stage' => sanitize_key((string) ($debug['stage'] ?? 'ajax')),
+                'action_name' => sanitize_key((string) ($debug['action'] ?? '')),
+                'http_status' => (int) ($debug['http_status'] ?? 0),
+                'severity' => self::severity_from_error_event($debug),
+                'message_user' => wp_strip_all_tags((string) $message),
+                'request_id' => self::maybe_extract_int_from_context($context, ['request_id']),
+                'location_id' => self::maybe_extract_int_from_context($context, ['location_id']),
+                'course_id' => self::maybe_extract_int_from_context($context, ['course_id']),
+                'wp_user_id' => get_current_user_id() ?: null,
+                'is_wp_logged_in' => is_user_logged_in() ? 1 : 0,
+                'user_email_masked' => self::mask_email_for_log($posted_email),
+                'user_email_hash' => self::hash_email_for_log($posted_email),
+                'page_url' => $request_uri,
+                'referer_url' => $referer,
+                'user_agent' => function_exists('mb_substr') ? mb_substr($ua, 0, 255) : substr($ua, 0, 255),
+                'ip_hash' => self::hash_ip_for_log($remote_ip),
+                'context_json' => wp_json_encode($context),
+                'resolved_status' => 'open',
+            ], [
+                '%s','%s','%s','%s','%s','%d','%s','%s',
+                '%d','%d','%d','%d','%d','%s','%s','%s','%s','%s','%s','%s'
+            ]);
+        } catch (\Throwable $e) {
+            // Never break AJAX error responses because error logging fails.
+        } catch (\Exception $e) {
+            // PHP < 7 compatibility path.
+        }
+    }
+
+    private static function send_json_error_debug($message, $http_status = 400, $code = 'error', $stage = 'ajax', $context = []) {
+        $http_status = (int) $http_status;
+        $code = (string) $code;
+        $debug = self::build_ajax_debug_payload($code, $http_status, $stage, $context);
+        self::log_ajax_error_event($message, $debug);
         wp_send_json_error([
-            'code' => (string) $code,
-            'message' => self::status_message((string) $code),
-        ], (int) $http_status);
+            'code' => sanitize_key($code),
+            'message' => (string) $message,
+            'debug' => $debug,
+        ], $http_status);
+    }
+
+    private static function ajax_error($code, $http_status = 400, $stage = 'ajax', $context = []) {
+        self::send_json_error_debug(self::status_message((string) $code), (int) $http_status, (string) $code, (string) $stage, (array) $context);
     }
 
     public static function handle_public_submission_ajax() {

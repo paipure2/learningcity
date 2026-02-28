@@ -25,6 +25,7 @@ $ctx = [
   'price_text' => function_exists('course_get_price_text') ? course_get_price_text($post_id) : 'ฟรี',
 
   'desc' => get_field('course_description', $post_id),
+  'course_mode' => get_field('course_mode', $post_id),
   'learning_link' => get_field('learning_link', $post_id),
   'images' => get_field('images', $post_id),
 

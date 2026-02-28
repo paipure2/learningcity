@@ -1,6 +1,8 @@
 <?php
 $ctx = get_query_var('ctx');
 if (empty($ctx) || !is_array($ctx)) { echo '<!-- description: missing ctx -->'; return; }
+$course_mode = !empty($ctx['course_mode']) ? sanitize_key((string) $ctx['course_mode']) : '';
+$show_learning_link_button = !empty($ctx['learning_link']) && ($course_mode === '' || $course_mode === 'online');
 ?>
 
 <?php if (!empty($ctx['desc'])): ?>
@@ -9,7 +11,7 @@ if (empty($ctx) || !is_array($ctx)) { echo '<!-- description: missing ctx -->'; 
   </p>
 <?php endif; ?>
 
-<?php if (!empty($ctx['learning_link'])): ?>
+<?php if ($show_learning_link_button): ?>
   <a href="<?php echo esc_url($ctx['learning_link']); ?>"
      target="_blank"
      rel="noopener noreferrer"

@@ -11,6 +11,392 @@ if (!defined('LC_ADMIN_WORKFLOWS_PLUGIN_ACTIVE')) {
     define('LC_ADMIN_WORKFLOWS_PLUGIN_ACTIVE', true);
 }
 
+if (!defined('LCAW_FIELD_COURSE_MODE')) {
+    define('LCAW_FIELD_COURSE_MODE', 'field_lc_course_mode_01');
+    define('LCAW_FIELD_LEARNING_LINK', 'field_6954ace1186ee');
+    define('LCAW_FIELD_ONSITE_SINGLE_SOURCE', 'field_lc_onsite_single_source_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_LOCATION', 'field_lc_onsite_single_location_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_REG_START', 'field_lc_onsite_single_reg_start_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_REG_END', 'field_lc_onsite_single_reg_end_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_START_DATE', 'field_lc_onsite_single_start_date_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_END_DATE', 'field_lc_onsite_single_end_date_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_VENUE_NAME', 'field_lc_onsite_single_custom_venue_name_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_CONTACT_NAME', 'field_lc_onsite_single_custom_contact_name_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_ADDRESS', 'field_lc_onsite_single_custom_address_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_PHONE', 'field_lc_onsite_single_custom_phone_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_EMAIL', 'field_lc_onsite_single_custom_email_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_REG_URL', 'field_lc_onsite_single_custom_reg_url_01');
+    define('LCAW_FIELD_ONSITE_SINGLE_CUSTOM_MAPS_URL', 'field_lc_onsite_single_custom_maps_url_01');
+}
+
+function lcaw_course_get_mode($course_id) {
+    $course_id = (int) $course_id;
+    if ($course_id <= 0) return '';
+    $mode = get_post_meta($course_id, 'course_mode', true);
+    return sanitize_key((string) $mode);
+}
+
+function lcaw_course_session_count($course_id) {
+    $course_id = (int) $course_id;
+    if ($course_id <= 0) return 0;
+
+    $q = new WP_Query([
+        'post_type' => 'session',
+        'post_status' => ['publish', 'draft', 'pending', 'private', 'future'],
+        'posts_per_page' => 1,
+        'fields' => 'ids',
+        'no_found_rows' => false,
+        'meta_query' => [
+            'relation' => 'OR',
+            [
+                'key' => 'course',
+                'value' => (string) $course_id,
+                'compare' => '=',
+            ],
+            [
+                'key' => 'course',
+                'value' => '"' . $course_id . '"',
+                'compare' => 'LIKE',
+            ],
+        ],
+    ]);
+
+    $count = (int) $q->found_posts;
+    wp_reset_postdata();
+    return max(0, $count);
+}
+
+function lcaw_infer_course_mode_from_legacy_data($course_id) {
+    $course_id = (int) $course_id;
+    if ($course_id <= 0 || get_post_type($course_id) !== 'course') return '';
+
+    // Conservative rule: if course already uses session-based structure, keep it as onsite_multi.
+    if (lcaw_course_session_count($course_id) > 0) {
+        return 'onsite_multi';
+    }
+
+    $learning_link = trim((string) get_post_meta($course_id, 'learning_link', true));
+    if ($learning_link !== '') {
+        return 'online';
+    }
+
+    $onsite_single_markers = [
+        'onsite_single_venue_source',
+        'onsite_single_location',
+        'onsite_single_reg_start',
+        'onsite_single_reg_end',
+        'onsite_single_start_date',
+        'onsite_single_end_date',
+        'onsite_single_time_period',
+        'onsite_single_apply_url',
+        'onsite_single_session_details',
+        'onsite_single_custom_venue_name',
+        'onsite_single_custom_contact_name',
+        'onsite_single_custom_address',
+        'onsite_single_custom_contact_phone',
+        'onsite_single_custom_contact_email',
+        'onsite_single_custom_registration_url',
+        'onsite_single_custom_maps_url',
+    ];
+    foreach ($onsite_single_markers as $meta_key) {
+        $v = get_post_meta($course_id, $meta_key, true);
+        if (is_array($v)) {
+            if (!empty($v)) return 'onsite_single';
+            continue;
+        }
+        if (trim((string) $v) !== '' && trim((string) $v) !== '0') {
+            return 'onsite_single';
+        }
+        if ($meta_key === 'onsite_single_location' && (int) $v > 0) {
+            return 'onsite_single';
+        }
+    }
+
+    return '';
+}
+
+function lcaw_resolve_course_id_from_acf_post_id($post_id) {
+    if (is_numeric($post_id)) return (int) $post_id;
+    if (is_string($post_id) && preg_match('/^post_(\d+)$/', $post_id, $m)) {
+        return (int) $m[1];
+    }
+    return 0;
+}
+
+function lcaw_prefill_course_mode_value_if_legacy_empty($value, $post_id) {
+    if (!is_admin()) return $value;
+    if (is_string($value) && trim($value) !== '') return $value;
+    if (is_array($value) && !empty($value)) return $value;
+
+    $course_id = lcaw_resolve_course_id_from_acf_post_id($post_id);
+    if ($course_id <= 0 || get_post_type($course_id) !== 'course') return $value;
+
+    $saved = lcaw_course_get_mode($course_id);
+    if (in_array($saved, ['online', 'onsite_single', 'onsite_multi'], true)) return $saved;
+
+    $inferred = lcaw_infer_course_mode_from_legacy_data($course_id);
+    if (!in_array($inferred, ['online', 'onsite_single', 'onsite_multi'], true)) return $value;
+
+    return $inferred;
+}
+
+function lcaw_course_has_provider($course_id) {
+    $course_id = (int) $course_id;
+    if ($course_id <= 0 || !taxonomy_exists('course_provider')) return false;
+    $terms = wp_get_post_terms($course_id, 'course_provider', ['fields' => 'ids']);
+    return !is_wp_error($terms) && is_array($terms) && !empty(array_filter(array_map('intval', $terms)));
+}
+
+function lcaw_course_provider_selected_in_request_or_saved($course_id) {
+    if (isset($_POST['tax_input']) && is_array($_POST['tax_input']) && array_key_exists('course_provider', $_POST['tax_input'])) {
+        $raw = wp_unslash($_POST['tax_input']['course_provider']);
+        if (is_array($raw)) {
+            $vals = array_filter(array_map(static function($v) {
+                return trim((string) $v);
+            }, $raw));
+            if (!empty($vals)) return true;
+            return false;
+        }
+        if (is_string($raw)) {
+            // Tag-like input may be comma-separated names/slugs.
+            return trim($raw) !== '';
+        }
+    }
+    return lcaw_course_has_provider($course_id);
+}
+
+function lcaw_course_provider_count_in_request_or_saved($course_id) {
+    $course_id = (int) $course_id;
+    if (isset($_POST['tax_input']) && is_array($_POST['tax_input']) && array_key_exists('course_provider', $_POST['tax_input'])) {
+        $raw = wp_unslash($_POST['tax_input']['course_provider']);
+        if (is_array($raw)) {
+            $vals = array_values(array_filter(array_map(static function($v) {
+                return trim((string) $v);
+            }, $raw)));
+            return count($vals);
+        }
+        if (is_string($raw)) {
+            $parts = array_values(array_filter(array_map('trim', explode(',', $raw))));
+            return count($parts);
+        }
+    }
+    if ($course_id <= 0 || !taxonomy_exists('course_provider')) return 0;
+    $terms = wp_get_post_terms($course_id, 'course_provider', ['fields' => 'ids']);
+    if (is_wp_error($terms) || !is_array($terms)) return 0;
+    return count(array_values(array_filter(array_map('intval', $terms))));
+}
+
+function lcaw_normalize_posted_acf_scalar($value) {
+    if (is_array($value)) {
+        $value = reset($value);
+    }
+    return is_string($value) ? trim($value) : (is_numeric($value) ? (string) $value : '');
+}
+
+function lcaw_is_valid_ymd_date($value) {
+    $value = trim((string) $value);
+    if ($value === '' || !preg_match('/^\d{8}$/', $value)) return false;
+    $y = (int) substr($value, 0, 4);
+    $m = (int) substr($value, 4, 2);
+    $d = (int) substr($value, 6, 2);
+    return checkdate($m, $d, $y);
+}
+
+function lcaw_compare_ymd_dates($a, $b) {
+    $a = trim((string) $a);
+    $b = trim((string) $b);
+    if (!lcaw_is_valid_ymd_date($a) || !lcaw_is_valid_ymd_date($b)) return null;
+    if ($a === $b) return 0;
+    return ($a < $b) ? -1 : 1;
+}
+
+function lcaw_get_posted_acf_value($field_key) {
+    if (!isset($_POST['acf']) || !is_array($_POST['acf'])) return null;
+    if (!array_key_exists($field_key, $_POST['acf'])) return null;
+    return wp_unslash($_POST['acf'][$field_key]);
+}
+
+function lcaw_resolve_learning_mode_taxonomy() {
+    $candidates = ['learning_modes', 'learning_mode'];
+    foreach ($candidates as $tax) {
+        if (taxonomy_exists($tax)) return $tax;
+    }
+
+    if (!post_type_exists('course')) return '';
+    $taxonomies = get_object_taxonomies('course', 'objects');
+    if (!is_array($taxonomies)) return '';
+
+    foreach ($taxonomies as $tax_obj) {
+        if (!$tax_obj || empty($tax_obj->name)) continue;
+        $tax_name = (string) $tax_obj->name;
+        $label = isset($tax_obj->labels->name) ? strtolower((string) $tax_obj->labels->name) : '';
+        if (strpos($tax_name, 'learning') !== false || strpos($label, 'learning') !== false) {
+            return $tax_name;
+        }
+    }
+    return '';
+}
+
+function lcaw_find_learning_mode_term_id($taxonomy, $targets) {
+    $taxonomy = (string) $taxonomy;
+    if ($taxonomy === '' || !taxonomy_exists($taxonomy)) return 0;
+    $targets = array_values(array_filter(array_map('strtolower', (array) $targets)));
+    if (empty($targets)) return 0;
+
+    $terms = get_terms([
+        'taxonomy' => $taxonomy,
+        'hide_empty' => false,
+    ]);
+    if (is_wp_error($terms) || !is_array($terms)) return 0;
+
+    foreach ($terms as $term) {
+        if (!$term instanceof WP_Term) continue;
+        $slug = strtolower((string) $term->slug);
+        $name = strtolower((string) $term->name);
+        if (in_array($slug, $targets, true) || in_array($name, $targets, true)) {
+            return (int) $term->term_id;
+        }
+    }
+    return 0;
+}
+
+function lcaw_sync_learning_mode_taxonomy_for_course($course_id) {
+    $course_id = (int) $course_id;
+    if ($course_id <= 0 || get_post_type($course_id) !== 'course') return;
+
+    $mode = lcaw_course_get_mode($course_id);
+    if (!in_array($mode, ['online', 'onsite_single', 'onsite_multi'], true)) return; // legacy/no selection
+
+    $taxonomy = lcaw_resolve_learning_mode_taxonomy();
+    if ($taxonomy === '') return;
+
+    $term_targets = ($mode === 'online') ? ['online'] : ['onsite', 'on site'];
+    $term_id = lcaw_find_learning_mode_term_id($taxonomy, $term_targets);
+    if ($term_id <= 0) return;
+
+    wp_set_post_terms($course_id, [$term_id], $taxonomy, false);
+}
+
+add_action('acf/validate_save_post', function () {
+    if (!is_admin() || !function_exists('acf_add_validation_error')) return;
+    if (empty($_POST['post_ID'])) return;
+
+    $post_id = (int) $_POST['post_ID'];
+    if ($post_id <= 0 || get_post_type($post_id) !== 'course') return;
+
+    $posted_mode = lcaw_get_posted_acf_value(LCAW_FIELD_COURSE_MODE);
+    $course_mode = $posted_mode !== null ? sanitize_key(lcaw_normalize_posted_acf_scalar($posted_mode)) : lcaw_course_get_mode($post_id);
+
+    if ($course_mode === 'online') {
+        $posted_learning_link = lcaw_get_posted_acf_value(LCAW_FIELD_LEARNING_LINK);
+        $learning_link = $posted_learning_link !== null
+            ? trim((string) $posted_learning_link)
+            : trim((string) get_post_meta($post_id, 'learning_link', true));
+        if ($learning_link === '') {
+            acf_add_validation_error(LCAW_FIELD_LEARNING_LINK, 'คอร์สแบบ Online ต้องกรอกลิงก์สำหรับเข้าไปเรียน');
+        }
+    }
+
+    if (in_array($course_mode, ['online', 'onsite_single', 'onsite_multi'], true)) {
+        $provider_count = lcaw_course_provider_count_in_request_or_saved($post_id);
+        if ($provider_count <= 0) {
+            acf_add_validation_error('', 'กรุณาเลือก Course Provider ก่อนบันทึกคอร์ส');
+        } elseif ($provider_count > 1) {
+            acf_add_validation_error('', 'Course Provider เลือกได้เพียง 1 รายการต่อคอร์ส');
+        }
+    }
+
+    if ($course_mode !== 'onsite_single') {
+        return;
+    }
+
+    $posted_source = lcaw_get_posted_acf_value(LCAW_FIELD_ONSITE_SINGLE_SOURCE);
+    $source = $posted_source !== null ? sanitize_key(lcaw_normalize_posted_acf_scalar($posted_source)) : sanitize_key((string) get_post_meta($post_id, 'onsite_single_venue_source', true));
+
+    if (!in_array($source, ['location_cpt', 'custom_contact'], true)) {
+        acf_add_validation_error(LCAW_FIELD_ONSITE_SINGLE_SOURCE, 'กรุณาเลือกแหล่งข้อมูลสถานที่สำหรับ Onsite (สถานที่เดียว)');
+        return;
+    }
+
+    if ($source === 'location_cpt') {
+        $posted_location = lcaw_get_posted_acf_value(LCAW_FIELD_ONSITE_SINGLE_LOCATION);
+        $location_id = $posted_location !== null ? (int) lcaw_normalize_posted_acf_scalar($posted_location) : (int) get_post_meta($post_id, 'onsite_single_location', true);
+        if ($location_id <= 0) {
+            acf_add_validation_error(LCAW_FIELD_ONSITE_SINGLE_LOCATION, 'กรุณาเลือกสถานที่ 1 แห่งจากระบบ');
+        }
+        return;
+    }
+
+    $custom_field_map = [
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_VENUE_NAME => 'onsite_single_custom_venue_name',
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_CONTACT_NAME => 'onsite_single_custom_contact_name',
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_ADDRESS => 'onsite_single_custom_address',
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_PHONE => 'onsite_single_custom_contact_phone',
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_EMAIL => 'onsite_single_custom_contact_email',
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_REG_URL => 'onsite_single_custom_registration_url',
+        LCAW_FIELD_ONSITE_SINGLE_CUSTOM_MAPS_URL => 'onsite_single_custom_maps_url',
+    ];
+    $custom_values = [];
+    foreach ($custom_field_map as $acf_key => $meta_key) {
+        $posted_val = lcaw_get_posted_acf_value($acf_key);
+        if ($posted_val !== null) {
+            $custom_values[] = lcaw_normalize_posted_acf_scalar($posted_val);
+        } else {
+            $custom_values[] = trim((string) get_post_meta($post_id, $meta_key, true));
+        }
+    }
+
+    $has_custom_input = false;
+    foreach ($custom_values as $v) {
+        if (is_string($v) && trim($v) !== '') {
+            $has_custom_input = true;
+            break;
+        }
+    }
+    if (!$has_custom_input) {
+        acf_add_validation_error(LCAW_FIELD_ONSITE_SINGLE_CUSTOM_VENUE_NAME, 'กรุณากรอกข้อมูลสถานที่/ช่องทางติดต่ออย่างน้อย 1 ช่อง หรือเปลี่ยนไปใช้ Location จากระบบ');
+    }
+
+    $date_field_meta_map = [
+        LCAW_FIELD_ONSITE_SINGLE_REG_START => 'onsite_single_reg_start',
+        LCAW_FIELD_ONSITE_SINGLE_REG_END => 'onsite_single_reg_end',
+        LCAW_FIELD_ONSITE_SINGLE_START_DATE => 'onsite_single_start_date',
+        LCAW_FIELD_ONSITE_SINGLE_END_DATE => 'onsite_single_end_date',
+    ];
+    $dates = [];
+    foreach ($date_field_meta_map as $acf_key => $meta_key) {
+        $posted_val = lcaw_get_posted_acf_value($acf_key);
+        $dates[$acf_key] = $posted_val !== null
+            ? lcaw_normalize_posted_acf_scalar($posted_val)
+            : trim((string) get_post_meta($post_id, $meta_key, true));
+    }
+
+    if ($dates[LCAW_FIELD_ONSITE_SINGLE_REG_START] !== '' && $dates[LCAW_FIELD_ONSITE_SINGLE_REG_END] !== '') {
+        $cmp = lcaw_compare_ymd_dates($dates[LCAW_FIELD_ONSITE_SINGLE_REG_START], $dates[LCAW_FIELD_ONSITE_SINGLE_REG_END]);
+        if ($cmp !== null && $cmp === 1) {
+            acf_add_validation_error(LCAW_FIELD_ONSITE_SINGLE_REG_END, 'วันที่ปิดรับสมัคร ต้องไม่น้อยกว่าวันที่รับสมัครเริ่ม');
+        }
+    }
+    if ($dates[LCAW_FIELD_ONSITE_SINGLE_START_DATE] !== '' && $dates[LCAW_FIELD_ONSITE_SINGLE_END_DATE] !== '') {
+        $cmp = lcaw_compare_ymd_dates($dates[LCAW_FIELD_ONSITE_SINGLE_START_DATE], $dates[LCAW_FIELD_ONSITE_SINGLE_END_DATE]);
+        if ($cmp !== null && $cmp === 1) {
+            acf_add_validation_error(LCAW_FIELD_ONSITE_SINGLE_END_DATE, 'วันสิ้นสุด ต้องไม่น้อยกว่าวันเริ่มเรียน');
+        }
+    }
+    if ($dates[LCAW_FIELD_ONSITE_SINGLE_REG_END] !== '' && $dates[LCAW_FIELD_ONSITE_SINGLE_START_DATE] !== '') {
+        $cmp = lcaw_compare_ymd_dates($dates[LCAW_FIELD_ONSITE_SINGLE_REG_END], $dates[LCAW_FIELD_ONSITE_SINGLE_START_DATE]);
+        if ($cmp !== null && $cmp === 1) {
+            acf_add_validation_error(LCAW_FIELD_ONSITE_SINGLE_REG_END, 'วันที่ปิดรับสมัคร ควรไม่เกินวันเริ่มเรียน');
+        }
+    }
+}, 20);
+
+add_action('acf/save_post', function ($post_id) {
+    $post_id = (int) $post_id;
+    if ($post_id <= 0 || get_post_type($post_id) !== 'course') return;
+    lcaw_sync_learning_mode_taxonomy_for_course($post_id);
+}, 30);
+
 /* =========================================================
  * [ADMIN COURSE] Tabs on single edit screen
  * - Tab 1: Course details (all boxes except sessions box)
@@ -21,6 +407,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
     $screen = function_exists('get_current_screen') ? get_current_screen() : null;
     if (!$screen || $screen->post_type !== 'course') return;
+    $learning_mode_tax = lcaw_resolve_learning_mode_taxonomy();
 
     $css = '
       .lc-course-tabs { margin: 12px 0 14px; display: flex; gap: 8px; }
@@ -37,10 +424,145 @@ add_action('admin_enqueue_scripts', function ($hook) {
         color: #fff;
         border-color: #2271b1;
       }
+      .lc-course-tab-btn.is-disabled {
+        opacity: .55;
+        cursor: not-allowed;
+      }
+      .lc-course-session-guard-note {
+        margin: 8px 0 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #f0c36d;
+        background: #fff8e5;
+        color: #6b4e00;
+        font-weight: 600;
+      }
+      .lc-course-session-guard-note.is-hidden { display: none; }
+      .lc-course-mode-note {
+        margin: 10px 0 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #cfe0f5;
+        background: #f4f8ff;
+        color: #12395f;
+        font-weight: 600;
+      }
+      .lc-course-mode-note.is-hidden { display: none; }
+      .lc-course-mode-note.is-warning {
+        border-color: #f0c36d;
+        background: #fff8e5;
+        color: #6b4e00;
+      }
+      .lc-course-mode-note.is-online {
+        border-color: #b9dcff;
+        background: #eef6ff;
+        color: #0f3d73;
+      }
+      .lc-course-mode-note.is-onsite-single {
+        border-color: #bfe7d2;
+        background: #effcf5;
+        color: #14532d;
+      }
+      .lc-course-mode-note.is-onsite-multi {
+        border-color: #d9cffb;
+        background: #f6f2ff;
+        color: #4c1d95;
+      }
+      .lc-provider-required-highlight {
+        box-shadow: 0 0 0 2px #f59e0b inset;
+        border-radius: 6px;
+        transition: box-shadow .15s ease;
+      }
+      .lc-mode-soft-note {
+        margin-top: 6px;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .lc-mode-calc-note {
+        margin-top: 6px;
+        color: #0f3d73;
+        font-size: 12px;
+        line-height: 1.35;
+        font-weight: 600;
+      }
+      .lc-auto-hidden-tax-box { display: none !important; }
+      .lc-provider-original-hidden { display: none !important; }
+      .lc-inline-provider-panel {
+        margin: 10px 0 0;
+        border: 1px solid #dbe4ee;
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .lc-inline-provider-panel-head {
+        padding: 8px 10px;
+        background: #f8fbff;
+        border-bottom: 1px solid #e5edf6;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .lc-inline-provider-panel-help {
+        padding: 8px 10px 0;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .lc-inline-provider-panel-body {
+        padding: 8px 10px 10px;
+      }
+      .lc-inline-provider-select-wrap {
+        margin: 0 0 8px;
+      }
+      .lc-inline-provider-select-label {
+        display: block;
+        margin: 0 0 6px;
+        font-weight: 600;
+        color: #1f2937;
+      }
+      .lc-inline-provider-panel.has-search-select .categorydiv {
+        display: none;
+      }
+      .lc-inline-provider-panel-body .tabs-panel {
+        max-height: 180px;
+      }
+      .lc-inline-provider-panel .categorydiv,
+      .lc-inline-provider-panel .tagsdiv {
+        margin: 0;
+      }
+      .lc-inline-mode-panel {
+        margin: 10px 0 0;
+        border: 1px solid #dbe4ee;
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .lc-inline-mode-panel.is-hidden { display: none; }
+      .lc-inline-mode-panel-head {
+        padding: 8px 10px;
+        background: #f8fbff;
+        border-bottom: 1px solid #e5edf6;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      .lc-inline-mode-panel-help {
+        padding: 8px 10px 0;
+        color: #64748b;
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .lc-inline-mode-panel-body > .acf-field { border-left: 0 !important; border-right: 0 !important; }
+      .lc-inline-mode-panel-body > .acf-field:first-child { border-top: 0 !important; }
+      .lc-inline-mode-panel-body > .acf-field:last-child { border-bottom: 0 !important; }
     ';
     wp_register_style('lc-course-admin-tabs', false);
     wp_enqueue_style('lc-course-admin-tabs');
     wp_add_inline_style('lc-course-admin-tabs', $css);
+
+    $learning_mode_selector = '';
+    if ($learning_mode_tax !== '') {
+        $learning_mode_selector = '#'.$learning_mode_tax.'div, #tagsdiv-'.$learning_mode_tax;
+    }
 
     $js = <<<'JS'
       (function($){
@@ -57,16 +579,45 @@ add_action('admin_enqueue_scripts', function ($hook) {
               '<button type="button" class="lc-course-tab-btn" data-tab="sessions">Sessions ในคอร์สนี้</button>' +
             '</div>'
           );
+          const $guardNote = $(
+            '<div class="lc-course-session-guard-note is-hidden" id="lc-course-session-guard-note">' +
+              'โหมด onsite_multi ต้องเลือก Course Provider ก่อน จึงจะเพิ่ม/จัดการ Session ได้' +
+            '</div>'
+          );
+          const $modeNote = $('<div class="lc-course-mode-note is-hidden" id="lc-course-mode-note"></div>');
           if ($permalinkBox.length) {
             $permalinkBox.after($tabs);
+            $tabs.after($guardNote);
           } else if ($titleDiv.length) {
             $titleDiv.after($tabs);
+            $tabs.after($guardNote);
           } else {
             $("#wpbody-content .wrap h1").first().after($tabs);
+            $tabs.after($guardNote);
           }
 
           const $allBoxes = $("#poststuff .postbox");
           const $pinnedAlways = $("#submitdiv, #course_last_updated_info, #postimagediv");
+          const $sessionsTabBtn = $tabs.find('[data-tab="sessions"]');
+          const $providerBox = $("#course_providerdiv, #tagsdiv-course_provider").first();
+          const $providerAcfField = $('[data-name="course_provider"]').first();
+          const learningModeBoxSelector = "__LCAW_LEARNING_MODE_BOX_SELECTOR__";
+          const $acfCourseFields = {
+            description: $('[data-name="course_description"]').first(),
+            learningLink: $('[data-name="learning_link"]').first(),
+            totalMinutes: $('[data-name="total_minutes"]').first(),
+            images: $('[data-name="images"]').first(),
+            price: $('[data-name="price"]').first(),
+            priceNote: $('[data-name="price_note"]').first(),
+            hasCertificate: $('[data-name="has_certificate"]').first(),
+            certificationNote: $('[data-name="certification_note"]').first()
+          };
+          const $courseFieldsContainer = $('[data-name="course_mode"]').first().closest('.acf-fields');
+          const $courseModeInputWrap = $('[data-name="course_mode"]').first().find(".acf-input").first();
+          let $inlineProviderPanel = $();
+          let $inlineOnlineUrlPanel = $();
+          let $learningLinkRowPlaceholder = $();
+          let $inlineProviderSearchSelect = $();
 
           function setTab(tab) {
             const isSessions = tab === "sessions";
@@ -86,16 +637,627 @@ add_action('admin_enqueue_scripts', function ($hook) {
               .addClass("is-active");
           }
 
+          function getCourseModeValue() {
+            const $field = $('[data-name="course_mode"]').first();
+            if ($field.length) {
+              const $btnSelected = $field.find('.acf-button-group label.selected input, .acf-button-group a.-selected, .acf-button-group a.selected').first();
+              if ($btnSelected.length) {
+                const dataVal = $btnSelected.attr('data-value');
+                if (typeof dataVal !== 'undefined' && String(dataVal).trim() !== '') {
+                  return String(dataVal).trim();
+                }
+                const val = $btnSelected.val();
+                if (typeof val !== 'undefined' && String(val).trim() !== '') {
+                  return String(val).trim();
+                }
+              }
+
+              const $hidden = $field.find('input[type="hidden"]').first();
+              if ($hidden.length) {
+                const hiddenVal = String($hidden.val() || '').trim();
+                if (hiddenVal !== '') return hiddenVal;
+              }
+
+              const $select = $field.find('select').first();
+              if ($select.length) {
+                const v = String($select.val() || '').trim();
+                if (v !== '') return v;
+              }
+
+              const $radio = $field.find('input[type="radio"]:checked').first();
+              if ($radio.length) {
+                const v = String($radio.val() || '').trim();
+                if (v !== '') return v;
+              }
+            }
+            return '';
+          }
+
+          function hasCourseProviderSelected() {
+            const $hier = $("#course_providerchecklist input[type='checkbox']:checked, #course_providerchecklist-pop input[type='checkbox']:checked");
+            if ($hier.length) return true;
+
+            const $tagInput = $("#tax-input-course_provider");
+            if ($tagInput.length && String($tagInput.val() || '').trim() !== '') return true;
+
+            const $acfTax = $('[data-name="course_provider"] input[type="checkbox"]:checked, [data-name="course_provider"] select');
+            if ($acfTax.length) {
+              const $select = $acfTax.filter("select").first();
+              if ($select.length) {
+                const val = $select.val();
+                if (Array.isArray(val)) return val.filter(Boolean).length > 0;
+                return String(val || '').trim() !== '';
+              }
+              return $acfTax.filter("input[type='checkbox']:checked").length > 0;
+            }
+
+            return false;
+          }
+
+          function getProviderChecklistCheckboxes() {
+            return $("#course_providerchecklist input[type='checkbox'], #course_providerchecklist-pop input[type='checkbox']");
+          }
+
+          function getCheckedCourseProviderIds() {
+            const ids = [];
+            const seen = new Set();
+            getProviderChecklistCheckboxes().filter(":checked").each(function(){
+              const v = String($(this).val() || "").trim();
+              if (!v || seen.has(v)) return;
+              seen.add(v);
+              ids.push(v);
+            });
+            return ids;
+          }
+
+          function syncInlineCourseProviderSelectFromChecklist() {
+            if (!$inlineProviderSearchSelect.length) return;
+            const ids = getCheckedCourseProviderIds();
+            const selected = ids.length ? ids[0] : "";
+            if (String($inlineProviderSearchSelect.val() || "") === String(selected)) return;
+            $inlineProviderSearchSelect.val(selected).trigger("change.select2");
+          }
+
+          function enforceSingleCourseProviderSelection($changed) {
+            const $all = getProviderChecklistCheckboxes();
+            if (!$all.length) return;
+
+            if ($changed && $changed.length && $changed.is(":checked")) {
+              const selectedVal = String($changed.val() || "");
+              $all.each(function(){
+                const $cb = $(this);
+                if (String($cb.val() || "") !== selectedVal && $cb.is(":checked")) {
+                  $cb.prop("checked", false);
+                }
+              });
+              return;
+            }
+
+            const $checked = $all.filter(":checked");
+            if ($checked.length <= 1) return;
+            const keepVal = String($checked.first().val() || "");
+            $checked.each(function(index){
+              const $cb = $(this);
+              if (index === 0) return;
+              if (String($cb.val() || "") !== keepVal) {
+                $cb.prop("checked", false);
+              }
+            });
+            syncInlineCourseProviderSelectFromChecklist();
+          }
+
+          function isOnsiteMultiMode() {
+            const mode = getCourseModeValue();
+            return mode === "onsite_multi";
+          }
+
+          function requiresCourseProviderByMode() {
+            const mode = getCourseModeValue();
+            return mode === "online" || mode === "onsite_single" || mode === "onsite_multi";
+          }
+
+          function isOnlineMode() {
+            return getCourseModeValue() === "online";
+          }
+
+          function refreshInlineCourseProviderVisibility() {
+            if (!$inlineProviderPanel.length) return;
+            $inlineProviderPanel.toggle(requiresCourseProviderByMode());
+          }
+
+          function getProviderHighlightTarget() {
+            if ($inlineProviderPanel.length) return $inlineProviderPanel;
+            if ($providerBox.length) return $providerBox;
+            if ($providerAcfField.length) return $providerAcfField;
+            return $();
+          }
+
+          function shouldShowSessionsTab() {
+            const mode = getCourseModeValue();
+            if (mode === "online" || mode === "onsite_single") return false;
+            return true; // onsite_multi + legacy/no mode
+          }
+
+          function isSessionGuardBlocked() {
+            return isOnsiteMultiMode() && !hasCourseProviderSelected();
+          }
+
+          function setProviderHighlight(enabled) {
+            getProviderHighlightTarget().toggleClass("lc-provider-required-highlight", !!enabled);
+          }
+
+          function setFieldRowVisible($field, visible) {
+            if (!$field || !$field.length) return;
+            const $row = $field.closest(".acf-field");
+            if (!$row.length) return;
+            $row.toggle(!!visible);
+          }
+
+          function refreshFieldDependencies() {
+            // Price note: show only when price > 0
+            if ($acfCourseFields.price.length && $acfCourseFields.priceNote.length) {
+              const $priceInput = $acfCourseFields.price.find('input[type="number"], input').first();
+              const rawPrice = String(($priceInput.val && $priceInput.val()) || '').trim();
+              const priceVal = rawPrice === '' ? 0 : parseFloat(rawPrice);
+              const showPriceNote = Number.isFinite(priceVal) && priceVal > 0;
+              setFieldRowVisible($acfCourseFields.priceNote, showPriceNote);
+            }
+
+            // Certification note: show only when certificate is enabled
+            if ($acfCourseFields.hasCertificate.length && $acfCourseFields.certificationNote.length) {
+              const $checkbox = $acfCourseFields.hasCertificate.find('input[type="checkbox"]').first();
+              const hasCert = !!($checkbox.length && $checkbox.is(':checked'));
+              setFieldRowVisible($acfCourseFields.certificationNote, hasCert);
+            }
+          }
+
+          function ensureTotalMinutesModeNote() {
+            const $field = $acfCourseFields.totalMinutes;
+            if (!$field || !$field.length) return;
+            const $inputWrap = $field.find(".acf-input").first();
+            if (!$inputWrap.length) return;
+            if ($inputWrap.find(".lc-mode-soft-note").length) return;
+            if (!$inputWrap.find("#lc-total-minutes-calc-note").length) {
+              $inputWrap.append('<div class="lc-mode-calc-note" id="lc-total-minutes-calc-note" style="display:none;"></div>');
+            }
+          }
+
+          function refreshTotalMinutesCalcNote() {
+            const $field = $acfCourseFields.totalMinutes;
+            if (!$field || !$field.length) return;
+            const $input = $field.find('input[type=\"number\"], input').first();
+            const $calcNote = $('#lc-total-minutes-calc-note');
+            if (!$input.length || !$calcNote.length) return;
+
+            const raw = String($input.val() || '').trim();
+            if (raw === '') {
+              $calcNote.hide().text('');
+              return;
+            }
+
+            const minutes = parseInt(raw, 10);
+            if (!Number.isFinite(minutes) || minutes < 0) {
+              $calcNote.hide().text('');
+              return;
+            }
+
+            const hours = Math.floor(minutes / 60);
+            const remain = minutes % 60;
+            let text = '';
+
+            if (hours > 0 && remain > 0) {
+              text = `${minutes} นาที = ${hours} ชั่วโมง ${remain} นาที`;
+            } else if (hours > 0) {
+              text = `${minutes} นาที = ${hours} ชั่วโมง`;
+            } else {
+              text = `${minutes} นาที = 0 ชั่วโมง ${remain} นาที`;
+            }
+
+            $calcNote.text(text).show();
+          }
+
+          function ensureInlineCourseProviderPanel() {
+            if (!$courseModeInputWrap.length) return;
+            if ($inlineProviderPanel.length) return;
+
+            // Prefer moving the WP taxonomy metabox into the Course Mode area.
+            if ($providerBox.length) {
+              const $inside = $providerBox.children(".inside").first();
+              const titleText = $.trim(
+                $providerBox.find(".postbox-header .hndle, .hndle span, .hndle").first().text()
+              ) || "Course Providers";
+              if ($inside.length) {
+                $inlineProviderPanel = $(
+                  '<div id="lc-inline-course-provider-panel" class="lc-inline-provider-panel">' +
+                    '<div class="lc-inline-provider-panel-head"></div>' +
+                    '<div class="lc-inline-provider-panel-body"></div>' +
+                  '</div>'
+                );
+                $inlineProviderPanel.find(".lc-inline-provider-panel-head").text(titleText);
+                $inlineProviderPanel.find(".lc-inline-provider-panel-body").append($inside);
+                $courseModeInputWrap.append($inlineProviderPanel);
+                $providerBox.addClass("lc-provider-original-hidden");
+                return;
+              }
+            }
+          }
+
+          function ensureInlineCourseProviderSearchSelect() {
+            if (!$inlineProviderPanel.length) return;
+            if ($inlineProviderSearchSelect.length) return;
+
+            const $body = $inlineProviderPanel.find(".lc-inline-provider-panel-body").first();
+            const $checklist = $("#course_providerchecklist").first();
+            if (!$body.length || !$checklist.length) return;
+
+            const items = [];
+            const seen = new Set();
+            $checklist.find("input[type='checkbox']").each(function(){
+              const $cb = $(this);
+              const value = String($cb.val() || "").trim();
+              if (!value || seen.has(value)) return;
+              seen.add(value);
+              const label = $.trim($cb.closest("label").text()) || $.trim($cb.parent().text()) || value;
+              items.push({ value, label });
+            });
+            if (!items.length) return;
+
+            const $wrap = $(
+              '<div class="lc-inline-provider-select-wrap">' +
+                '<label class="lc-inline-provider-select-label" for="lc-inline-course-provider-select">เลือก Course Provider</label>' +
+                '<select id="lc-inline-course-provider-select" style="width:100%">' +
+                  '<option value="">-- เลือก Course Provider --</option>' +
+                '</select>' +
+              '</div>'
+            );
+            const $select = $wrap.find("select");
+            items.forEach(function(item){
+              $select.append($("<option></option>").attr("value", item.value).text(item.label));
+            });
+
+            $body.prepend($wrap);
+            $inlineProviderSearchSelect = $select;
+            $inlineProviderPanel.addClass("has-search-select");
+
+            if ($.fn.selectWoo) {
+              $select.selectWoo({
+                width: "100%",
+                allowClear: true,
+                placeholder: "-- เลือก Course Provider --"
+              });
+            } else if ($.fn.select2) {
+              $select.select2({
+                width: "100%",
+                allowClear: true,
+                placeholder: "-- เลือก Course Provider --"
+              });
+            }
+
+            syncInlineCourseProviderSelectFromChecklist();
+
+            $select.on("change", function(){
+              const selected = String($(this).val() || "");
+              const $all = getProviderChecklistCheckboxes();
+              $all.each(function(){
+                const $cb = $(this);
+                $cb.prop("checked", selected !== "" && String($cb.val() || "") === selected);
+              });
+              enforceSingleCourseProviderSelection();
+              refreshSessionGuard();
+              refreshCourseFieldVisibilityByMode();
+              if ($("#lc-session-add-modal").is(":visible")) {
+                refreshAddSessionLocationOptions();
+              }
+            });
+          }
+
+          function ensureInlineOnlineUrlPanel() {
+            if (!$courseModeInputWrap.length) return;
+            if ($inlineOnlineUrlPanel.length) return;
+
+            $inlineOnlineUrlPanel = $(
+              '<div id="lc-inline-online-url-panel" class="lc-inline-mode-panel is-hidden">' +
+                '<div class="lc-inline-mode-panel-head">ลิงก์เรียน (Online)</div>' +
+                '<div class="lc-inline-mode-panel-body acf-fields -left"></div>' +
+              '</div>'
+            );
+            $courseModeInputWrap.append($inlineOnlineUrlPanel);
+
+            const $learningRow = $acfCourseFields.learningLink.closest(".acf-field");
+            if ($learningRow.length && !$learningLinkRowPlaceholder.length) {
+              $learningLinkRowPlaceholder = $('<div id="lc-learning-link-row-placeholder" style="display:none;"></div>');
+              $learningRow.after($learningLinkRowPlaceholder);
+            }
+          }
+
+          function refreshInlineOnlineUrlPanel() {
+            if (!$inlineOnlineUrlPanel.length) return;
+            const $learningRow = $acfCourseFields.learningLink.closest(".acf-field");
+            if (!$learningRow.length) return;
+            const $panelBody = $inlineOnlineUrlPanel.find(".lc-inline-mode-panel-body");
+            const $learningLabel = $learningRow.find('> .acf-label label').first();
+            const $learningInstructions = $learningRow.find('> .acf-label .description, > .acf-label .acf-help').first();
+
+            function compactOnlineLinkRow() {
+              if ($learningLabel.length && !$learningLabel.attr('data-lc-original-label')) {
+                $learningLabel.attr('data-lc-original-label', $learningLabel.text());
+              }
+              if ($learningLabel.length) {
+                $learningLabel.text('URL');
+              }
+              if ($learningInstructions.length) {
+                if (!$learningInstructions.attr('data-lc-original-display')) {
+                  $learningInstructions.attr('data-lc-original-display', $learningInstructions.css('display') || '');
+                }
+                $learningInstructions.hide();
+              }
+            }
+
+            function restoreOnlineLinkRow() {
+              if ($learningLabel.length) {
+                const originalLabel = $learningLabel.attr('data-lc-original-label');
+                if (typeof originalLabel !== 'undefined' && originalLabel !== '') {
+                  $learningLabel.text(originalLabel);
+                }
+              }
+              if ($learningInstructions.length) {
+                const originalDisplay = $learningInstructions.attr('data-lc-original-display');
+                if (typeof originalDisplay !== 'undefined') {
+                  $learningInstructions.css('display', originalDisplay);
+                } else {
+                  $learningInstructions.show();
+                }
+              }
+            }
+
+            if (isOnlineMode()) {
+              if (!$panelBody.find($learningRow).length) {
+                $panelBody.append($learningRow);
+              }
+              // ACF tabs may mark rows hidden via classes/attrs/inline styles; clear all of them.
+              $learningRow
+                .removeClass('acf-hidden hidden -hidden acf-hidden-by-tab')
+                .removeAttr('hidden')
+                .attr('aria-hidden', 'false')
+                .css('display', '')
+                .show();
+              $learningRow.find('.acf-input, .acf-label, .acf-input-wrap, input, textarea, select, .select2, .acf-url').each(function(){
+                this.classList.remove('acf-hidden', 'hidden', '-hidden', 'acf-hidden-by-tab');
+                this.removeAttribute('hidden');
+                this.setAttribute('aria-hidden', 'false');
+                if (this.style) {
+                  this.style.removeProperty('display');
+                  this.style.removeProperty('visibility');
+                }
+              });
+              if ($learningRow.get(0) && $learningRow.get(0).style) {
+                $learningRow.get(0).style.setProperty('display', 'block', 'important');
+                $learningRow.get(0).style.removeProperty('visibility');
+              }
+              compactOnlineLinkRow();
+              $inlineOnlineUrlPanel.removeClass("is-hidden");
+            } else {
+              restoreOnlineLinkRow();
+              if ($learningLinkRowPlaceholder.length) {
+                $learningLinkRowPlaceholder.after($learningRow);
+              }
+              $inlineOnlineUrlPanel.addClass("is-hidden");
+            }
+          }
+
+          function refreshCourseFieldVisibilityByMode() {
+            const mode = getCourseModeValue();
+            const isOnsiteMulti = mode === "onsite_multi";
+
+            // Keep these visible in all modes (including legacy / no mode selected).
+            setFieldRowVisible($acfCourseFields.description, true);
+            setFieldRowVisible($acfCourseFields.totalMinutes, true);
+            setFieldRowVisible($acfCourseFields.images, true);
+
+            // Hide learning link for onsite modes; keep visible for online and legacy.
+            if (mode === "onsite_single" || mode === "onsite_multi") {
+              setFieldRowVisible($acfCourseFields.learningLink, false);
+            } else {
+              setFieldRowVisible($acfCourseFields.learningLink, true);
+            }
+            refreshInlineOnlineUrlPanel();
+            refreshFieldDependencies();
+          }
+
+          function refreshCourseAcfTabsVisibilityByMode() {
+            if (!$courseFieldsContainer.length) return;
+            const mode = getCourseModeValue();
+            const $tabWrap = $courseFieldsContainer.children('.acf-tab-wrap').first();
+            if (!$tabWrap.length) return;
+
+            const $tabButtons = $tabWrap.find('.acf-tab-button');
+            if (!$tabButtons.length) return;
+
+            const $scheduleBtn = $tabButtons.filter(function(){
+              const txt = $.trim($(this).text());
+              return txt.indexOf('การสมัคร') !== -1 || txt.indexOf('เวลาเรียน') !== -1;
+            }).first();
+            const $basicBtn = $tabButtons.filter(function(){
+              const txt = $.trim($(this).text());
+              return txt.indexOf('ข้อมูลพื้นฐาน') !== -1;
+            }).first();
+
+            if (!$scheduleBtn.length) return;
+
+            const hideScheduleTab = (mode === 'online' || mode === 'onsite_multi');
+            const $scheduleTabItem = $scheduleBtn.closest('li').length ? $scheduleBtn.closest('li') : $scheduleBtn;
+            $scheduleTabItem.toggle(!hideScheduleTab);
+
+            const isScheduleActive = $scheduleBtn.hasClass('active') || $scheduleBtn.closest('li').hasClass('active');
+            if (hideScheduleTab && isScheduleActive && $basicBtn.length) {
+              $basicBtn.trigger('click');
+            }
+          }
+
+          function setSessionButtonsDisabled(disabled) {
+            const $addBtn = $("#lc-session-add-open");
+            $addBtn.prop("disabled", !!disabled).attr("aria-disabled", disabled ? "true" : "false");
+            $sessionsTabBtn.toggleClass("is-disabled", !!disabled).attr("aria-disabled", disabled ? "true" : "false");
+            $guardNote.toggleClass("is-hidden", !disabled || !shouldShowSessionsTab());
+          }
+
+          function renderModeNotice() {
+            const mode = getCourseModeValue();
+            let text = "";
+            let warning = false;
+            let modeClass = "";
+
+            if (mode === "online") {
+              text = "คอร์สออนไลน์ : คอร์สที่เรียนออนไลน์เท่านั้น ผู้เรียนจะเข้าเรียนผ่านลิงก์ภายนอก";
+              warning = !hasCourseProviderSelected();
+              modeClass = "is-online";
+            } else if (mode === "onsite_single") {
+              text = "Onsite (สถานที่เดียว) : คอร์สที่จัดเรียนที่สถานที่เดียว";
+              warning = !hasCourseProviderSelected();
+              modeClass = "is-onsite-single";
+            } else if (mode === "onsite_multi") {
+              if (hasCourseProviderSelected()) {
+                text = "Onsite (หลาย Session) : คอร์สที่มีหลายรอบเรียน และ/หรือจัดได้มากกว่า 1 สถานที่";
+              } else {
+                text = "Onsite (หลาย Session) : คอร์สที่มีหลายรอบเรียน และ/หรือจัดได้มากกว่า 1 สถานที่";
+                warning = true;
+              }
+              modeClass = "is-onsite-multi";
+            } else {
+              text = "";
+            }
+
+            if (text === "") {
+              $modeNote
+                .addClass("is-hidden")
+                .removeClass("is-warning is-online is-onsite-single is-onsite-multi")
+                .text("");
+              return;
+            }
+            $modeNote
+              .removeClass("is-hidden")
+              .removeClass("is-online is-onsite-single is-onsite-multi")
+              .addClass(modeClass)
+              .toggleClass("is-warning", warning)
+              .text(text);
+          }
+
+          function refreshModeLayout() {
+            const showSessions = shouldShowSessionsTab();
+            $sessionsTabBtn.toggle(showSessions);
+            if (!showSessions && $sessionsTabBtn.hasClass("is-active")) {
+              setTab("details");
+            }
+
+            refreshInlineCourseProviderVisibility();
+            const blocked = isSessionGuardBlocked();
+            setSessionButtonsDisabled(blocked);
+            setProviderHighlight((requiresCourseProviderByMode() && !hasCourseProviderSelected()) || blocked);
+            renderModeNotice();
+            refreshCourseAcfTabsVisibilityByMode();
+
+            if (!showSessions) {
+              $("#lc-session-add-open").prop("disabled", true).attr("aria-disabled", "true");
+            }
+          }
+
+          function refreshSessionGuard() {
+            refreshModeLayout();
+            if (isSessionGuardBlocked() && $sessionsTabBtn.hasClass("is-active")) {
+              setTab("details");
+            }
+          }
+
           // default: details
           setTab("details");
+          if ($courseModeInputWrap.length && !$courseModeInputWrap.find("#lc-course-mode-note").length) {
+            $courseModeInputWrap.append($modeNote);
+          }
+          ensureInlineCourseProviderPanel();
+          ensureInlineCourseProviderSearchSelect();
+          ensureInlineOnlineUrlPanel();
+          refreshInlineCourseProviderVisibility();
+          ensureTotalMinutesModeNote();
+          refreshTotalMinutesCalcNote();
+          refreshSessionGuard();
+          refreshCourseFieldVisibilityByMode();
+
+          if (learningModeBoxSelector) {
+            $(learningModeBoxSelector).addClass("lc-auto-hidden-tax-box");
+          }
 
           $tabs.on("click", ".lc-course-tab-btn", function(){
             const tab = $(this).data("tab");
+            if (tab === "sessions" && !shouldShowSessionsTab()) {
+              refreshSessionGuard();
+              return;
+            }
+            if (tab === "sessions" && isSessionGuardBlocked()) {
+              refreshSessionGuard();
+              const $target = getProviderHighlightTarget();
+              if ($target.length) {
+                $("html, body").animate({ scrollTop: Math.max(0, $target.offset().top - 80) }, 180);
+              }
+              window.alert("กรุณาเลือก Course Provider ก่อนใช้งาน Sessions สำหรับคอร์สแบบ onsite_multi");
+              return;
+            }
             setTab(tab);
           });
+
+          $(document).on("change", "#course_providerchecklist input, #course_providerchecklist-pop input, #tax-input-course_provider, [data-name='course_provider'] input, [data-name='course_provider'] select, [data-name='course_mode'] input, [data-name='course_mode'] select, [name='course_mode']", function(){
+            const $t = $(this);
+            if ($t.is("#course_providerchecklist input[type='checkbox'], #course_providerchecklist-pop input[type='checkbox']")) {
+              enforceSingleCourseProviderSelection($t);
+              syncInlineCourseProviderSelectFromChecklist();
+            }
+            refreshSessionGuard();
+            refreshCourseFieldVisibilityByMode();
+          });
+          $(document).on("input change", "[data-name='total_minutes'] input", function(){
+            refreshTotalMinutesCalcNote();
+          });
+          $(document).on("input change", "[data-name='price'] input, [data-name='has_certificate'] input", function(){
+            refreshFieldDependencies();
+          });
+
+          $(document).on("click", "#lc-session-add-open", function(e){
+            if (!shouldShowSessionsTab()) {
+              e.preventDefault();
+              refreshSessionGuard();
+              return;
+            }
+            if (!isSessionGuardBlocked()) return;
+            e.preventDefault();
+            refreshSessionGuard();
+            const $target = getProviderHighlightTarget();
+            if ($target.length) {
+              $("html, body").animate({ scrollTop: Math.max(0, $target.offset().top - 80) }, 180);
+            }
+            window.alert("กรุณาเลือก Course Provider ก่อนเพิ่ม Session (onsite_multi)");
+          });
+
+          window.setTimeout(function(){
+            enforceSingleCourseProviderSelection();
+            syncInlineCourseProviderSelectFromChecklist();
+            refreshSessionGuard();
+            refreshCourseFieldVisibilityByMode();
+            refreshTotalMinutesCalcNote();
+          }, 250);
+          window.setTimeout(function(){
+            enforceSingleCourseProviderSelection();
+            syncInlineCourseProviderSelectFromChecklist();
+            refreshSessionGuard();
+            refreshCourseFieldVisibilityByMode();
+            refreshTotalMinutesCalcNote();
+          }, 1000);
         });
       })(jQuery);
     JS;
+    if ($learning_mode_selector !== '') {
+        $js = str_replace('__LCAW_LEARNING_MODE_BOX_SELECTOR__', addslashes($learning_mode_selector), $js);
+    } else {
+        $js = str_replace('__LCAW_LEARNING_MODE_BOX_SELECTOR__', '', $js);
+    }
     wp_add_inline_script('jquery', $js, 'after');
 });
 
@@ -451,6 +1613,86 @@ function lc_location_matches_course_provider($course_id, $location_id) {
     return !empty(array_intersect($course_terms, $location_terms));
 }
 
+function lcaw_get_course_provider_slugs_from_term_ids($provider_term_ids) {
+    $provider_term_ids = array_values(array_filter(array_map('intval', (array) $provider_term_ids)));
+    if (empty($provider_term_ids) || !taxonomy_exists('course_provider')) return [];
+
+    $terms = get_terms([
+        'taxonomy' => 'course_provider',
+        'include' => $provider_term_ids,
+        'hide_empty' => false,
+    ]);
+    if (is_wp_error($terms) || !is_array($terms)) return [];
+
+    $slugs = [];
+    foreach ($terms as $term) {
+        if ($term instanceof WP_Term) $slugs[] = (string) $term->slug;
+    }
+    return array_values(array_filter(array_map('sanitize_title', $slugs)));
+}
+
+function lcaw_location_matches_provider_term_ids($location_id, $provider_term_ids) {
+    if (!taxonomy_exists('location-type')) return true;
+
+    $provider_slugs = lcaw_get_course_provider_slugs_from_term_ids($provider_term_ids);
+    if (empty($provider_slugs)) return true;
+
+    $location_terms = wp_get_post_terms((int) $location_id, 'location-type', ['fields' => 'slugs']);
+    if (is_wp_error($location_terms) || !is_array($location_terms) || empty($location_terms)) return false;
+
+    $location_terms = array_values(array_filter(array_map('sanitize_title', $location_terms)));
+    return !empty(array_intersect($provider_slugs, $location_terms));
+}
+
+function lcaw_get_location_options_for_course_provider_term_ids($provider_term_ids = []) {
+    $provider_term_ids = array_values(array_filter(array_map('intval', (array) $provider_term_ids)));
+
+    $location_query_args = [
+        'post_type' => 'location',
+        'post_status' => ['publish', 'draft', 'private'],
+        'posts_per_page' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC',
+        'no_found_rows' => true,
+    ];
+
+    if (!empty($provider_term_ids) && taxonomy_exists('course_provider')) {
+        $provider_terms = get_terms([
+            'taxonomy' => 'course_provider',
+            'include' => $provider_term_ids,
+            'hide_empty' => false,
+        ]);
+        if (!is_wp_error($provider_terms) && is_array($provider_terms)) {
+            $provider_slugs = [];
+            foreach ($provider_terms as $term) {
+                if ($term instanceof WP_Term) {
+                    $provider_slugs[] = (string) $term->slug;
+                }
+            }
+            $provider_slugs = array_values(array_filter(array_unique($provider_slugs)));
+            if (!empty($provider_slugs)) {
+                $location_query_args['tax_query'] = [[
+                    'taxonomy' => 'location-type',
+                    'field' => 'slug',
+                    'terms' => $provider_slugs,
+                    'operator' => 'IN',
+                ]];
+            }
+        }
+    }
+
+    return get_posts($location_query_args);
+}
+
+function lcaw_render_location_select_options_html($locations) {
+    $html = '<option value="">-- เลือกสถานที่ --</option>';
+    foreach ((array) $locations as $loc) {
+        if (!($loc instanceof WP_Post)) continue;
+        $html .= '<option value="' . (int) $loc->ID . '">' . esc_html($loc->post_title) . '</option>';
+    }
+    return $html;
+}
+
 function lc_render_course_session_row_html($sid) {
     $sid = (int) $sid;
     if (!$sid || get_post_type($sid) !== 'session') return '';
@@ -550,31 +1792,13 @@ function lc_render_course_sessions_metabox($post) {
         'courseId' => $course_id,
     ]);
 
-    $location_query_args = [
-        'post_type' => 'location',
-        'post_status' => ['publish', 'draft', 'private'],
-        'posts_per_page' => -1,
-        'orderby' => 'title',
-        'order' => 'ASC',
-        'no_found_rows' => true,
-    ];
-
-    $course_provider_terms = lc_get_course_provider_term_slugs($course_id);
-    if (!empty($course_provider_terms)) {
-        $location_query_args['tax_query'] = [[
-            'taxonomy' => 'location-type',
-            'field' => 'slug',
-            'terms' => $course_provider_terms,
-            'operator' => 'IN',
-        ]];
+    $saved_provider_ids = [];
+    if (taxonomy_exists('course_provider')) {
+        $saved_provider_ids = wp_get_post_terms($course_id, 'course_provider', ['fields' => 'ids']);
+        if (is_wp_error($saved_provider_ids) || !is_array($saved_provider_ids)) $saved_provider_ids = [];
     }
-
-    $location_options = get_posts($location_query_args);
-
-    $location_select_html = '<option value="">-- เลือกสถานที่ --</option>';
-    foreach ($location_options as $loc) {
-        $location_select_html .= '<option value="' . (int) $loc->ID . '">' . esc_html($loc->post_title) . '</option>';
-    }
+    $location_options = lcaw_get_location_options_for_course_provider_term_ids($saved_provider_ids);
+    $location_select_html = lcaw_render_location_select_options_html($location_options);
 
     echo '<div id="lc-session-quick-modal" style="display:none;">';
     echo '  <div class="lc-session-quick-backdrop"></div>';
@@ -640,6 +1864,7 @@ function lc_render_course_sessions_metabox($post) {
         const $msg = $("#lc-session-quick-message");
         const $addModal = $("#lc-session-add-modal");
         const $addMsg = $("#lc-session-add-message");
+        const $addLocation = $("#lc-add-location");
 
         function setMessage(text, isError) {
           $msg.text(text || "");
@@ -665,6 +1890,51 @@ function lc_render_course_sessions_metabox($post) {
         function closeAddModal() {
           $addModal.hide();
           setAddMessage("", false);
+        }
+
+        function getSelectedCourseProviderIdsFromPage() {
+          const ids = [];
+          const seen = new Set();
+          $("#course_providerchecklist input[type=\"checkbox\"]:checked, #course_providerchecklist-pop input[type=\"checkbox\"]:checked").each(function(){
+            const v = String($(this).val() || "").trim();
+            if (!v || seen.has(v)) return;
+            seen.add(v);
+            ids.push(v);
+          });
+          return ids;
+        }
+
+        function refreshAddSessionLocationOptions(callback) {
+          if (!$addLocation.length) {
+            if (typeof callback === "function") callback();
+            return;
+          }
+          const currentVal = String($addLocation.val() || "");
+          const providerIds = getSelectedCourseProviderIdsFromPage();
+          $addLocation.prop("disabled", true);
+          setAddMessage("กำลังโหลดรายการสถานที่...", false);
+
+          $.post(cfg.ajaxUrl, {
+            action: "lc_course_session_location_options",
+            nonce: cfg.nonce,
+            course_id: cfg.courseId,
+            provider_term_ids: providerIds
+          }).done(function(res){
+            if (!res || !res.success || !res.data || typeof res.data.options_html !== "string") {
+              setAddMessage("โหลดรายการสถานที่ไม่สำเร็จ", true);
+              return;
+            }
+            $addLocation.html(res.data.options_html);
+            if (currentVal && $addLocation.find("option").filter(function(){ return String($(this).val() || "") === currentVal; }).length) {
+              $addLocation.val(currentVal);
+            }
+            setAddMessage("", false);
+          }).fail(function(){
+            setAddMessage("โหลดรายการสถานที่ไม่สำเร็จ", true);
+          }).always(function(){
+            $addLocation.prop("disabled", false);
+            if (typeof callback === "function") callback();
+          });
         }
 
         function fillForm(data) {
@@ -709,7 +1979,9 @@ function lc_render_course_sessions_metabox($post) {
         });
 
         $("#lc-session-add-open").on("click", function(){
-          openAddModal();
+          refreshAddSessionLocationOptions(function(){
+            openAddModal();
+          });
         });
 
         $("#lc-session-add-cancel, #lc-session-add-modal .lc-session-add-backdrop").on("click", function(){
@@ -804,7 +2076,8 @@ function lc_render_course_sessions_metabox($post) {
             end_date: $("#lc-add-end-date").val(),
             time_period: $("#lc-add-time-period").val(),
             apply_url: $("#lc-add-apply-url").val(),
-            session_details: $("#lc-add-session-details").val()
+            session_details: $("#lc-add-session-details").val(),
+            provider_term_ids: getSelectedCourseProviderIdsFromPage()
           };
 
           if (!payload.location_id) {
@@ -817,7 +2090,10 @@ function lc_render_course_sessions_metabox($post) {
 
           $.post(cfg.ajaxUrl, payload).done(function(res){
             if (!res || !res.success || !res.data || !res.data.row_html) {
-              setAddMessage("สร้าง session ไม่สำเร็จ", true);
+              const msg = (res && res.data && res.data.message)
+                ? String(res.data.message)
+                : "สร้าง session ไม่สำเร็จ";
+              setAddMessage(msg, true);
               return;
             }
 
@@ -837,11 +2113,22 @@ function lc_render_course_sessions_metabox($post) {
 
             setMessage("เพิ่ม session สำเร็จ", false);
             closeAddModal();
-          }).fail(function(){
-            setAddMessage("สร้าง session ไม่สำเร็จ", true);
+          }).fail(function(xhr){
+            let msg = "สร้าง session ไม่สำเร็จ";
+            try {
+              const res = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+              if (res && res.data && res.data.message) msg = String(res.data.message);
+            } catch (e) {}
+            setAddMessage(msg, true);
           }).always(function(){
             $("#lc-session-add-save").prop("disabled", false);
           });
+        });
+
+        $(document).on("change", "#course_providerchecklist input[type=\"checkbox\"], #course_providerchecklist-pop input[type=\"checkbox\"]", function(){
+          if ($addModal.is(":visible")) {
+            refreshAddSessionLocationOptions();
+          }
         });
       })(jQuery);
     </script>';
@@ -951,21 +2238,67 @@ add_action('wp_ajax_lc_course_session_toggle_status', function () {
     wp_send_json_success(['ok' => true, 'status' => $next_status]);
 });
 
+add_action('wp_ajax_lc_course_session_location_options', function () {
+    check_ajax_referer('lc_course_session_quick_edit', 'nonce');
+
+    $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
+    if (!$course_id || get_post_type($course_id) !== 'course') {
+        wp_send_json_error(['message' => 'invalid_course'], 400);
+    }
+    if (!current_user_can('edit_post', $course_id)) {
+        wp_send_json_error(['message' => 'forbidden'], 403);
+    }
+
+    $raw_provider_ids = isset($_POST['provider_term_ids']) ? wp_unslash($_POST['provider_term_ids']) : [];
+    $provider_term_ids = [];
+    if (is_array($raw_provider_ids)) {
+        $provider_term_ids = array_values(array_filter(array_map('intval', $raw_provider_ids)));
+    } elseif (is_string($raw_provider_ids) && trim($raw_provider_ids) !== '') {
+        $provider_term_ids = array_values(array_filter(array_map('intval', explode(',', $raw_provider_ids))));
+    }
+
+    // Fallback to saved provider when none is passed from the page state.
+    if (empty($provider_term_ids) && taxonomy_exists('course_provider')) {
+        $saved_ids = wp_get_post_terms($course_id, 'course_provider', ['fields' => 'ids']);
+        if (!is_wp_error($saved_ids) && is_array($saved_ids)) {
+            $provider_term_ids = array_values(array_filter(array_map('intval', $saved_ids)));
+        }
+    }
+
+    $locations = lcaw_get_location_options_for_course_provider_term_ids($provider_term_ids);
+    wp_send_json_success([
+        'options_html' => lcaw_render_location_select_options_html($locations),
+        'count' => is_array($locations) ? count($locations) : 0,
+    ]);
+});
+
 add_action('wp_ajax_lc_course_session_create', function () {
     check_ajax_referer('lc_course_session_quick_edit', 'nonce');
 
     $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
     $location_id = isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0;
     $post_status = isset($_POST['post_status']) ? sanitize_key($_POST['post_status']) : 'draft';
+    $raw_provider_ids = isset($_POST['provider_term_ids']) ? wp_unslash($_POST['provider_term_ids']) : [];
+    $provider_term_ids = [];
+    if (is_array($raw_provider_ids)) {
+        $provider_term_ids = array_values(array_filter(array_map('intval', $raw_provider_ids)));
+    } elseif (is_string($raw_provider_ids) && trim($raw_provider_ids) !== '') {
+        $provider_term_ids = array_values(array_filter(array_map('intval', explode(',', $raw_provider_ids))));
+    }
 
     if (!$course_id || get_post_type($course_id) !== 'course') {
         wp_send_json_error(['message' => 'invalid_course'], 400);
     }
+    $course_mode = lcaw_course_get_mode($course_id);
+    $saved_provider_ids = taxonomy_exists('course_provider') ? wp_get_post_terms($course_id, 'course_provider', ['fields' => 'ids']) : [];
+    if (is_wp_error($saved_provider_ids) || !is_array($saved_provider_ids)) $saved_provider_ids = [];
+    $effective_provider_ids = !empty($provider_term_ids) ? $provider_term_ids : array_values(array_filter(array_map('intval', $saved_provider_ids)));
+
+    if ($course_mode === 'onsite_multi' && empty($effective_provider_ids)) {
+        wp_send_json_error(['message' => 'กรุณาเลือกและบันทึก Course Provider ของคอร์สก่อนเพิ่ม Session (onsite_multi)'], 400);
+    }
     if (!$location_id || get_post_type($location_id) !== 'location') {
         wp_send_json_error(['message' => 'invalid_location'], 400);
-    }
-    if (!lc_location_matches_course_provider($course_id, $location_id)) {
-        wp_send_json_error(['message' => 'location_provider_mismatch'], 400);
     }
     if (!current_user_can('edit_post', $course_id)) {
         wp_send_json_error(['message' => 'forbidden'], 403);
@@ -984,6 +2317,17 @@ add_action('wp_ajax_lc_course_session_create', function () {
         if (!current_user_can($publish_cap)) {
             $post_status = 'draft';
         }
+    }
+
+    // If the user changed provider in the page but has not clicked Update yet, sync it here
+    // so session validation and the course stay aligned.
+    if (!empty($provider_term_ids) && taxonomy_exists('course_provider')) {
+        wp_set_post_terms($course_id, array_slice($provider_term_ids, 0, 1), 'course_provider', false);
+        $effective_provider_ids = array_slice($provider_term_ids, 0, 1);
+    }
+
+    if (!lcaw_location_matches_provider_term_ids($location_id, $effective_provider_ids)) {
+        wp_send_json_error(['message' => 'สถานที่ที่เลือกไม่ตรงกับ Course Provider ของคอร์ส'], 400);
     }
 
     $course_title = get_the_title($course_id);
@@ -1062,6 +2406,31 @@ add_filter('acf/load_value/name=course', function ($value, $post_id, $field) {
 
     return $course_id;
 }, 10, 3);
+
+add_filter('acf/load_value/key=' . LCAW_FIELD_COURSE_MODE, function ($value, $post_id, $field) {
+    return lcaw_prefill_course_mode_value_if_legacy_empty($value, $post_id);
+}, 10, 3);
+
+add_filter('acf/load_value/name=course_mode', function ($value, $post_id, $field) {
+    return lcaw_prefill_course_mode_value_if_legacy_empty($value, $post_id);
+}, 10, 3);
+
+add_filter('acf/prepare_field/key=' . LCAW_FIELD_COURSE_MODE, function ($field) {
+    if (!is_admin() || !is_array($field)) return $field;
+    if (!empty($field['value'])) return $field;
+
+    $post_id = 0;
+    if (isset($field['post_id'])) {
+        $post_id = $field['post_id'];
+    } elseif (!empty($_GET['post'])) {
+        $post_id = (int) $_GET['post'];
+    } elseif (!empty($_POST['post_ID'])) {
+        $post_id = (int) $_POST['post_ID'];
+    }
+
+    $field['value'] = lcaw_prefill_course_mode_value_if_legacy_empty($field['value'] ?? '', $post_id);
+    return $field;
+}, 10, 1);
 
 /* =========================================================
  * [ADMIN COURSE] Filter Course Provider ในหน้า All Courses

@@ -11,6 +11,8 @@
 (() => {
   const cache = new Map();
   let controller = null;
+  let loadingCourseId = null;
+  let loadingPromise = null;
 
   // ✅ หน่วง skeleton หลังข้อมูลมาแล้ว
   const SKELETON_DELAY_MS = 200;
@@ -144,13 +146,14 @@
     fd.append('nonce', CFG.nonce || '');
     fd.append('course_id', String(courseId || ''));
 
-    controller = new AbortController();
+    const reqController = new AbortController();
+    controller = reqController;
 
     const res = await fetch(CFG.ajax_url, {
       method: 'POST',
       credentials: 'same-origin',
       body: fd,
-      signal: controller.signal,
+      signal: reqController.signal,
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     });
 
@@ -189,6 +192,12 @@
   async function loadIntoModal(courseId, fallbackUrl) {
     const modal = getModalEl();
     if (!modal) return;
+    const courseKey = String(courseId || '');
+
+    // กัน trigger ซ้ำของคอร์สเดิมในจังหวะเดียวกัน (เช่น click ซ้ำ / listener ซ้ำ)
+    if (loadingPromise && loadingCourseId === courseKey) {
+      return loadingPromise;
+    }
 
     // ✅ ถ้ามีการโหลดรอบก่อนค้างอยู่ ให้เคลียร์ timeout กันปิดผิดจังหวะ
     clearSkeletonTimer();
@@ -197,42 +206,56 @@
     setSkeleton(modal, true);
 
     // ✅ ยกเลิก request เก่า (ถ้ามี)
-    if (controller) controller.abort();
+    if (controller && loadingCourseId !== courseKey) controller.abort();
 
-    try {
-      let data;
-      if (cache.has(courseId)) {
-        data = cache.get(courseId);
-      } else {
-        data = await fetchCourse(courseId);
-        cache.set(courseId, data);
+    loadingCourseId = courseKey;
+    loadingPromise = (async () => {
+      try {
+        let data;
+        if (cache.has(courseKey)) {
+          data = cache.get(courseKey);
+        } else {
+          data = await fetchCourse(courseKey);
+          cache.set(courseKey, data);
+        }
+
+        const body = modal.querySelector('[data-course-modal-body]');
+        if (body) {
+          body.innerHTML = data.html;
+          bindCourseGalleryFancybox(body);
+        }
+
+        // ✅ ใช้ single permalink ให้ 2 ปุ่ม
+        const singleUrl = data.permalink || fallbackUrl || '';
+        updateTopLinks(modal, singleUrl);
+
+        // ✅ หน่วงให้ skeleton อยู่ต่ออีก 2 วิ (ไม่รอรูป/วิดีโอ)
+        hideSkeletonAfterDelay(modal, courseKey);
+
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+
+        const body = modal.querySelector('[data-course-modal-body]');
+        if (body) body.innerHTML = `<div class="py-6 text-center opacity-70">โหลดข้อมูลไม่สำเร็จ</div>`;
+
+        // error ก็ยังให้ 2 ปุ่มไป single ถ้าเรามี fallbackUrl
+        updateTopLinks(modal, fallbackUrl || '');
+
+        // ✅ จะให้ error ก็หน่วง 2 วิเหมือนกัน
+        hideSkeletonAfterDelay(modal, courseKey);
+      } finally {
+        if (loadingCourseId === courseKey) {
+          loadingCourseId = null;
+        }
+        loadingPromise = null;
+        if (controller && controller.signal.aborted) {
+          controller = null;
+        }
       }
-
-      const body = modal.querySelector('[data-course-modal-body]');
-      if (body) {
-        body.innerHTML = data.html;
-        bindCourseGalleryFancybox(body);
-      }
-
-      // ✅ ใช้ single permalink ให้ 2 ปุ่ม
-      const singleUrl = data.permalink || fallbackUrl || '';
-      updateTopLinks(modal, singleUrl);
-
-      // ✅ หน่วงให้ skeleton อยู่ต่ออีก 2 วิ (ไม่รอรูป/วิดีโอ)
-      hideSkeletonAfterDelay(modal, courseId);
-
-    } catch (err) {
-      if (err.name === 'AbortError') return;
-
-      const body = modal.querySelector('[data-course-modal-body]');
-      if (body) body.innerHTML = `<div class="py-6 text-center opacity-70">โหลดข้อมูลไม่สำเร็จ</div>`;
-
-      // error ก็ยังให้ 2 ปุ่มไป single ถ้าเรามี fallbackUrl
-      updateTopLinks(modal, fallbackUrl || '');
-
-      // ✅ จะให้ error ก็หน่วง 2 วิเหมือนกัน
-      hideSkeletonAfterDelay(modal, courseId);
     }
+    )();
+
+    return loadingPromise;
   }
 
   async function onCourseCardClick(a, e) {
@@ -336,10 +359,13 @@
 // ===== Distance sort for course sessions (single + modal) =====
 (() => {
   const LOCATION_CACHE_KEY = "lc_user_location_v1";
-  const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+  const LOCATION_CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
   function toNum(v) {
-    const n = Number(v);
+    if (v === null || typeof v === "undefined") return null;
+    const s = String(v).trim();
+    if (s === "") return null;
+    const n = Number(s);
     return Number.isFinite(n) ? n : null;
   }
 
@@ -452,12 +478,12 @@
       if (!btnCurrent) return;
       const isActive = mode === "active";
       const isLoading = mode === "loading";
-      btnCurrent.disabled = isActive || isLoading;
+      btnCurrent.disabled = isLoading;
       btnCurrent.textContent = isLoading
         ? "กำลังระบุตำแหน่ง..."
-        : (isActive ? "ใช้ตำแหน่งปัจจุบันอยู่" : "ใช้ตำแหน่งปัจจุบัน");
+        : (isActive ? "อัปเดตตำแหน่งปัจจุบัน" : "ใช้ตำแหน่งปัจจุบัน");
 
-      if (isActive || isLoading) {
+      if (isLoading) {
         btnCurrent.classList.add("opacity-60", "cursor-not-allowed");
       } else {
         btnCurrent.classList.remove("opacity-60", "cursor-not-allowed");

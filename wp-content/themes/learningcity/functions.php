@@ -2283,6 +2283,17 @@ add_action('wp_enqueue_scripts', function () {
     true
   );
   wp_script_add_data('theme-app', 'type', 'module');
+  add_filter('script_loader_tag', function ($tag, $handle) {
+    if ($handle !== 'theme-app') {
+      return $tag;
+    }
+
+    if (strpos($tag, ' type=') !== false) {
+      return $tag;
+    }
+
+    return str_replace('<script ', '<script type="module" ', $tag);
+  }, 10, 2);
 
   $wanted = ['job', 'language', 'digital'];
 
@@ -2526,7 +2537,15 @@ add_action('admin_enqueue_scripts', function ($hook) {
 
     wp_add_inline_script('jquery-core', <<<JS
 jQuery(function($){
-  var \$boxes = $('#normal-sortables .postbox[id^="acf-group_"]');
+  var \$boxes = $('#acf_after_title-sortables .postbox, #normal-sortables .postbox, #advanced-sortables .postbox').filter(function(){
+    var \$box = $(this);
+    var id = String(\$box.attr('id') || '');
+    var hasAcfSignature = /^(acf-group_|acf-)/.test(id) || \$box.hasClass('acf-postbox') || \$box.find('.acf-fields').length > 0;
+    if (!hasAcfSignature) return false;
+    // Ignore known non-ACF boxes if they accidentally match by nested markup.
+    if (id === 'submitdiv' || id === 'slugdiv' || id === 'revisionsdiv') return false;
+    return true;
+  });
   if (\$boxes.length < 2) return;
 
   if (!document.getElementById('lc-acf-tabs-style')) {
@@ -2557,7 +2576,9 @@ jQuery(function($){
       label = $.trim(\$box.find('> .postbox-header .hndle, > .hndle').first().text());
     }
     if (!label) {
-      var raw = String(\$box.attr('id') || '').replace(/^acf-group_/, '');
+      var raw = String(\$box.attr('id') || '')
+        .replace(/^acf-group_/, '')
+        .replace(/^acf-/, '');
       label = raw ? raw.replace(/[_-]+/g, ' ') : '';
     }
     if (!label) label = 'Section ' + (idx + 1);
@@ -2583,7 +2604,9 @@ jQuery(function($){
   }));
 
   // Re-append in sorted order so visual order and tab order match.
-  var \$container = $('#normal-sortables');
+  var \$container = $('#acf_after_title-sortables');
+  if (!\$container.length) \$container = $('#normal-sortables');
+  if (!\$container.length) \$container = $('#advanced-sortables');
   \$boxes.each(function(){ \$container.append(this); });
 
   function activate(index) {
