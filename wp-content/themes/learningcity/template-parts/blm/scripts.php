@@ -2763,6 +2763,10 @@ if (!defined('ABSPATH')) exit;
               <input id="lcInlineFacilitySearch" class="lc-inline-input" placeholder="ค้นหา facility...">
               <div id="lcInlineFacilities" class="lc-inline-facility-wrap"></div>
             </div>
+            <div style="margin-top:12px;">
+              <label class="lc-inline-label" for="lcInlineRequestNote">ส่งข้อความถึงแอดมิน (ไม่บังคับ)</label>
+              <textarea id="lcInlineRequestNote" class="lc-inline-input ta" rows="4" placeholder="เช่น ขอเร่งตรวจสอบ, เหตุผลการแก้ไข, รายละเอียดเพิ่มเติมที่อยากให้ทีมตรวจสอบทราบ"></textarea>
+            </div>
           </section>
           <section class="lc-inline-section lc-inline-panel" data-inline-panel="images">
             <div class="lc-inline-subsection">
@@ -3045,6 +3049,7 @@ if (!defined('ABSPATH')) exit;
       const newImagesMeta = el("lcInlineNewImagesMeta");
       const confirm = el("lcInlineConfirmCheck");
       const sessionSearch = el("lcInlineSessionSearch");
+      const requestNoteInput = el("lcInlineRequestNote");
       if (grid) {
         grid.innerHTML = "";
         INLINE_LOCATION_FIELDS.forEach((cfg) => {
@@ -3259,6 +3264,9 @@ if (!defined('ABSPATH')) exit;
       }
       if (newImagesInput) newImagesInput.value = "";
       if (newImagesMeta) newImagesMeta.textContent = "ยังไม่ได้เลือกรูป";
+      if (requestNoteInput instanceof HTMLTextAreaElement) {
+        requestNoteInput.value = "";
+      }
       const newImagesPreview = el("lcInlineNewImagesPreview");
       if (newImagesPreview) newImagesPreview.innerHTML = "";
       if (newImagesInput) newImagesInput._lcPendingFiles = [];
@@ -3710,6 +3718,7 @@ if (!defined('ABSPATH')) exit;
     const confirmCheck = el("lcInlineConfirmCheck");
     if (!modal || !note || !submitBtn || !confirmCheck) return;
     const currentValues = inlineLocationContext?.location || {};
+    const requestNote = String(el("lcInlineRequestNote")?.value || "").trim();
     const nextValues = {};
     modal.querySelectorAll("[data-inline-field]").forEach((node) => {
       const key = String(node.getAttribute("data-inline-field") || "").trim();
@@ -3778,7 +3787,7 @@ if (!defined('ABSPATH')) exit;
     });
     const deleteSessionChanged = deleteSessionIds.length > 0;
     const newSessionChanged = newSessions.length > 0;
-    const changed = locationChanged || facilityChanged || sessionChanged || deleteSessionChanged || newSessionChanged || removedImageIds.length > 0 || newFiles.length > 0;
+    const changed = locationChanged || facilityChanged || sessionChanged || deleteSessionChanged || newSessionChanged || removedImageIds.length > 0 || newFiles.length > 0 || requestNote !== "";
     if (!changed) {
       window.lcInlineEditModalApi?.setInlineNote?.("error", "ข้อความใหม่เหมือนข้อมูลเดิม");
       return;
@@ -3805,6 +3814,7 @@ if (!defined('ABSPATH')) exit;
       fd.append("sessions", JSON.stringify(sessions));
       deleteSessionIds.forEach((id) => fd.append("delete_session_ids[]", String(id)));
       fd.append("new_sessions", JSON.stringify(newSessions));
+      fd.append("request_note", requestNote);
       newFiles.forEach((file) => fd.append("new_images[]", file));
       const res = await fetch(String(LOCATION_EDIT_CONFIG?.ajax_url || ""), { method: "POST", body: fd, credentials: "same-origin" });
       if (!res.ok) throw await buildInlineAjaxError(res, "ส่งคำขอแก้ไขไม่สำเร็จ", { stage: "submit_location_request" });

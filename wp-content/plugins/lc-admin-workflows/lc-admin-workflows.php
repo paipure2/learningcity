@@ -469,9 +469,9 @@ add_action('admin_enqueue_scripts', function ($hook) {
         color: #4c1d95;
       }
       .lc-provider-required-highlight {
-        box-shadow: 0 0 0 2px #f59e0b inset;
-        border-radius: 6px;
-        transition: box-shadow .15s ease;
+        box-shadow: none !important;
+        border-radius: 0;
+        transition: none;
       }
       .lc-mode-soft-note {
         margin-top: 6px;
@@ -674,6 +674,12 @@ add_action('admin_enqueue_scripts', function ($hook) {
           }
 
           function hasCourseProviderSelected() {
+            const $singleSelect = $("#lc-course-provider-select");
+            if ($singleSelect.length && String($singleSelect.val() || '').trim() !== '') return true;
+
+            const $singleHidden = $("#lc-course-provider-term-id");
+            if ($singleHidden.length && String($singleHidden.val() || '').trim() !== '') return true;
+
             const $hier = $("#course_providerchecklist input[type='checkbox']:checked, #course_providerchecklist-pop input[type='checkbox']:checked");
             if ($hier.length) return true;
 
@@ -1204,7 +1210,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             setTab(tab);
           });
 
-          $(document).on("change", "#course_providerchecklist input, #course_providerchecklist-pop input, #tax-input-course_provider, [data-name='course_provider'] input, [data-name='course_provider'] select, [data-name='course_mode'] input, [data-name='course_mode'] select, [name='course_mode']", function(){
+          $(document).on("change", "#course_providerchecklist input, #course_providerchecklist-pop input, #tax-input-course_provider, #lc-course-provider-select, #lc-course-provider-term-id, [data-name='course_provider'] input, [data-name='course_provider'] select, [data-name='course_mode'] input, [data-name='course_mode'] select, [name='course_mode']", function(){
             const $t = $(this);
             if ($t.is("#course_providerchecklist input[type='checkbox'], #course_providerchecklist-pop input[type='checkbox']")) {
               enforceSingleCourseProviderSelection($t);
@@ -1309,6 +1315,7 @@ function lc_render_location_session_row_html($sid) {
     echo '<td>';
     echo '<button type="button" class="button button-small lc-location-session-quick-edit" data-session-id="' . esc_attr($sid) . '">Quick Edit</button> ';
     echo '<button type="button" class="button button-small lc-location-session-toggle-status" data-session-id="' . esc_attr($sid) . '" data-next-status="' . esc_attr($next_status) . '">' . esc_html($toggle_label) . '</button> ';
+    echo '<button type="button" class="button button-small lc-location-session-trash" data-session-id="' . esc_attr($sid) . '">Delete</button> ';
     if ($edit_url) {
         echo '<a class="button button-small" href="' . esc_url($edit_url) . '" target="_blank" rel="noopener">Edit</a>';
     }
@@ -1449,6 +1456,11 @@ function lc_render_location_courses_metabox($post) {
           const ns=(res.data&&res.data.status)?String(res.data.status):nextStatus; const $tr=$btn.closest("tr"); $tr.find(".lc-session-status").text("(" + ns + ")");
           if(ns==="draft"){$btn.text("Publish").data("next-status","publish")}else{$btn.text("Unpublish").data("next-status","draft")}
         }).fail(()=>window.alert("เปลี่ยนสถานะไม่สำเร็จ")).always(()=>{$btn.prop("disabled",false)});});
+      $(document).on("click",".lc-location-session-trash",function(){const sid=$(this).data("session-id"); if(!sid)return; if(!window.confirm("ย้าย session นี้ไปที่ถังขยะ (Trash) ใช่ไหม?")) return; const $btn=$(this); $btn.prop("disabled",true);
+        $.post(cfg.ajaxUrl,{action:"lc_course_session_trash",nonce:cfg.nonce,session_id:sid}).done(function(res){if(!res||!res.success){window.alert("ลบ session ไม่สำเร็จ");return;}
+          const $tr=$btn.closest("tr"); $tr.remove(); if($("#lc-location-sessions-tbody tr").length===0){$("#lc-location-sessions-table").hide(); $("#lc-location-session-empty-note").show();}
+          setQ("ย้าย session ไป Trash แล้ว",false);
+        }).fail(()=>window.alert("ลบ session ไม่สำเร็จ")).always(()=>{$btn.prop("disabled",false)});});
       $("#lc-location-session-add-save").on("click",function(){const payload={action:"lc_course_session_create",nonce:cfg.nonce,location_id:cfg.locationId,course_id:$("#lc-location-add-course").val(),post_status:$("#lc-location-add-post-status").val(),reg_start:$("#lc-location-add-reg-start").val(),reg_end:$("#lc-location-add-reg-end").val(),start_date:$("#lc-location-add-start-date").val(),end_date:$("#lc-location-add-end-date").val(),time_period:$("#lc-location-add-time-period").val(),apply_url:$("#lc-location-add-apply-url").val(),session_details:$("#lc-location-add-session-details").val()};
         if(!payload.course_id){setA("กรุณาเลือกคอร์ส",true);return;} $(this).prop("disabled",true); setA("กำลังสร้าง session...",false);
         $.post(cfg.ajaxUrl,payload).done(function(res){if(!res||!res.success||!res.data||!res.data.row_html_location){setA("สร้าง session ไม่สำเร็จ",true);return;}
@@ -1716,6 +1728,7 @@ function lc_render_course_session_row_html($sid) {
 
     echo '<button type="button" class="button button-small lc-session-quick-edit" data-session-id="' . esc_attr($sid) . '">Quick Edit</button> ';
     echo '<button type="button" class="button button-small lc-session-toggle-status" data-session-id="' . esc_attr($sid) . '" data-next-status="' . esc_attr($next_status) . '">' . esc_html($toggle_label) . '</button> ';
+    echo '<button type="button" class="button button-small lc-session-trash" data-session-id="' . esc_attr($sid) . '">Delete</button> ';
 
     if ($edit_url) {
         echo '<a class="button button-small" href="' . esc_url($edit_url) . '" target="_blank" rel="noopener">Edit</a>';
@@ -2063,6 +2076,41 @@ function lc_render_course_sessions_metabox($post) {
           });
         });
 
+        $(document).on("click", ".lc-session-trash", function(){
+          const sid = $(this).data("session-id");
+          if (!sid) return;
+          if (!window.confirm("ย้าย session นี้ไปที่ถังขยะ (Trash) ใช่ไหม?")) return;
+
+          const $btn = $(this);
+          $btn.prop("disabled", true);
+
+          $.post(cfg.ajaxUrl, {
+            action: "lc_course_session_trash",
+            nonce: cfg.nonce,
+            session_id: sid
+          }).done(function(res){
+            if (!res || !res.success) {
+              window.alert("ลบ session ไม่สำเร็จ");
+              return;
+            }
+
+            const $tr = $btn.closest("tr");
+            $tr.remove();
+
+            const hasRows = $("#lc-course-sessions-tbody tr").length > 0;
+            if (!hasRows) {
+              $("#lc-course-sessions-table").hide();
+              $("#lc-session-empty-note").show();
+            }
+
+            setMessage("ย้าย session ไป Trash แล้ว", false);
+          }).fail(function(){
+            window.alert("ลบ session ไม่สำเร็จ");
+          }).always(function(){
+            $btn.prop("disabled", false);
+          });
+        });
+
         $("#lc-session-add-save").on("click", function(){
           const payload = {
             action: "lc_course_session_create",
@@ -2236,6 +2284,33 @@ add_action('wp_ajax_lc_course_session_toggle_status', function () {
     }
 
     wp_send_json_success(['ok' => true, 'status' => $next_status]);
+});
+
+add_action('wp_ajax_lc_course_session_trash', function () {
+    check_ajax_referer('lc_course_session_quick_edit', 'nonce');
+
+    $session_id = isset($_POST['session_id']) ? (int) $_POST['session_id'] : 0;
+    if (!$session_id || get_post_type($session_id) !== 'session') {
+        wp_send_json_error(['message' => 'invalid_session'], 400);
+    }
+    if (!current_user_can('delete_post', $session_id)) {
+        wp_send_json_error(['message' => 'forbidden'], 403);
+    }
+
+    $course_id = function_exists('lc_get_course_id_from_session')
+        ? (int) lc_get_course_id_from_session($session_id)
+        : (int) get_post_meta($session_id, 'course', true);
+
+    $trashed = wp_trash_post($session_id);
+    if (!$trashed) {
+        wp_send_json_error(['message' => 'trash_failed'], 500);
+    }
+
+    if ($course_id > 0 && function_exists('lc_recalc_course_flags')) {
+        lc_recalc_course_flags($course_id);
+    }
+
+    wp_send_json_success(['ok' => true, 'status' => 'trash']);
 });
 
 add_action('wp_ajax_lc_course_session_location_options', function () {

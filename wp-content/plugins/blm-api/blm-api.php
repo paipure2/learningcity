@@ -17,6 +17,11 @@ function blm_location_full_cache_key($location_id) {
   return 'blm_location_full_v3_' . intval($location_id);
 }
 
+function blm_location_full_cache_keys($location_id) {
+  $base = blm_location_full_cache_key($location_id);
+  return [$base, $base . '_public', $base . '_editor'];
+}
+
 function blm_get_location_description_from_content($post_id) {
   $post = get_post($post_id);
   if (!$post || empty($post->post_content)) return '';
@@ -574,12 +579,17 @@ function blm_clear_light_cache() {
 
 /** ล้าง full cache ของ location รายตัว */
 function blm_clear_full_cache_for_post($post_id) {
-  delete_transient(blm_location_full_cache_key($post_id));
+  foreach (blm_location_full_cache_keys($post_id) as $cache_key) {
+    delete_transient($cache_key);
+  }
 }
 
 function blm_clear_full_cache_for_location_id($location_id) {
   $location_id = (int) $location_id;
-  if ($location_id) delete_transient(blm_location_full_cache_key($location_id));
+  if (!$location_id) return;
+  foreach (blm_location_full_cache_keys($location_id) as $cache_key) {
+    delete_transient($cache_key);
+  }
 }
 
 /** ---------- auto rebuild caches on content update (NEW) ---------- */
@@ -653,7 +663,10 @@ add_action('blm_rebuild_caches_event', function ($post_id = 0) {
       ],
     ];
 
-    set_transient(blm_location_full_cache_key($post_id), $resp, 15 * MINUTE_IN_SECONDS);
+    // Endpoint reads *_public / *_editor keys. Prewarm public key explicitly.
+    $base_key = blm_location_full_cache_key($post_id);
+    set_transient($base_key, $resp, 15 * MINUTE_IN_SECONDS); // backward compatibility
+    set_transient($base_key . '_public', $resp, 15 * MINUTE_IN_SECONDS);
   }
 }, 10, 1);
 

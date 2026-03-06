@@ -2583,6 +2583,193 @@ add_action('admin_enqueue_scripts', function ($hook) {
 });
 
 /* =========================================================
+ * [ADMIN COURSE] Course Providers as single-select dropdown
+ * - Render under "รูปแบบคอร์ส" ACF field
+ * - Save exactly one term from dropdown
+ * ========================================================= */
+add_action('add_meta_boxes_course', function () {
+    if (!taxonomy_exists('course_provider')) return;
+    add_meta_box(
+        'tagsdiv-course_provider',
+        __('Course Providers'),
+        'post_tags_meta_box',
+        'course',
+        'normal',
+        'default',
+        ['taxonomy' => 'course_provider']
+    );
+}, 20);
+
+add_action('admin_enqueue_scripts', function ($hook) {
+    if (!in_array($hook, ['post.php', 'post-new.php'], true)) return;
+
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->post_type !== 'course') return;
+
+    $post_id = 0;
+    if (isset($_GET['post'])) {
+        $post_id = (int) $_GET['post'];
+    } elseif (isset($_POST['post_ID'])) {
+        $post_id = (int) $_POST['post_ID'];
+    }
+
+    $terms = get_terms([
+        'taxonomy'   => 'course_provider',
+        'hide_empty' => false,
+        'orderby'    => 'name',
+        'order'      => 'ASC',
+    ]);
+    if (is_wp_error($terms)) {
+        $terms = [];
+    }
+
+    $options = [];
+    foreach ((array) $terms as $term) {
+        if (!($term instanceof WP_Term)) continue;
+        $options[] = [
+            'id'   => (int) $term->term_id,
+            'name' => (string) $term->name,
+        ];
+    }
+
+    $selected_term_id = 0;
+    if ($post_id > 0) {
+        $selected_ids = wp_get_post_terms($post_id, 'course_provider', ['fields' => 'ids']);
+        if (!is_wp_error($selected_ids) && !empty($selected_ids)) {
+            $selected_term_id = (int) reset($selected_ids);
+        }
+    }
+
+    $config = [
+        'options'         => $options,
+        'selectedTermId'  => $selected_term_id,
+        'nonce'           => wp_create_nonce('lc_course_provider_single_select'),
+        'emptyLabel'      => 'เลือก Course Provider',
+    ];
+
+    wp_add_inline_script(
+        'jquery-core',
+        'window.LCCourseProviderSingle = ' . wp_json_encode($config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';',
+        'before'
+    );
+
+    wp_add_inline_script('jquery-core', <<<'JS'
+jQuery(function($){
+  var CFG = window.LCCourseProviderSingle || {};
+
+  function escHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function buildSelectHtml(selectedId) {
+    var opts = Array.isArray(CFG.options) ? CFG.options : [];
+    var html = '<select id="lc-course-provider-select" style="min-width:260px;max-width:100%;border:1px solid #8c8f94;box-shadow:none;">';
+    html += '<option value="">' + escHtml(CFG.emptyLabel || 'Select') + '</option>';
+
+    opts.forEach(function(opt){
+      var id = parseInt(opt.id, 10) || 0;
+      if (!id) return;
+      var selected = (id === selectedId) ? ' selected' : '';
+      html += '<option value="' + id + '"' + selected + '>' + escHtml(opt.name) + '</option>';
+    });
+    html += '</select>';
+    return html;
+  }
+
+  function renderSingleSelect($box, selectedId) {
+    if ($box.find('.lc-provider-single-wrap').length) return;
+
+    var $inside = $box.find('> .inside').first();
+    if (!$inside.length) {
+      $inside = $('<div class="inside"></div>');
+      $box.append($inside);
+    }
+    $box.css({
+      marginTop: '12px',
+      border: '0',
+      boxShadow: 'none',
+      background: 'transparent'
+    });
+    $box.removeClass('form-required form-invalid');
+    $inside.css({
+      margin: 0,
+      padding: 0
+    });
+    $inside.removeClass('form-required form-invalid');
+    $box.find('.form-required, .form-invalid').removeClass('form-required form-invalid');
+    $box.find('#new-tag-course_provider').prop('required', false).removeClass('form-required');
+    if (!document.getElementById('lc-course-provider-style')) {
+      var style = document.createElement('style');
+      style.id = 'lc-course-provider-style';
+      style.textContent =
+        '#lc-course-provider-select:focus{outline:none !important;box-shadow:none !important;border-color:#8c8f94 !important;}' +
+        '#tagsdiv-course_provider,#tagsdiv-course_provider .inside,#tagsdiv-course_provider .lc-provider-single-wrap{border:0 !important;box-shadow:none !important;outline:none !important;background:transparent !important;}' +
+        '#tagsdiv-course_provider:focus,#tagsdiv-course_provider:focus-within,#tagsdiv-course_provider .inside:focus,#tagsdiv-course_provider .inside:focus-within{border:0 !important;box-shadow:none !important;outline:none !important;}';
+      document.head.appendChild(style);
+    }
+
+    var html = '';
+    html += '<div class="lc-provider-single-wrap" style="padding:8px 0;">';
+    html += '<label for="lc-course-provider-select" style="display:block;margin-bottom:8px;font-weight:600;">Course Providers</label>';
+    html += buildSelectHtml(selectedId);
+    html += '<input type="hidden" id="lc-course-provider-term-id" name="lc_course_provider_single_term_id" value="' + (selectedId || '') + '">';
+    html += '<input type="hidden" name="lc_course_provider_single_nonce" value="' + escHtml(CFG.nonce || '') + '">';
+    html += '</div>';
+    $inside.html(html);
+
+    $box.on('change', '#lc-course-provider-select', function(){
+      $('#lc-course-provider-term-id').val($(this).val() || '');
+    });
+  }
+
+  function mountCourseProviderBox() {
+    var $box = $('#tagsdiv-course_provider');
+    var $target = $('.acf-field[data-key="field_lc_course_mode_01"]').first();
+    if (!$box.length || !$target.length) return;
+
+    renderSingleSelect($box, parseInt(CFG.selectedTermId, 10) || 0);
+
+    if (!$box.parent().is($target.parent())) {
+      $target.after($box);
+    } else if (!$box.prev().is($target)) {
+      $target.after($box);
+    }
+  }
+
+  mountCourseProviderBox();
+  window.setTimeout(mountCourseProviderBox, 300);
+  window.setTimeout(mountCourseProviderBox, 1000);
+});
+JS, 'after');
+});
+
+add_action('save_post_course', function ($post_id, $post, $update) {
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if (wp_is_post_revision($post_id)) return;
+    if (!current_user_can('edit_post', $post_id)) return;
+
+    if (!isset($_POST['lc_course_provider_single_nonce'])) return;
+    $nonce = sanitize_text_field(wp_unslash($_POST['lc_course_provider_single_nonce']));
+    if (!wp_verify_nonce($nonce, 'lc_course_provider_single_select')) return;
+
+    $term_id = isset($_POST['lc_course_provider_single_term_id'])
+        ? (int) wp_unslash($_POST['lc_course_provider_single_term_id'])
+        : 0;
+
+    if ($term_id > 0 && term_exists($term_id, 'course_provider')) {
+        wp_set_object_terms($post_id, [$term_id], 'course_provider', false);
+        return;
+    }
+
+    wp_set_object_terms($post_id, [], 'course_provider', false);
+}, 30, 3);
+
+/* =========================================================
  * [ADMIN MENU] Top-level quick links to Homepage ACF tabs
  * ========================================================= */
 if (!function_exists('lc_admin_redirect_to_homepage_tab')) {

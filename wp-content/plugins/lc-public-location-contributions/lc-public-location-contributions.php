@@ -22,6 +22,7 @@ final class LC_Public_Place_Photo_Upload {
     const NONCE_ACTION_EDIT_SUBMIT = 'lc_location_edit_submit';
     const NONCE_ACTION_EDIT_MODERATE = 'lc_location_edit_moderate';
     const NONCE_ACTION_EDIT_LOGOUT = 'lc_location_edit_logout';
+    const NONCE_ACTION_TEXT_CLEANUP = 'lc_text_artifact_cleanup';
     const ERROR_LOG_TABLE_SUFFIX = 'lc_error_logs';
     const EDIT_SESSION_TTL = 43200; // 12 hours.
     const OTP_VERIFY_MAX_ATTEMPTS = 5;
@@ -80,6 +81,7 @@ final class LC_Public_Place_Photo_Upload {
         add_action('admin_post_lc_bulk_update_location_change_request_status', [__CLASS__, 'handle_bulk_update_location_change_request_status']);
         add_action('admin_post_lc_approve_location_change_request', [__CLASS__, 'handle_approve_location_change_request']);
         add_action('admin_post_lc_reject_location_change_request', [__CLASS__, 'handle_reject_location_change_request']);
+        add_action('admin_post_lc_cleanup_text_artifacts', [__CLASS__, 'handle_cleanup_text_artifacts']);
     }
 
     public static function activate() {
@@ -1921,6 +1923,36 @@ final class LC_Public_Place_Photo_Upload {
         return null;
     }
 
+    private static function settings_notice_transient_key($user_id = 0) {
+        $uid = (int) $user_id;
+        if ($uid <= 0) {
+            $uid = (int) get_current_user_id();
+        }
+        return 'lc_system_settings_notice_' . (string) max(0, $uid);
+    }
+
+    private static function push_admin_settings_notice($message, $type = 'info', $user_id = 0) {
+        $message = trim((string) $message);
+        if ($message === '') {
+            return;
+        }
+        $type = in_array((string) $type, ['success', 'warning', 'error', 'info'], true) ? (string) $type : 'info';
+        set_transient(self::settings_notice_transient_key($user_id), [
+            'message' => $message,
+            'type' => $type,
+        ], 5 * MINUTE_IN_SECONDS);
+    }
+
+    private static function pop_admin_settings_notice($user_id = 0) {
+        $key = self::settings_notice_transient_key($user_id);
+        $data = get_transient($key);
+        if (is_array($data)) {
+            delete_transient($key);
+            return $data;
+        }
+        return null;
+    }
+
     public static function render_location_edit_requests_page() {
         self::render_location_edit_queue_page('all', 'คำขอแก้ไขข้อมูล (สถานที่/คอร์ส)');
     }
@@ -1931,6 +1963,297 @@ final class LC_Public_Place_Photo_Upload {
 
     public static function render_system_settings_page() {
         self::render_settings_page(false);
+    }
+
+    public static function handle_cleanup_text_artifacts() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Insufficient permissions.', 'lc-public-place-photo-upload'));
+        }
+        check_admin_referer(self::NONCE_ACTION_TEXT_CLEANUP);
+
+        $stats = self::run_text_artifact_cleanup_once();
+        if (is_wp_error($stats)) {
+            self::push_admin_settings_notice((string) $stats->get_error_message(), 'error');
+            wp_safe_redirect(admin_url('admin.php?page=lc-contribution-system-settings'));
+            exit;
+        }
+
+        $message = sprintf(
+            'Text cleanup เสร็จแล้ว: location %1$d รายการ, session %2$d รายการ, course %3$d รายการ, change request %4$d รายการ, ฟิลด์ที่แก้ไขทั้งหมด %5$d ฟิลด์ และล้าง cache location %6$d รายการ',
+            (int) ($stats['location_posts'] ?? 0),
+            (int) ($stats['session_posts'] ?? 0),
+            (int) ($stats['course_posts'] ?? 0),
+            (int) ($stats['request_posts'] ?? 0),
+            (int) ($stats['changed_fields'] ?? 0),
+            (int) ($stats['cache_locations'] ?? 0)
+        );
+        self::push_admin_settings_notice($message, 'success');
+        wp_safe_redirect(admin_url('admin.php?page=lc-contribution-system-settings'));
+        exit;
+    }
+
+    private static function parse_related_post_id($value) {
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+        if (is_object($value) && isset($value->ID)) {
+            return (int) $value->ID;
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                $id = self::parse_related_post_id($item);
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static function cleanup_payload_text_value($value, &$changed_fields) {
+        if (!is_scalar($value)) {
+            return $value;
+        }
+        $raw = (string) $value;
+        $clean = self::normalize_multiline_text($raw);
+        if ($clean !== $raw) {
+            $changed_fields++;
+            return $clean;
+        }
+        return $value;
+    }
+
+    private static function run_text_artifact_cleanup_once() {
+        @set_time_limit(120); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
+
+        $stats = [
+            'location_posts' => 0,
+            'session_posts' => 0,
+            'course_posts' => 0,
+            'request_posts' => 0,
+            'changed_fields' => 0,
+            'cache_locations' => 0,
+        ];
+        $affected_locations = [];
+        $all_post_statuses = ['publish', 'future', 'draft', 'pending', 'private'];
+
+        $location_ids = get_posts([
+            'post_type' => 'location',
+            'post_status' => $all_post_statuses,
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+            'no_found_rows' => true,
+        ]);
+        foreach ((array) $location_ids as $location_id) {
+            $location_id = (int) $location_id;
+            if ($location_id <= 0) {
+                continue;
+            }
+            $post_changed = false;
+            foreach (['opening_hours', 'description', 'address'] as $meta_key) {
+                $raw = get_post_meta($location_id, $meta_key, true);
+                if (!is_scalar($raw)) {
+                    continue;
+                }
+                $raw_text = (string) $raw;
+                $clean_text = self::normalize_multiline_text($raw_text);
+                if ($clean_text === $raw_text) {
+                    continue;
+                }
+                update_post_meta($location_id, $meta_key, $clean_text);
+                $stats['changed_fields']++;
+                $post_changed = true;
+            }
+            if ($post_changed) {
+                $stats['location_posts']++;
+                $affected_locations[$location_id] = true;
+            }
+        }
+
+        $session_ids = get_posts([
+            'post_type' => 'session',
+            'post_status' => $all_post_statuses,
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+            'no_found_rows' => true,
+        ]);
+        foreach ((array) $session_ids as $session_id) {
+            $session_id = (int) $session_id;
+            if ($session_id <= 0) {
+                continue;
+            }
+            $post_changed = false;
+            foreach (['time_period', 'session_details'] as $meta_key) {
+                $raw = get_post_meta($session_id, $meta_key, true);
+                if (!is_scalar($raw)) {
+                    continue;
+                }
+                $raw_text = (string) $raw;
+                $clean_text = self::normalize_multiline_text($raw_text);
+                if ($clean_text === $raw_text) {
+                    continue;
+                }
+                update_post_meta($session_id, $meta_key, $clean_text);
+                $stats['changed_fields']++;
+                $post_changed = true;
+            }
+            if ($post_changed) {
+                $stats['session_posts']++;
+                $location_id = self::parse_related_post_id(get_post_meta($session_id, 'location', true));
+                if ($location_id <= 0 && function_exists('get_field')) {
+                    $location_id = self::parse_related_post_id(get_field('location', $session_id, false));
+                }
+                if ($location_id > 0) {
+                    $affected_locations[$location_id] = true;
+                }
+            }
+        }
+
+        $course_ids = get_posts([
+            'post_type' => 'course',
+            'post_status' => $all_post_statuses,
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+            'no_found_rows' => true,
+        ]);
+        foreach ((array) $course_ids as $course_id) {
+            $course_id = (int) $course_id;
+            if ($course_id <= 0) {
+                continue;
+            }
+            $raw = get_post_meta($course_id, 'course_description', true);
+            if (!is_scalar($raw)) {
+                continue;
+            }
+            $raw_text = (string) $raw;
+            $clean_text = self::normalize_multiline_text($raw_text);
+            if ($clean_text === $raw_text) {
+                continue;
+            }
+            update_post_meta($course_id, 'course_description', $clean_text);
+            if (function_exists('update_field')) {
+                update_field('course_description', $clean_text, $course_id);
+            }
+            $stats['changed_fields']++;
+            $stats['course_posts']++;
+        }
+
+        $request_ids = get_posts([
+            'post_type' => self::change_request_post_types(),
+            'post_status' => ['pending', 'publish', 'draft'],
+            'posts_per_page' => -1,
+            'fields' => 'ids',
+            'no_found_rows' => true,
+        ]);
+        foreach ((array) $request_ids as $request_id) {
+            $request_id = (int) $request_id;
+            if ($request_id <= 0) {
+                continue;
+            }
+            $payload_json = (string) get_post_meta($request_id, '_lc_change_payload', true);
+            if ($payload_json === '') {
+                continue;
+            }
+            $payload = json_decode($payload_json, true);
+            if (!is_array($payload)) {
+                continue;
+            }
+            $changed_before = (int) $stats['changed_fields'];
+
+            if (isset($payload['location']) && is_array($payload['location'])) {
+                foreach (['address', 'opening_hours', 'description'] as $field_key) {
+                    if (array_key_exists($field_key, $payload['location'])) {
+                        $payload['location'][$field_key] = self::cleanup_payload_text_value($payload['location'][$field_key], $stats['changed_fields']);
+                    }
+                }
+            }
+            if (isset($payload['course']) && is_array($payload['course']) && array_key_exists('course_description', $payload['course'])) {
+                $payload['course']['course_description'] = self::cleanup_payload_text_value($payload['course']['course_description'], $stats['changed_fields']);
+            }
+            if (array_key_exists('request_note', $payload)) {
+                $payload['request_note'] = self::cleanup_payload_text_value($payload['request_note'], $stats['changed_fields']);
+            }
+            if (isset($payload['sessions']) && is_array($payload['sessions'])) {
+                foreach ($payload['sessions'] as $idx => $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    foreach (['time_period', 'session_details'] as $field_key) {
+                        if (array_key_exists($field_key, $row)) {
+                            $payload['sessions'][$idx][$field_key] = self::cleanup_payload_text_value($row[$field_key], $stats['changed_fields']);
+                        }
+                    }
+                }
+            }
+            if (isset($payload['new_sessions']) && is_array($payload['new_sessions'])) {
+                foreach ($payload['new_sessions'] as $idx => $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    foreach (['time_period', 'session_details'] as $field_key) {
+                        if (array_key_exists($field_key, $row)) {
+                            $payload['new_sessions'][$idx][$field_key] = self::cleanup_payload_text_value($row[$field_key], $stats['changed_fields']);
+                        }
+                    }
+                }
+            }
+            if (isset($payload['snapshot']) && is_array($payload['snapshot'])) {
+                if (isset($payload['snapshot']['location']) && is_array($payload['snapshot']['location'])) {
+                    foreach (['address', 'opening_hours', 'description'] as $field_key) {
+                        if (array_key_exists($field_key, $payload['snapshot']['location'])) {
+                            $payload['snapshot']['location'][$field_key] = self::cleanup_payload_text_value($payload['snapshot']['location'][$field_key], $stats['changed_fields']);
+                        }
+                    }
+                }
+                if (isset($payload['snapshot']['course']) && is_array($payload['snapshot']['course']) && array_key_exists('course_description', $payload['snapshot']['course'])) {
+                    $payload['snapshot']['course']['course_description'] = self::cleanup_payload_text_value($payload['snapshot']['course']['course_description'], $stats['changed_fields']);
+                }
+                if (isset($payload['snapshot']['sessions']) && is_array($payload['snapshot']['sessions'])) {
+                    foreach ($payload['snapshot']['sessions'] as $sid => $snapshot_row) {
+                        if (!is_array($snapshot_row)) {
+                            continue;
+                        }
+                        foreach (['time_period', 'session_details'] as $field_key) {
+                            if (array_key_exists($field_key, $snapshot_row)) {
+                                $payload['snapshot']['sessions'][$sid][$field_key] = self::cleanup_payload_text_value($snapshot_row[$field_key], $stats['changed_fields']);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ((int) $stats['changed_fields'] > $changed_before) {
+                update_post_meta($request_id, '_lc_change_payload', wp_json_encode($payload, JSON_UNESCAPED_UNICODE));
+                $stats['request_posts']++;
+            }
+        }
+
+        if (function_exists('blm_clear_light_cache')) {
+            blm_clear_light_cache();
+        }
+        foreach (array_keys($affected_locations) as $location_id) {
+            $location_id = (int) $location_id;
+            if ($location_id <= 0) {
+                continue;
+            }
+            if (function_exists('blm_clear_full_cache_for_location_id')) {
+                blm_clear_full_cache_for_location_id($location_id);
+            } elseif (function_exists('blm_clear_full_cache_for_post')) {
+                blm_clear_full_cache_for_post($location_id);
+            }
+        }
+        if (!empty($affected_locations) && function_exists('blm_schedule_rebuild')) {
+            $first_location_id = (int) array_key_first($affected_locations);
+            if ($first_location_id > 0) {
+                blm_schedule_rebuild($first_location_id);
+            } else {
+                blm_schedule_rebuild(0);
+            }
+        } elseif (function_exists('blm_schedule_rebuild')) {
+            blm_schedule_rebuild(0);
+        }
+        $stats['cache_locations'] = count($affected_locations);
+        return $stats;
     }
 
     public static function render_error_logs_page() {
@@ -2278,9 +2601,14 @@ final class LC_Public_Place_Photo_Upload {
         }
 
         $settings = self::get_settings();
+        $flash_notice = self::pop_admin_settings_notice();
         ?>
         <div class="wrap">
             <h1><?php echo esc_html__($permissions_only ? 'ให้สิทธิ์ผู้แก้ไข' : 'ตั้งค่าระบบ', 'lc-public-place-photo-upload'); ?></h1>
+            <?php if (is_array($flash_notice) && !empty($flash_notice['message'])) : ?>
+                <?php $notice_type = in_array((string) ($flash_notice['type'] ?? 'info'), ['success', 'warning', 'error', 'info'], true) ? (string) $flash_notice['type'] : 'info'; ?>
+                <div class="notice notice-<?php echo esc_attr($notice_type); ?> is-dismissible"><p><?php echo esc_html((string) $flash_notice['message']); ?></p></div>
+            <?php endif; ?>
             <form method="post" action="options.php">
                 <?php settings_fields('lc_public_place_upload_settings_group'); ?>
                 <table class="form-table" role="presentation">
@@ -2339,6 +2667,19 @@ final class LC_Public_Place_Photo_Upload {
 
                 <?php submit_button(); ?>
             </form>
+            <?php if (!$permissions_only) : ?>
+            <hr style="margin:24px 0;">
+            <h2>One-time Text Cleanup</h2>
+            <p style="max-width:860px;">
+                เครื่องมือนี้จะทำความสะอาดข้อมูลที่เคยเพี้ยนจาก escape sequence (เช่น <code>rnrn</code>, <code>rn</code>, <code>nn</code>, <code>t</code>, <code>n</code>)
+                ในฟิลด์ข้อความหลัก และล้าง cache หลังทำงานเสร็จ เพื่อให้หน้าบ้านเห็นผลทันที
+            </p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return window.confirm('ยืนยันรัน cleanup แบบ one-time? ระบบจะอัปเดตข้อมูลข้อความในฐานข้อมูลทันที');">
+                <input type="hidden" name="action" value="lc_cleanup_text_artifacts" />
+                <?php wp_nonce_field(self::NONCE_ACTION_TEXT_CLEANUP); ?>
+                <button type="submit" class="button button-secondary">Run One-time Cleanup</button>
+            </form>
+            <?php endif; ?>
             <style>
             .lc-email-tags-widget{width:100%;max-width:820px;min-width:0}
             .lc-email-tags-list{display:flex;flex-wrap:wrap;gap:8px;width:100%;max-width:100%;box-sizing:border-box;padding:8px;border:1px solid #d1d5db;border-radius:8px;background:#fff;min-height:44px;margin-bottom:8px}
@@ -2648,6 +2989,7 @@ final class LC_Public_Place_Photo_Upload {
         $delete_session_ids = [];
         $new_sessions = [];
         $has_session_changes = false;
+        $request_note = sanitize_textarea_field(self::normalize_multiline_text((string) wp_unslash($_POST['request_note'] ?? '')));
         if ($mode === 'full_location') {
             $sessions_json = isset($_POST['sessions']) ? (string) wp_unslash($_POST['sessions']) : '';
             $sessions_payload = json_decode($sessions_json, true);
@@ -2787,7 +3129,7 @@ final class LC_Public_Place_Photo_Upload {
             }
         }
 
-        if (!$has_changes && !$has_facility_changes && empty($remove_image_ids) && empty($new_image_ids) && !$has_session_changes) {
+        if (!$has_changes && !$has_facility_changes && empty($remove_image_ids) && empty($new_image_ids) && !$has_session_changes && $request_note === '') {
             self::send_json_error_debug(__('ข้อความใหม่เหมือนข้อมูลเดิม', 'lc-public-place-photo-upload'), 400, 'no_changes_detected', 'submit_location_request');
         }
 
@@ -2807,6 +3149,7 @@ final class LC_Public_Place_Photo_Upload {
         $payload = [
             'request_type' => 'update_location',
             'location' => $next_location,
+            'request_note' => $request_note,
             'remove_image_ids' => $remove_image_ids,
             'new_image_ids' => $new_image_ids,
             'sessions' => $proposed_sessions,
@@ -3769,6 +4112,14 @@ final class LC_Public_Place_Photo_Upload {
                                 </details>
                             <?php endforeach; ?>
                         <?php endif; ?>
+                    </section>
+
+                    <section class="lc-card">
+                        <h2><?php echo esc_html__('ส่งข้อความถึงแอดมิน', 'lc-public-place-photo-upload'); ?></h2>
+                        <div class="lc-field" style="margin-top:8px;">
+                            <label><?php echo esc_html__('ข้อความเพิ่มเติมสำหรับทีมตรวจสอบ (ไม่บังคับ)', 'lc-public-place-photo-upload'); ?></label>
+                            <textarea name="request_note" rows="4" placeholder="<?php echo esc_attr__('เช่น ขอเร่งตรวจสอบ, เหตุผลการเปลี่ยนแปลง, รายละเอียดที่ควรทราบเพิ่มเติม', 'lc-public-place-photo-upload'); ?>"></textarea>
+                        </div>
                     </section>
 
                     <div class="lc-sticky-actions">
@@ -5052,6 +5403,7 @@ final class LC_Public_Place_Photo_Upload {
                 'google_maps' => esc_url_raw((string) ($_POST['google_maps'] ?? '')),
                 'facebook' => esc_url_raw((string) ($_POST['facebook'] ?? '')),
             ],
+            'request_note' => sanitize_textarea_field(self::normalize_multiline_text((string) ($_POST['request_note'] ?? ''))),
             'remove_image_ids' => array_values(array_filter(array_map('intval', (array) ($_POST['remove_image_ids'] ?? [])))),
             'new_image_ids' => [],
             'sessions' => [],
@@ -5179,13 +5531,26 @@ final class LC_Public_Place_Photo_Upload {
         }
         // Convert escaped and real line-break tokens into actual new lines.
         $text = str_replace(["\\r\\n", "\\n\\r", "\\n", "\\r"], "\n", $text);
+        // Convert escaped tabs into real tabs first; later we normalize tabs to spaces.
+        $text = str_replace(["\\t"], "\t", $text);
         $text = str_replace(["\r\n", "\r"], "\n", $text);
         // Recover stripped escaped newline markers after wp_unslash (e.g. "\r\n" -> "rn", "\r\n\r\n" -> "rnrn").
-        $text = preg_replace('/(?<=\p{Thai})\s*rnrn\s*(?=\p{Thai})/u', "\n\n", $text);
-        $text = preg_replace('/(?<=\p{Thai})\s*rn\s*(?=\p{Thai})/u', "\n", $text);
+        // Include punctuation-boundary cases like "น.rnrnวัน..." that were missed by strict Thai/digit-only guards.
+        $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*rnrn\s*(?=[\p{Thai}\d\(])/u', "\n\n", $text);
+        $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*rn\s*(?=[\p{Thai}\d\(])/u', "\n", $text);
+        // Fallback for standalone tokens not surrounded by latin words.
+        $text = preg_replace('/(?<![A-Za-z0-9])rnrn(?![A-Za-z0-9])/iu', "\n\n", $text);
+        $text = preg_replace('/(?<![A-Za-z0-9])rn(?![A-Za-z0-9])/iu', "\n", $text);
         // Recover stripped escaped newline markers after wp_unslash (e.g. "\n\n" -> "nn").
-        $text = preg_replace('/(?<=\p{Thai})nn(?=\p{Thai})/u', "\n\n", $text);
-        $text = preg_replace('/(?<=\p{Thai})n(?=\p{Thai})/u', "\n", $text);
+        $text = preg_replace('/(?<=[\p{Thai}\d])nn(?=[\p{Thai}\d])/u', "\n\n", $text);
+        $text = preg_replace('/(?<=[\p{Thai}\d])n(?=[\p{Thai}\d])/u', "\n", $text);
+        // Recover stripped escaped tab marker after wp_unslash (e.g. "\t" -> "t"), mostly seen between Thai text and time values.
+        $text = preg_replace('/(?<=[\p{Thai}\d])\s*t\s*(?=[\p{Thai}\d])/u', "\t", $text);
+        // Handle punctuation-separated artifacts (e.g. "น.tห้อง", "การn อาทิตย์", "น. nอาทิตย์").
+        $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*n\s*(?=[\p{Thai}\d\(])/u', "\n", $text);
+        $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*t\s*(?=[\p{Thai}\d\(])/u', "\t", $text);
+        $text = str_replace("\t", ' ', $text);
+        $text = preg_replace('/[ ]{2,}/u', ' ', $text);
         $text = preg_replace("/[ \t]+\n/u", "\n", $text);
         $text = preg_replace("/\n{3,}/u", "\n\n", $text);
         return trim((string) $text);
@@ -5481,6 +5846,11 @@ final class LC_Public_Place_Photo_Upload {
             if ($details !== '') {
                 self::add_diff_row($rows, $label, 'Session Details', '-', $details);
             }
+        }
+
+        $request_note = sanitize_textarea_field((string) ($payload['request_note'] ?? ''));
+        if ($request_note !== '') {
+            self::add_diff_row($rows, 'Location', 'Request Note', '-', $request_note);
         }
 
         return $rows;
@@ -6115,7 +6485,7 @@ final class LC_Public_Place_Photo_Upload {
                 (string) $status,
             ]);
             echo '<div class="lc-mail-row" data-row-id="' . esc_attr((string) $rid) . '">';
-            $row_checkbox_disabled = $status === 'cancelled' ? ' disabled' : '';
+            $row_checkbox_disabled = in_array($status, ['approved', 'rejected', 'cancelled'], true) ? ' disabled' : '';
             echo '<div class="lc-mail-check-wrap"><input form="lcBulkStatusForm" class="lc-mail-check" type="checkbox" name="request_ids[]" value="' . esc_attr((string) $rid) . '" data-id="' . esc_attr((string) $rid) . '"' . $row_checkbox_disabled . ' /></div>';
             echo '<button type="button" class="lc-mail-item' . esc_attr($is_active) . '" data-id="' . esc_attr((string) $rid) . '" data-status="' . esc_attr($status) . '" data-request-type="' . esc_attr($request_type) . '" data-search="' . esc_attr($search_blob) . '">';
             echo '<div class="lc-mail-item-grid">';
@@ -6215,10 +6585,14 @@ final class LC_Public_Place_Photo_Upload {
             wp_nonce_field(self::NONCE_ACTION_EDIT_MODERATE, '_wpnonce', true, true);
             echo '<label class="lc-status-label">';
             echo '<span class="lc-status-label-text">สถานะ</span>';
-            $status_select_disabled = $status === 'cancelled' ? ' disabled' : '';
+            $status_select_disabled = in_array($status, ['approved', 'rejected', 'cancelled'], true) ? ' disabled' : '';
             echo '<select name="new_status" data-status-select class="lc-status-select"' . $status_select_disabled . '>';
             if ($status === 'cancelled') {
                 echo '<option value="cancelled" selected>ยกเลิก</option>';
+            } elseif ($status === 'approved') {
+                echo '<option value="approved" selected>อนุมัติ</option>';
+            } elseif ($status === 'rejected') {
+                echo '<option value="rejected" selected>ไม่อนุมัติ</option>';
             } else {
                 echo '<option value="pending" ' . selected($status, 'pending', false) . '>รอตรวจสอบ</option>';
                 echo '<option value="approved" ' . selected($status, 'approved', false) . '>อนุมัติ</option>';
@@ -6232,6 +6606,10 @@ final class LC_Public_Place_Photo_Upload {
             }
             if ($status === 'cancelled') {
                 echo '<div style="width:100%;margin-top:8px;color:#64748b;font-weight:600;">คำขอนี้ถูกยกเลิกโดยผู้ส่งแล้ว ไม่สามารถอนุมัติหรือไม่อนุมัติได้</div>';
+            } elseif ($status === 'approved') {
+                echo '<div style="width:100%;margin-top:8px;color:#166534;font-weight:600;">คำขอนี้ถูกอนุมัติและนำข้อมูลไปใช้แล้ว ไม่สามารถเปลี่ยนกลับเป็นสถานะอื่นได้</div>';
+            } elseif ($status === 'rejected') {
+                echo '<div style="width:100%;margin-top:8px;color:#991b1b;font-weight:600;">คำขอนี้ถูกไม่อนุมัติและปิดเคสแล้ว หากต้องการดำเนินการต่อให้ผู้ส่งทำคำขอใหม่</div>';
             }
             echo '<div data-reject-reason-wrap style="display:' . ($status === 'rejected' ? 'block' : 'none') . ';width:100%;margin-top:8px;">';
             echo '<label style="display:block;font-weight:600;margin-bottom:4px;">เหตุผลที่ไม่อนุมัติ</label>';
@@ -6859,6 +7237,103 @@ final class LC_Public_Place_Photo_Upload {
         exit;
     }
 
+    private static function approval_lock_timeout_seconds() {
+        return 120;
+    }
+
+    private static function approval_lock_option_key($request_id) {
+        return 'lc_loc_change_approve_lock_' . md5((string) ((int) $request_id));
+    }
+
+    private static function acquire_request_approval_lock($request_id) {
+        $request_id = (int) $request_id;
+        if ($request_id <= 0) {
+            return new WP_Error('invalid_request', __('Invalid request.', 'lc-public-place-photo-upload'));
+        }
+        $option_key = self::approval_lock_option_key($request_id);
+        $now = time();
+        $token = (string) $now . ':' . wp_generate_password(16, false, false);
+        $payload = [
+            'token' => $token,
+            'created_at' => $now,
+        ];
+        if (add_option($option_key, $payload, '', 'no')) {
+            return $token;
+        }
+
+        $existing = get_option($option_key, null);
+        $existing_created_at = is_array($existing) ? (int) ($existing['created_at'] ?? 0) : 0;
+        if ($existing_created_at > 0 && ($now - $existing_created_at) > self::approval_lock_timeout_seconds()) {
+            delete_option($option_key);
+            if (add_option($option_key, $payload, '', 'no')) {
+                return $token;
+            }
+        }
+
+        return new WP_Error('approval_in_progress', __('มีผู้ดูแลระบบคนอื่นกำลังอนุมัติคำขอนี้อยู่ กรุณาลองใหม่อีกครั้ง', 'lc-public-place-photo-upload'));
+    }
+
+    private static function release_request_approval_lock($request_id, $token) {
+        $request_id = (int) $request_id;
+        $token = (string) $token;
+        if ($request_id <= 0 || $token === '') {
+            return;
+        }
+        $option_key = self::approval_lock_option_key($request_id);
+        $existing = get_option($option_key, null);
+        if (is_array($existing) && (string) ($existing['token'] ?? '') === $token) {
+            delete_option($option_key);
+        }
+    }
+
+    private static function build_new_session_request_key($request_id, $flow, $index, $course_id, $location_id, $row) {
+        $request_id = (int) $request_id;
+        if ($request_id <= 0) {
+            return '';
+        }
+        $row = is_array($row) ? $row : [];
+        $payload = [
+            'request_id' => $request_id,
+            'flow' => sanitize_key((string) $flow),
+            'index' => (int) $index,
+            'course_id' => (int) $course_id,
+            'location_id' => (int) $location_id,
+            'time_period' => sanitize_textarea_field(self::normalize_multiline_text((string) ($row['time_period'] ?? ''))),
+            'session_details' => sanitize_textarea_field(self::normalize_multiline_text((string) ($row['session_details'] ?? ''))),
+            'apply_url' => esc_url_raw((string) ($row['apply_url'] ?? '')),
+            'start_date' => sanitize_text_field((string) ($row['start_date'] ?? '')),
+            'end_date' => sanitize_text_field((string) ($row['end_date'] ?? '')),
+            'reg_start' => sanitize_text_field((string) ($row['reg_start'] ?? '')),
+            'reg_end' => sanitize_text_field((string) ($row['reg_end'] ?? '')),
+        ];
+        $json = wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($json) || $json === '') {
+            $json = serialize($payload);
+        }
+        return md5($json);
+    }
+
+    private static function find_existing_new_session_by_request_key($request_key) {
+        $request_key = sanitize_text_field((string) $request_key);
+        if ($request_key === '') {
+            return 0;
+        }
+        $ids = get_posts([
+            'post_type' => 'session',
+            'post_status' => ['publish', 'future', 'draft', 'pending', 'private'],
+            'posts_per_page' => 1,
+            'fields' => 'ids',
+            'meta_query' => [
+                ['key' => '_lc_created_from_request_key', 'value' => $request_key, 'compare' => '='],
+            ],
+            'no_found_rows' => true,
+        ]);
+        if (empty($ids)) {
+            return 0;
+        }
+        return (int) $ids[0];
+    }
+
     private static function update_location_change_request_status_internal($request_id, $new_status, $reject_reason = '') {
         $request_id = (int) $request_id;
         $new_status = sanitize_key((string) $new_status);
@@ -6878,75 +7353,105 @@ final class LC_Public_Place_Photo_Upload {
         if ($current_status === 'cancelled' && $new_status !== 'cancelled') {
             return new WP_Error('request_cancelled', __('คำขอนี้ถูกยกเลิกโดยผู้ส่งแล้ว และไม่สามารถเปลี่ยนสถานะได้', 'lc-public-place-photo-upload'));
         }
+        if ($current_status === 'rejected' && $new_status !== 'rejected') {
+            return new WP_Error('rejected_is_terminal', __('คำขอนี้ถูกไม่อนุมัติและปิดเคสแล้ว หากต้องการดำเนินการต่อให้ผู้ส่งทำคำขอใหม่', 'lc-public-place-photo-upload'));
+        }
+        if ($current_status === 'approved' && $new_status !== 'approved') {
+            return new WP_Error('approved_is_terminal', __('คำขอนี้ถูกอนุมัติและนำไปใช้แล้ว ไม่สามารถเปลี่ยนกลับเป็นสถานะอื่นได้', 'lc-public-place-photo-upload'));
+        }
         $location_id = (int) get_post_meta($request_id, '_lc_location_id', true);
         $course_id = (int) get_post_meta($request_id, '_lc_course_id', true);
+        $stale_conflict = false;
+        $approval_lock_token = '';
 
-        if ($new_status === 'approved' && $current_status !== 'approved') {
-            $payload_json = (string) get_post_meta($request_id, '_lc_change_payload', true);
-            $payload = json_decode($payload_json, true);
-            if (!is_array($payload)) {
-                $payload = [];
-            }
-            $request_type = self::get_request_type_for_request($request_id, $payload);
-            $stale_conflict = false;
-            $stale_error = self::validate_request_snapshot_before_approve($request_id, $request_type, $payload);
-            if (is_wp_error($stale_error)) {
-                if ($stale_error->get_error_code() === 'stale_request_conflict') {
-                    $stale_conflict = true;
-                    update_post_meta($request_id, '_lc_stale_conflict_message', (string) $stale_error->get_error_message());
-                } else {
-                    return $stale_error;
+        try {
+            if ($new_status === 'approved' && $current_status !== 'approved') {
+                $lock_result = self::acquire_request_approval_lock($request_id);
+                if (is_wp_error($lock_result)) {
+                    return $lock_result;
                 }
-            }
-            if ($request_type === 'update_course') {
-                if ($course_id <= 0 || get_post_type($course_id) !== 'course') {
-                    return new WP_Error('invalid_course', __('Invalid course for this request.', 'lc-public-place-photo-upload'));
+                $approval_lock_token = (string) $lock_result;
+
+                $current_status_after_lock = (string) get_post_meta($request_id, '_lc_change_status', true);
+                if ($current_status_after_lock === '' || !in_array($current_status_after_lock, ['pending', 'approved', 'rejected', 'cancelled'], true)) {
+                    $current_status_after_lock = 'pending';
                 }
-                self::apply_course_change_payload($course_id, $payload);
-                if (function_exists('clean_post_cache')) {
-                    clean_post_cache($course_id);
+                if ($current_status_after_lock === 'approved') {
+                    return ['updated' => false, 'stale_conflict' => false];
                 }
-            } else {
-                if ($location_id <= 0 || get_post_type($location_id) !== 'location') {
-                    return new WP_Error('invalid_location', __('Invalid location for this request.', 'lc-public-place-photo-upload'));
+                if ($current_status_after_lock === 'cancelled') {
+                    return new WP_Error('request_cancelled', __('คำขอนี้ถูกยกเลิกโดยผู้ส่งแล้ว และไม่สามารถเปลี่ยนสถานะได้', 'lc-public-place-photo-upload'));
                 }
-                self::apply_location_change_payload($location_id, $payload);
-                if ($location_id > 0) {
+
+                $payload_json = (string) get_post_meta($request_id, '_lc_change_payload', true);
+                $payload = json_decode($payload_json, true);
+                if (!is_array($payload)) {
+                    $payload = [];
+                }
+                $request_type = self::get_request_type_for_request($request_id, $payload);
+                $stale_error = self::validate_request_snapshot_before_approve($request_id, $request_type, $payload);
+                if (is_wp_error($stale_error)) {
+                    if ($stale_error->get_error_code() === 'stale_request_conflict') {
+                        $stale_conflict = true;
+                        update_post_meta($request_id, '_lc_stale_conflict_message', (string) $stale_error->get_error_message());
+                    } else {
+                        return $stale_error;
+                    }
+                }
+                if ($request_type === 'update_course') {
+                    if ($course_id <= 0 || get_post_type($course_id) !== 'course') {
+                        return new WP_Error('invalid_course', __('Invalid course for this request.', 'lc-public-place-photo-upload'));
+                    }
+                    self::apply_course_change_payload($course_id, $payload, $request_id);
                     if (function_exists('clean_post_cache')) {
-                        clean_post_cache($location_id);
+                        clean_post_cache($course_id);
                     }
-                    if (function_exists('blm_clear_full_cache_for_post')) {
-                        blm_clear_full_cache_for_post($location_id);
+                } else {
+                    if ($location_id <= 0 || get_post_type($location_id) !== 'location') {
+                        return new WP_Error('invalid_location', __('Invalid location for this request.', 'lc-public-place-photo-upload'));
                     }
-                    if (function_exists('blm_clear_light_cache')) {
-                        blm_clear_light_cache();
-                    }
-                    if (function_exists('blm_schedule_rebuild')) {
-                        blm_schedule_rebuild($location_id);
+                    self::apply_location_change_payload($location_id, $payload, $request_id);
+                    if ($location_id > 0) {
+                        if (function_exists('clean_post_cache')) {
+                            clean_post_cache($location_id);
+                        }
+                        if (function_exists('blm_clear_full_cache_for_post')) {
+                            blm_clear_full_cache_for_post($location_id);
+                        }
+                        if (function_exists('blm_clear_light_cache')) {
+                            blm_clear_light_cache();
+                        }
+                        if (function_exists('blm_schedule_rebuild')) {
+                            blm_schedule_rebuild($location_id);
+                        }
                     }
                 }
+                if ($stale_conflict) {
+                    update_post_meta($request_id, '_lc_approved_with_conflict', '1');
+                } else {
+                    delete_post_meta($request_id, '_lc_approved_with_conflict');
+                    delete_post_meta($request_id, '_lc_stale_conflict_message');
+                }
             }
-            if ($stale_conflict) {
-                update_post_meta($request_id, '_lc_approved_with_conflict', '1');
+
+            update_post_meta($request_id, '_lc_change_status', $new_status);
+            update_post_meta($request_id, '_lc_moderated_by', get_current_user_id());
+            update_post_meta($request_id, '_lc_moderated_at', current_time('mysql'));
+            if ($new_status === 'rejected') {
+                update_post_meta($request_id, '_lc_reject_reason', $reject_reason);
             } else {
-                delete_post_meta($request_id, '_lc_approved_with_conflict');
-                delete_post_meta($request_id, '_lc_stale_conflict_message');
+                delete_post_meta($request_id, '_lc_reject_reason');
+            }
+
+            return [
+                'updated' => true,
+                'stale_conflict' => !empty($stale_conflict),
+            ];
+        } finally {
+            if ($approval_lock_token !== '') {
+                self::release_request_approval_lock($request_id, $approval_lock_token);
             }
         }
-
-        update_post_meta($request_id, '_lc_change_status', $new_status);
-        update_post_meta($request_id, '_lc_moderated_by', get_current_user_id());
-        update_post_meta($request_id, '_lc_moderated_at', current_time('mysql'));
-        if ($new_status === 'rejected') {
-            update_post_meta($request_id, '_lc_reject_reason', $reject_reason);
-        } else {
-            delete_post_meta($request_id, '_lc_reject_reason');
-        }
-
-        return [
-            'updated' => true,
-            'stale_conflict' => !empty($stale_conflict),
-        ];
     }
 
     private static function validate_request_snapshot_before_approve($request_id, $request_type, $payload) {
@@ -7137,10 +7642,11 @@ final class LC_Public_Place_Photo_Upload {
         return true;
     }
 
-    private static function apply_location_change_payload($location_id, $payload) {
+    private static function apply_location_change_payload($location_id, $payload, $request_id = 0) {
         if ($location_id <= 0 || get_post_type($location_id) !== 'location') {
             return;
         }
+        $request_id = (int) $request_id;
         $location = is_array($payload['location'] ?? null) ? $payload['location'] : [];
         $next_title = isset($location['title']) ? sanitize_text_field((string) $location['title']) : '';
         if ($next_title !== '' && $next_title !== '-') {
@@ -7228,12 +7734,16 @@ final class LC_Public_Place_Photo_Upload {
         $allowed_course_ids = self::get_location_available_course_ids($location_id);
         $allowed_course_map = array_fill_keys(array_values(array_filter(array_map('intval', (array) $allowed_course_ids))), true);
         $location_title = (string) get_the_title($location_id);
-        foreach ($new_sessions as $row) {
+        foreach ($new_sessions as $index => $row) {
             if (!is_array($row)) {
                 continue;
             }
             $course_id = (int) ($row['course_id'] ?? 0);
             if ($course_id <= 0 || !isset($allowed_course_map[$course_id]) || get_post_type($course_id) !== 'course') {
+                continue;
+            }
+            $request_key = self::build_new_session_request_key($request_id, 'location', $index, $course_id, $location_id, $row);
+            if ($request_key !== '' && self::find_existing_new_session_by_request_key($request_key) > 0) {
                 continue;
             }
             $course_title = (string) get_the_title($course_id);
@@ -7246,7 +7756,7 @@ final class LC_Public_Place_Photo_Upload {
             }
             $new_session_id = wp_insert_post([
                 'post_type' => 'session',
-                'post_status' => 'draft',
+                'post_status' => 'publish',
                 'post_title' => $session_title,
             ], true);
             if (is_wp_error($new_session_id) || !$new_session_id) {
@@ -7254,6 +7764,12 @@ final class LC_Public_Place_Photo_Upload {
             }
             update_post_meta($new_session_id, 'course', $course_id);
             update_post_meta($new_session_id, 'location', $location_id);
+            if ($request_id > 0) {
+                update_post_meta($new_session_id, '_lc_created_from_request', $request_id);
+            }
+            if ($request_key !== '') {
+                update_post_meta($new_session_id, '_lc_created_from_request_key', $request_key);
+            }
             update_post_meta($new_session_id, 'time_period', sanitize_textarea_field(self::normalize_multiline_text((string) ($row['time_period'] ?? ''))));
             update_post_meta($new_session_id, 'session_details', sanitize_textarea_field(self::normalize_multiline_text((string) ($row['session_details'] ?? ''))));
             if (function_exists('update_field')) {
@@ -7265,10 +7781,11 @@ final class LC_Public_Place_Photo_Upload {
         }
     }
 
-    private static function apply_course_change_payload($course_id, $payload) {
+    private static function apply_course_change_payload($course_id, $payload, $request_id = 0) {
         if ($course_id <= 0 || get_post_type($course_id) !== 'course') {
             return;
         }
+        $request_id = (int) $request_id;
         $payload = is_array($payload) ? $payload : [];
         $course = is_array($payload['course'] ?? null) ? $payload['course'] : [];
 
@@ -7384,12 +7901,16 @@ final class LC_Public_Place_Photo_Upload {
         $new_sessions = is_array($payload['new_sessions'] ?? null) ? $payload['new_sessions'] : [];
         $course_title = (string) get_the_title($course_id);
         $allowed_new_location_map = array_fill_keys(self::get_course_available_location_ids($course_id), true);
-        foreach ($new_sessions as $row) {
+        foreach ($new_sessions as $index => $row) {
             if (!is_array($row)) {
                 continue;
             }
             $location_id = isset($row['location_id']) ? (int) $row['location_id'] : 0;
             if ($location_id <= 0 || get_post_type($location_id) !== 'location' || !isset($allowed_new_location_map[$location_id])) {
+                continue;
+            }
+            $request_key = self::build_new_session_request_key($request_id, 'course', $index, $course_id, $location_id, $row);
+            if ($request_key !== '' && self::find_existing_new_session_by_request_key($request_key) > 0) {
                 continue;
             }
             $location_title = (string) get_the_title($location_id);
@@ -7399,7 +7920,7 @@ final class LC_Public_Place_Photo_Upload {
             }
             $new_session_id = wp_insert_post([
                 'post_type' => 'session',
-                'post_status' => 'draft',
+                'post_status' => 'publish',
                 'post_title' => $session_title,
             ], true);
             if (is_wp_error($new_session_id) || !$new_session_id) {
@@ -7407,6 +7928,12 @@ final class LC_Public_Place_Photo_Upload {
             }
             update_post_meta($new_session_id, 'course', $course_id);
             update_post_meta($new_session_id, 'location', $location_id);
+            if ($request_id > 0) {
+                update_post_meta($new_session_id, '_lc_created_from_request', $request_id);
+            }
+            if ($request_key !== '') {
+                update_post_meta($new_session_id, '_lc_created_from_request_key', $request_key);
+            }
             if (function_exists('update_field')) {
                 update_field('course', $course_id, $new_session_id);
                 update_field('location', $location_id, $new_session_id);
