@@ -1120,6 +1120,8 @@ final class LC_Public_Place_Photo_Upload {
                 'title' => (string) get_the_title($location_id),
                 'address' => (string) get_post_meta($location_id, 'address', true),
                 'phone' => (string) get_post_meta($location_id, 'phone', true),
+                'latitude' => self::normalized_coordinate_or_empty(get_post_meta($location_id, 'latitude', true), 'lat'),
+                'longitude' => self::normalized_coordinate_or_empty(get_post_meta($location_id, 'longitude', true), 'lng'),
                 'opening_hours' => self::normalize_multiline_text((string) get_post_meta($location_id, 'opening_hours', true)),
                 'description' => self::normalize_multiline_text((string) get_post_meta($location_id, 'description', true)),
                 'google_maps' => (string) get_post_meta($location_id, 'google_maps', true),
@@ -2010,6 +2012,44 @@ final class LC_Public_Place_Photo_Upload {
         return 0;
     }
 
+    private static function normalize_coordinate_value($value, $axis) {
+        if (!is_scalar($value)) {
+            return '';
+        }
+        $axis = $axis === 'lng' ? 'lng' : 'lat';
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+        if (!is_numeric($raw)) {
+            return new WP_Error(
+                $axis === 'lat' ? 'invalid_latitude' : 'invalid_longitude',
+                $axis === 'lat'
+                    ? __('Latitude must be a valid number between -90 and 90.', 'lc-public-place-photo-upload')
+                    : __('Longitude must be a valid number between -180 and 180.', 'lc-public-place-photo-upload')
+            );
+        }
+        $number = (float) $raw;
+        if (($axis === 'lat' && (abs($number) > 90)) || ($axis === 'lng' && (abs($number) > 180))) {
+            return new WP_Error(
+                $axis === 'lat' ? 'invalid_latitude' : 'invalid_longitude',
+                $axis === 'lat'
+                    ? __('Latitude must be between -90 and 90.', 'lc-public-place-photo-upload')
+                    : __('Longitude must be between -180 and 180.', 'lc-public-place-photo-upload')
+            );
+        }
+        if (abs($number) < 0.0000005) {
+            $number = 0.0;
+        }
+        $normalized = rtrim(rtrim(sprintf('%.10F', $number), '0'), '.');
+        return $normalized === '-0' ? '0' : $normalized;
+    }
+
+    private static function normalized_coordinate_or_empty($value, $axis) {
+        $normalized = self::normalize_coordinate_value($value, $axis);
+        return is_wp_error($normalized) ? '' : (string) $normalized;
+    }
+
     private static function cleanup_payload_text_value($value, &$changed_fields) {
         if (!is_scalar($value)) {
             return $value;
@@ -2050,7 +2090,7 @@ final class LC_Public_Place_Photo_Upload {
                 continue;
             }
             $post_changed = false;
-            foreach (['opening_hours', 'description', 'address'] as $meta_key) {
+            foreach (['opening_hours', 'hours', 'description', 'address'] as $meta_key) {
                 $raw = get_post_meta($location_id, $meta_key, true);
                 if (!is_scalar($raw)) {
                     continue;
@@ -2920,6 +2960,8 @@ final class LC_Public_Place_Photo_Upload {
         $allowed_fields = [
             'address' => 'address',
             'phone' => 'phone',
+            'latitude' => 'latitude',
+            'longitude' => 'longitude',
             'opening_hours' => 'opening_hours',
             'description' => 'description',
             'google_maps' => 'google_maps',
@@ -2930,6 +2972,8 @@ final class LC_Public_Place_Photo_Upload {
             'title' => (string) get_the_title($location_id),
             'address' => (string) get_post_meta($location_id, 'address', true),
             'phone' => (string) get_post_meta($location_id, 'phone', true),
+            'latitude' => self::normalized_coordinate_or_empty(get_post_meta($location_id, 'latitude', true), 'lat'),
+            'longitude' => self::normalized_coordinate_or_empty(get_post_meta($location_id, 'longitude', true), 'lng'),
             'opening_hours' => (string) get_post_meta($location_id, 'opening_hours', true),
             'description' => (string) get_post_meta($location_id, 'description', true),
             'google_maps' => (string) get_post_meta($location_id, 'google_maps', true),
@@ -2948,8 +2992,22 @@ final class LC_Public_Place_Photo_Upload {
             if (array_key_exists('phone', $_POST)) {
                 $next_location['phone'] = sanitize_text_field((string) wp_unslash($_POST['phone']));
             }
+            if (array_key_exists('latitude', $_POST)) {
+                $latitude = self::normalize_coordinate_value(wp_unslash($_POST['latitude']), 'lat');
+                if (is_wp_error($latitude)) {
+                    self::send_json_error_debug($latitude->get_error_message(), 400, (string) $latitude->get_error_code(), 'submit_location_request');
+                }
+                $next_location['latitude'] = $latitude;
+            }
+            if (array_key_exists('longitude', $_POST)) {
+                $longitude = self::normalize_coordinate_value(wp_unslash($_POST['longitude']), 'lng');
+                if (is_wp_error($longitude)) {
+                    self::send_json_error_debug($longitude->get_error_message(), 400, (string) $longitude->get_error_code(), 'submit_location_request');
+                }
+                $next_location['longitude'] = $longitude;
+            }
             if (array_key_exists('opening_hours', $_POST)) {
-                $next_location['opening_hours'] = sanitize_textarea_field((string) wp_unslash($_POST['opening_hours']));
+                $next_location['opening_hours'] = sanitize_textarea_field(self::normalize_multiline_text((string) wp_unslash($_POST['opening_hours'])));
             }
             if (array_key_exists('description', $_POST)) {
                 $next_location['description'] = sanitize_textarea_field(self::normalize_multiline_text((string) wp_unslash($_POST['description'])));
@@ -2980,6 +3038,17 @@ final class LC_Public_Place_Photo_Upload {
             }
             if (!isset($allowed_fields[$field])) {
                 self::send_json_error_debug(__('ไม่รองรับช่องข้อมูลนี้', 'lc-public-place-photo-upload'), 400, 'unsupported_field', 'submit_location_request', ['field' => $field]);
+            }
+            if ($field === 'latitude') {
+                $suggestion = self::normalize_coordinate_value($suggestion, 'lat');
+                if (is_wp_error($suggestion)) {
+                    self::send_json_error_debug($suggestion->get_error_message(), 400, (string) $suggestion->get_error_code(), 'submit_location_request');
+                }
+            } elseif ($field === 'longitude') {
+                $suggestion = self::normalize_coordinate_value($suggestion, 'lng');
+                if (is_wp_error($suggestion)) {
+                    self::send_json_error_debug($suggestion->get_error_message(), 400, (string) $suggestion->get_error_code(), 'submit_location_request');
+                }
             }
             $next_location[$field] = $suggestion;
         }
@@ -4027,6 +4096,14 @@ final class LC_Public_Place_Photo_Upload {
                             <div class="lc-field">
                                 <label><?php echo esc_html__('เบอร์โทร', 'lc-public-place-photo-upload'); ?></label>
                                 <input type="text" name="phone" value="<?php echo esc_attr((string) ($meta['phone'][0] ?? '')); ?>">
+                            </div>
+                            <div class="lc-field">
+                                <label><?php echo esc_html__('Latitude', 'lc-public-place-photo-upload'); ?></label>
+                                <input type="text" name="latitude" inputmode="decimal" value="<?php echo esc_attr(self::normalized_coordinate_or_empty(($meta['latitude'][0] ?? ''), 'lat')); ?>">
+                            </div>
+                            <div class="lc-field">
+                                <label><?php echo esc_html__('Longitude', 'lc-public-place-photo-upload'); ?></label>
+                                <input type="text" name="longitude" inputmode="decimal" value="<?php echo esc_attr(self::normalized_coordinate_or_empty(($meta['longitude'][0] ?? ''), 'lng')); ?>">
                             </div>
                             <div class="lc-field">
                                 <label><?php echo esc_html__('เวลาทำการ', 'lc-public-place-photo-upload'); ?></label>
@@ -5398,7 +5475,9 @@ final class LC_Public_Place_Photo_Upload {
                 'title' => $location_title,
                 'address' => sanitize_textarea_field((string) ($_POST['address'] ?? '')),
                 'phone' => sanitize_text_field((string) ($_POST['phone'] ?? '')),
-                'opening_hours' => sanitize_textarea_field((string) ($_POST['opening_hours'] ?? '')),
+                'latitude' => '',
+                'longitude' => '',
+                'opening_hours' => sanitize_textarea_field(self::normalize_multiline_text((string) ($_POST['opening_hours'] ?? ''))),
                 'description' => sanitize_textarea_field(self::normalize_multiline_text((string) ($_POST['description'] ?? ''))),
                 'google_maps' => esc_url_raw((string) ($_POST['google_maps'] ?? '')),
                 'facebook' => esc_url_raw((string) ($_POST['facebook'] ?? '')),
@@ -5412,6 +5491,8 @@ final class LC_Public_Place_Photo_Upload {
                 'title' => (string) get_the_title($location_id),
                 'address' => (string) get_post_meta($location_id, 'address', true),
                 'phone' => (string) get_post_meta($location_id, 'phone', true),
+                'latitude' => self::normalized_coordinate_or_empty(get_post_meta($location_id, 'latitude', true), 'lat'),
+                'longitude' => self::normalized_coordinate_or_empty(get_post_meta($location_id, 'longitude', true), 'lng'),
                 'opening_hours' => self::normalize_multiline_text((string) get_post_meta($location_id, 'opening_hours', true)),
                 'description' => self::normalize_multiline_text((string) get_post_meta($location_id, 'description', true)),
                 'google_maps' => (string) get_post_meta($location_id, 'google_maps', true),
@@ -5422,6 +5503,16 @@ final class LC_Public_Place_Photo_Upload {
                 'sessions' => $snapshot_sessions,
             ],
         ];
+        $latitude = self::normalize_coordinate_value($_POST['latitude'] ?? '', 'lat');
+        if (is_wp_error($latitude)) {
+            wp_die(esc_html($latitude->get_error_message()), '', ['response' => 400]);
+        }
+        $payload['location']['latitude'] = $latitude;
+        $longitude = self::normalize_coordinate_value($_POST['longitude'] ?? '', 'lng');
+        if (is_wp_error($longitude)) {
+            wp_die(esc_html($longitude->get_error_message()), '', ['response' => 400]);
+        }
+        $payload['location']['longitude'] = $longitude;
         if (isset($_POST['facility_slugs'])) {
             $payload['facility_slugs'] = self::sanitize_facility_slugs((array) $_POST['facility_slugs']);
         }
@@ -5744,6 +5835,8 @@ final class LC_Public_Place_Photo_Upload {
             'title' => 'Title',
             'address' => 'Address',
             'phone' => 'Phone',
+            'latitude' => 'Latitude',
+            'longitude' => 'Longitude',
             'opening_hours' => 'Opening Hours',
             'description' => 'Description',
             'google_maps' => 'Google Maps',
@@ -5754,6 +5847,13 @@ final class LC_Public_Place_Photo_Upload {
                 ? (string) get_the_title($location_id)
                 : (string) get_post_meta($location_id, $key, true));
             $new = isset($location[$key]) ? (string) $location[$key] : '';
+            if ($key === 'latitude') {
+                $old = self::normalized_coordinate_or_empty($old, 'lat');
+                $new = self::normalized_coordinate_or_empty($new, 'lat');
+            } elseif ($key === 'longitude') {
+                $old = self::normalized_coordinate_or_empty($old, 'lng');
+                $new = self::normalized_coordinate_or_empty($new, 'lng');
+            }
             self::add_diff_row($rows, 'Location', $label, $old, $new);
         }
 
@@ -7473,10 +7573,10 @@ final class LC_Public_Place_Photo_Upload {
             $snapshot_course = is_array($snapshot['course'] ?? null) ? $snapshot['course'] : [];
             $course = is_array($payload['course'] ?? null) ? $payload['course'] : [];
             foreach (array_keys($course) as $field_key) {
-                $before = array_key_exists($field_key, $snapshot_course) ? (string) $snapshot_course[$field_key] : (string) get_post_meta($course_id, $field_key, true);
+                $before = array_key_exists($field_key, $snapshot_course) ? $snapshot_course[$field_key] : get_post_meta($course_id, $field_key, true);
                 $current = $field_key === 'title'
-                    ? (string) get_the_title($course_id)
-                    : (string) get_post_meta($course_id, $field_key, true);
+                    ? get_the_title($course_id)
+                    : get_post_meta($course_id, $field_key, true);
                 if (self::normalized_compare_key($before) !== self::normalized_compare_key($current)) {
                     $conflicts[] = 'course.' . $field_key;
                 }
@@ -7546,6 +7646,13 @@ final class LC_Public_Place_Photo_Upload {
                 $current = $field_key === 'title'
                     ? (string) get_the_title($location_id)
                     : (string) get_post_meta($location_id, $field_key, true);
+                if ($field_key === 'latitude') {
+                    $before = self::normalized_coordinate_or_empty($before, 'lat');
+                    $current = self::normalized_coordinate_or_empty($current, 'lat');
+                } elseif ($field_key === 'longitude') {
+                    $before = self::normalized_coordinate_or_empty($before, 'lng');
+                    $current = self::normalized_coordinate_or_empty($current, 'lng');
+                }
                 if (self::normalized_compare_key($before) !== self::normalized_compare_key($current)) {
                     $conflicts[] = 'location.' . $field_key;
                 }
@@ -7654,7 +7761,18 @@ final class LC_Public_Place_Photo_Upload {
         }
         update_post_meta($location_id, 'address', sanitize_textarea_field((string) ($location['address'] ?? '')));
         update_post_meta($location_id, 'phone', sanitize_text_field((string) ($location['phone'] ?? '')));
-        update_post_meta($location_id, 'opening_hours', sanitize_textarea_field((string) ($location['opening_hours'] ?? '')));
+        $latitude = self::normalize_coordinate_value($location['latitude'] ?? '', 'lat');
+        $longitude = self::normalize_coordinate_value($location['longitude'] ?? '', 'lng');
+        if (!is_wp_error($latitude)) {
+            update_post_meta($location_id, 'latitude', $latitude);
+        }
+        if (!is_wp_error($longitude)) {
+            update_post_meta($location_id, 'longitude', $longitude);
+        }
+        $normalized_opening_hours = sanitize_textarea_field(self::normalize_multiline_text((string) ($location['opening_hours'] ?? '')));
+        update_post_meta($location_id, 'opening_hours', $normalized_opening_hours);
+        // Keep legacy key synced because some paths still fallback to "hours".
+        update_post_meta($location_id, 'hours', $normalized_opening_hours);
         update_post_meta($location_id, 'description', sanitize_textarea_field(self::normalize_multiline_text((string) ($location['description'] ?? ''))));
         update_post_meta($location_id, 'google_maps', esc_url_raw((string) ($location['google_maps'] ?? '')));
         update_post_meta($location_id, 'facebook', esc_url_raw((string) ($location['facebook'] ?? '')));

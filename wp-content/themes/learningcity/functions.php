@@ -2668,7 +2668,7 @@ jQuery(function($){
 
   function buildSelectHtml(selectedId) {
     var opts = Array.isArray(CFG.options) ? CFG.options : [];
-    var html = '<select id="lc-course-provider-select" style="min-width:260px;max-width:100%;border:1px solid #8c8f94;box-shadow:none;">';
+    var html = '<select id="lc-course-provider-select" name="tax_input[course_provider]">';
     html += '<option value="">' + escHtml(CFG.emptyLabel || 'Select') + '</option>';
 
     opts.forEach(function(opt){
@@ -2689,17 +2689,9 @@ jQuery(function($){
       $inside = $('<div class="inside"></div>');
       $box.append($inside);
     }
-    $box.css({
-      marginTop: '12px',
-      border: '0',
-      boxShadow: 'none',
-      background: 'transparent'
-    });
+    $box.addClass('lc-course-provider-inline-box');
     $box.removeClass('form-required form-invalid');
-    $inside.css({
-      margin: 0,
-      padding: 0
-    });
+    $inside.css({ margin: 0, padding: 0 });
     $inside.removeClass('form-required form-invalid');
     $box.find('.form-required, .form-invalid').removeClass('form-required form-invalid');
     $box.find('#new-tag-course_provider').prop('required', false).removeClass('form-required');
@@ -2707,37 +2699,53 @@ jQuery(function($){
       var style = document.createElement('style');
       style.id = 'lc-course-provider-style';
       style.textContent =
-        '#lc-course-provider-select:focus{outline:none !important;box-shadow:none !important;border-color:#8c8f94 !important;}' +
-        '#tagsdiv-course_provider,#tagsdiv-course_provider .inside,#tagsdiv-course_provider .lc-provider-single-wrap{border:0 !important;box-shadow:none !important;outline:none !important;background:transparent !important;}' +
-        '#tagsdiv-course_provider:focus,#tagsdiv-course_provider:focus-within,#tagsdiv-course_provider .inside:focus,#tagsdiv-course_provider .inside:focus-within{border:0 !important;box-shadow:none !important;outline:none !important;}';
+        '.acf-field.lc-course-provider-inline-row{border-top:0 !important;padding-top:0 !important;}' +
+        '.acf-field.lc-course-provider-inline-row > .acf-label{margin-top:18px;}' +
+        '.acf-field.lc-course-provider-inline-row > .acf-input{margin-top:18px;}' +
+        '#tagsdiv-course_provider.lc-course-provider-inline-box{margin:0;border:1px solid #cfd9e6;border-radius:12px;box-shadow:none;background:#f5f9fd;overflow:hidden;max-width:none;}' +
+        '#tagsdiv-course_provider.lc-course-provider-inline-box .postbox-header{display:none;}' +
+        '#tagsdiv-course_provider.lc-course-provider-inline-box .inside{margin:0 !important;padding:0 !important;background:#f5f9fd !important;}' +
+        '#tagsdiv-course_provider.lc-course-provider-inline-box .lc-provider-single-wrap{padding:16px 18px;background:#f5f9fd;}' +
+        '#tagsdiv-course_provider.lc-course-provider-inline-box .lc-provider-single-label{display:block;margin:0 0 8px;font-size:13px;font-weight:600;line-height:1.4;color:#1d2327;}' +
+        '#lc-course-provider-select{width:100%;max-width:none;}' +
+        '#tagsdiv-course_provider.lc-course-provider-inline-box,#tagsdiv-course_provider.lc-course-provider-inline-box:focus,#tagsdiv-course_provider.lc-course-provider-inline-box:focus-within,#tagsdiv-course_provider.lc-course-provider-inline-box .inside:focus,#tagsdiv-course_provider.lc-course-provider-inline-box .inside:focus-within{outline:none !important;box-shadow:none !important;}';
       document.head.appendChild(style);
     }
 
     var html = '';
-    html += '<div class="lc-provider-single-wrap" style="padding:8px 0;">';
-    html += '<label for="lc-course-provider-select" style="display:block;margin-bottom:8px;font-weight:600;">Course Providers</label>';
+    html += '<div class="lc-provider-single-wrap">';
+    html += '<label class="lc-provider-single-label" for="lc-course-provider-select">Course Providers</label>';
     html += buildSelectHtml(selectedId);
-    html += '<input type="hidden" id="lc-course-provider-term-id" name="lc_course_provider_single_term_id" value="' + (selectedId || '') + '">';
     html += '<input type="hidden" name="lc_course_provider_single_nonce" value="' + escHtml(CFG.nonce || '') + '">';
     html += '</div>';
     $inside.html(html);
+  }
 
-    $box.on('change', '#lc-course-provider-select', function(){
-      $('#lc-course-provider-term-id').val($(this).val() || '');
-    });
+  function ensureInlineProviderRow($target) {
+    var $row = $('.lc-course-provider-inline-row').first();
+    if ($row.length) return $row;
+
+    $row = $(
+      '<div class="acf-field -left lc-course-provider-inline-row">' +
+        '<div class="acf-label"><label>Course Providers</label></div>' +
+        '<div class="acf-input"></div>' +
+      '</div>'
+    );
+    $target.after($row);
+    return $row;
   }
 
   function mountCourseProviderBox() {
     var $box = $('#tagsdiv-course_provider');
     var $target = $('.acf-field[data-key="field_lc_course_mode_01"]').first();
     if (!$box.length || !$target.length) return;
+    var $row = ensureInlineProviderRow($target);
+    var $input = $row.find('> .acf-input').first();
 
     renderSingleSelect($box, parseInt(CFG.selectedTermId, 10) || 0);
 
-    if (!$box.parent().is($target.parent())) {
-      $target.after($box);
-    } else if (!$box.prev().is($target)) {
-      $target.after($box);
+    if ($input.length && !$box.parent().is($input)) {
+      $input.append($box);
     }
   }
 
@@ -2757,9 +2765,14 @@ add_action('save_post_course', function ($post_id, $post, $update) {
     $nonce = sanitize_text_field(wp_unslash($_POST['lc_course_provider_single_nonce']));
     if (!wp_verify_nonce($nonce, 'lc_course_provider_single_select')) return;
 
-    $term_id = isset($_POST['lc_course_provider_single_term_id'])
-        ? (int) wp_unslash($_POST['lc_course_provider_single_term_id'])
-        : 0;
+    $term_id = 0;
+    if (isset($_POST['tax_input']) && is_array($_POST['tax_input']) && array_key_exists('course_provider', $_POST['tax_input'])) {
+        $raw = wp_unslash($_POST['tax_input']['course_provider']);
+        if (is_array($raw)) {
+            $raw = reset($raw);
+        }
+        $term_id = (int) $raw;
+    }
 
     if ($term_id > 0 && term_exists($term_id, 'course_provider')) {
         wp_set_object_terms($post_id, [$term_id], 'course_provider', false);

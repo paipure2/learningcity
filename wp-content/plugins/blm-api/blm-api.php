@@ -592,6 +592,25 @@ function blm_clear_full_cache_for_location_id($location_id) {
   }
 }
 
+if (!function_exists('blm_normalize_multiline_text')) {
+  function blm_normalize_multiline_text($value) {
+    $text = is_scalar($value) ? (string) $value : '';
+    if ($text === '') return '';
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = str_replace(["\\r\\n", "\\n\\r", "\\n", "\\r"], "\n", $text);
+    $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*rnrn\s*(?=[\p{Thai}\d\(])/u', "\n\n", $text);
+    $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*rn\s*(?=[\p{Thai}\d\(])/u', "\n", $text);
+    $text = preg_replace('/(?<![A-Za-z0-9])rnrn(?![A-Za-z0-9])/iu', "\n\n", $text);
+    $text = preg_replace('/(?<![A-Za-z0-9])rn(?![A-Za-z0-9])/iu', "\n", $text);
+    $text = preg_replace('/(?<=[\p{Thai}\d\)\]\.])\s*n\s*(?=[\p{Thai}\d\(])/u', "\n", $text);
+    $text = preg_replace('/[ ]{2,}/u', ' ', $text);
+    $text = preg_replace("/[ \t]+\n/u", "\n", $text);
+    $text = preg_replace("/\n{3,}/u", "\n\n", $text);
+    return trim((string) $text);
+  }
+}
+
 /** ---------- auto rebuild caches on content update (NEW) ---------- */
 
 /**
@@ -629,8 +648,10 @@ add_action('blm_rebuild_caches_event', function ($post_id = 0) {
     // ---- ปรับคีย์ให้ตรง ACF ของคุณ ----
     $phone = $meta['phone'][0] ?? '';
     $hours = $meta['opening_hours'][0] ?? ($meta['hours'][0] ?? '');
+    $hours = blm_normalize_multiline_text($hours);
     $description = blm_get_location_description_from_content($post_id);
     if ($description === '') $description = $meta['description'][0] ?? '';
+    $description = blm_normalize_multiline_text($description);
 
     // links
     $googleMaps = $meta['google_maps'][0] ?? '';
@@ -958,8 +979,10 @@ add_action('rest_api_init', function () {
       // ---- ปรับคีย์ให้ตรง ACF ของคุณ ----
       $phone = $meta['phone'][0] ?? '';
       $hours = $meta['opening_hours'][0] ?? ($meta['hours'][0] ?? '');
+      $hours = blm_normalize_multiline_text($hours);
       $description = blm_get_location_description_from_content($id);
       if ($description === '') $description = $meta['description'][0] ?? '';
+      $description = blm_normalize_multiline_text($description);
 
       // links
       $acfMapUrl  = $meta['map_url'][0] ?? '';

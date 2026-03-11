@@ -863,28 +863,9 @@ add_action('admin_enqueue_scripts', function ($hook) {
           }
 
           function ensureInlineCourseProviderPanel() {
-            if (!$courseModeInputWrap.length) return;
-            if ($inlineProviderPanel.length) return;
-
-            // Prefer moving the WP taxonomy metabox into the Course Mode area.
             if ($providerBox.length) {
-              const $inside = $providerBox.children(".inside").first();
-              const titleText = $.trim(
-                $providerBox.find(".postbox-header .hndle, .hndle span, .hndle").first().text()
-              ) || "Course Providers";
-              if ($inside.length) {
-                $inlineProviderPanel = $(
-                  '<div id="lc-inline-course-provider-panel" class="lc-inline-provider-panel">' +
-                    '<div class="lc-inline-provider-panel-head"></div>' +
-                    '<div class="lc-inline-provider-panel-body"></div>' +
-                  '</div>'
-                );
-                $inlineProviderPanel.find(".lc-inline-provider-panel-head").text(titleText);
-                $inlineProviderPanel.find(".lc-inline-provider-panel-body").append($inside);
-                $courseModeInputWrap.append($inlineProviderPanel);
-                $providerBox.addClass("lc-provider-original-hidden");
-                return;
-              }
+              $providerBox.removeClass("lc-provider-original-hidden");
+              return;
             }
           }
 

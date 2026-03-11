@@ -2584,6 +2584,8 @@ if (!defined('ABSPATH')) exit;
     { key: "title", label: "ชื่อสถานที่", multiline: false, locked: true },
     { key: "address", label: "ที่อยู่", multiline: true },
     { key: "phone", label: "เบอร์โทร", multiline: false },
+    { key: "latitude", label: "Latitude", multiline: false, inputMode: "decimal", placeholder: "เช่น 13.756331" },
+    { key: "longitude", label: "Longitude", multiline: false, inputMode: "decimal", placeholder: "เช่น 100.501765" },
     { key: "opening_hours", label: "เวลาเปิดทำการ", multiline: true },
     { key: "description", label: "คำอธิบาย", multiline: true },
     { key: "google_maps", label: "ลิงก์ Google Maps", multiline: false },
@@ -2593,6 +2595,25 @@ if (!defined('ABSPATH')) exit;
     INLINE_LOCATION_FIELDS.filter((cfg) => !!cfg?.locked).map((cfg) => String(cfg.key || "").trim()).filter(Boolean)
   );
   let inlineLocationContext = null;
+  const normalizeInlineDebug = (debug, fallback = {}) => {
+    const raw = (debug && typeof debug === "object") ? debug : {};
+    return {
+      error_id: String(raw.error_id || fallback.error_id || ""),
+      code: String(raw.code || fallback.code || ""),
+      stage: String(raw.stage || fallback.stage || ""),
+      action: String(raw.action || fallback.action || ""),
+      http_status: Number(raw.http_status || fallback.http_status || 0) || 0,
+      time_utc: String(raw.time_utc || fallback.time_utc || ""),
+      context: (raw.context && typeof raw.context === "object") ? raw.context : {},
+    };
+  };
+  const buildInlineAjaxError = async (res, fallbackMessage, fallbackDebug = {}) => {
+    let json = null;
+    try { json = await res.json(); } catch (_) {}
+    const err = new Error(String(json?.data?.message || fallbackMessage || `HTTP ${res?.status || 0}`));
+    err.lcDebug = normalizeInlineDebug(json?.data?.debug, { ...fallbackDebug, http_status: Number(res?.status || 0) });
+    return err;
+  };
   const decodeInlineHtmlEntities = (value) => {
     const raw = String(value || "");
     if (!raw || raw.indexOf("&") === -1) return raw;
@@ -2925,20 +2946,8 @@ if (!defined('ABSPATH')) exit;
       if (!(card instanceof HTMLElement)) return;
       card.classList.remove("is-processing");
     };
-    const normalizeDebug = (debug, fallback = {}) => {
-      const raw = (debug && typeof debug === "object") ? debug : {};
-      return {
-        error_id: String(raw.error_id || fallback.error_id || ""),
-        code: String(raw.code || fallback.code || ""),
-        stage: String(raw.stage || fallback.stage || ""),
-        action: String(raw.action || fallback.action || ""),
-        http_status: Number(raw.http_status || fallback.http_status || 0) || 0,
-        time_utc: String(raw.time_utc || fallback.time_utc || ""),
-        context: (raw.context && typeof raw.context === "object") ? raw.context : {},
-      };
-    };
     const debugTipText = (debug) => {
-      const d = normalizeDebug(debug);
+      const d = normalizeInlineDebug(debug);
       const lines = [];
       if (d.error_id) lines.push(`error_id: ${d.error_id}`);
       if (d.code) lines.push(`code: ${d.code}`);
@@ -2978,13 +2987,6 @@ if (!defined('ABSPATH')) exit;
         wrap.appendChild(details);
       }
       note.appendChild(wrap);
-    };
-    const buildInlineAjaxError = async (res, fallbackMessage, fallbackDebug = {}) => {
-      let json = null;
-      try { json = await res.json(); } catch (_) {}
-      const err = new Error(String(json?.data?.message || fallbackMessage || `HTTP ${res?.status || 0}`));
-      err.lcDebug = normalizeDebug(json?.data?.debug, { ...fallbackDebug, http_status: Number(res?.status || 0) });
-      return err;
     };
 
     const lockInlineBodyScroll = () => {};
@@ -3062,6 +3064,12 @@ if (!defined('ABSPATH')) exit;
           input.setAttribute("data-inline-field", cfg.key);
           if (!cfg.multiline) {
             input.type = "text";
+          }
+          if (cfg.inputMode) {
+            input.setAttribute("inputmode", cfg.inputMode);
+          }
+          if (cfg.placeholder) {
+            input.setAttribute("placeholder", cfg.placeholder);
           }
           input.value = String(locationValues?.[cfg.key] || "");
           if (cfg.locked) {
@@ -3691,7 +3699,7 @@ if (!defined('ABSPATH')) exit;
         const json = await res.json();
         if (!json?.success) {
           const err = new Error(json?.data?.message || "โหลดข้อมูลแก้ไขไม่สำเร็จ");
-          err.lcDebug = normalizeDebug(json?.data?.debug, { stage: "load_location_context" });
+          err.lcDebug = normalizeInlineDebug(json?.data?.debug, { stage: "load_location_context" });
           throw err;
         }
         inlineLocationContext = json.data || null;
@@ -3788,10 +3796,6 @@ if (!defined('ABSPATH')) exit;
     const deleteSessionChanged = deleteSessionIds.length > 0;
     const newSessionChanged = newSessions.length > 0;
     const changed = locationChanged || facilityChanged || sessionChanged || deleteSessionChanged || newSessionChanged || removedImageIds.length > 0 || newFiles.length > 0 || requestNote !== "";
-    if (!changed) {
-      window.lcInlineEditModalApi?.setInlineNote?.("error", "ข้อความใหม่เหมือนข้อมูลเดิม");
-      return;
-    }
     if (!confirmCheck.checked) {
       window.lcInlineEditModalApi?.setInlineNote?.("error", "กรุณาติ๊กยืนยันว่าตรวจสอบข้อมูลแล้วก่อนส่ง");
       return;
@@ -3821,7 +3825,7 @@ if (!defined('ABSPATH')) exit;
       const json = await res.json();
       if (!json?.success) {
         const err = new Error(json?.data?.message || "ส่งคำขอแก้ไขไม่สำเร็จ");
-        err.lcDebug = normalizeDebug(json?.data?.debug, { stage: "submit_location_request" });
+        err.lcDebug = normalizeInlineDebug(json?.data?.debug, { stage: "submit_location_request" });
         throw err;
       }
       const requestId = Number(json?.data?.request_id || 0);
