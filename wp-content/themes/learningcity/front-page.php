@@ -398,19 +398,32 @@
 
                   <div
                     class="lg:mt-[-20%] max-sm:mt-[-25%] bg-[#005A3A] flex flex-col rounded-20 sm:p-4 p-6 text-center 2xl:text-fs32 lg:text-[2.35vw] sm:text-[3.13vw] lg:w-auto sm:w-[30vw] w-auto text-[7.73vw] 2xl:gap-4 gap-[1vw]">
+                    <?php
+                    $chart_data = function_exists('blc_get_course_hours_chart_data') ? blc_get_course_hours_chart_data() : ['total' => 0, 'next_jobs' => 0, 'next_skills' => 0, 'other' => 0, 'percent' => ['next_jobs' => 0, 'next_skills' => 0, 'other' => 0]];
+                    $chart_tooltips = [
+                      'next_jobs' => 'คอร์สด้านอาชีพ งาน และการสร้างรายได้',
+                      'next_skills' => 'คอร์สทักษะอนาคต เทคโนโลยี ภาษา และการพัฒนาตัวเอง',
+                      'other' => 'คอร์สหมวดอื่นๆ ที่อยู่นอกสองกลุ่มหลัก',
+                    ];
+                    ?>
 
                     <!-- TOTAL -->
                     <div class="py-2">
                       <h2 class="text-white leading-tight font-medium">เรียนไปแล้ว</h2>
                       <h2 class="text-white leading-tight font-bold">
-                        <span id="total-hours" class="counter-hours">0</span> ชั่วโมง
+                        <span id="total-hours" class="counter-hours"><?php echo (int) ($chart_data['total'] ?? 0); ?></span> ชั่วโมง
                       </h2>
                     </div>
 
                     <div class="flex-1 max-sm:p-2 flex flex-col justify-center gap-3">
 
                       <!-- JOB -->
-                      <div class="flex items-start gap-2">
+                      <div
+                        class="relative flex items-start gap-2 cursor-help focus:outline-none"
+                        data-chart-tooltip-trigger
+                        tabindex="0"
+                        aria-label="<?php echo esc_attr($chart_tooltips['next_jobs']); ?>"
+                        data-chart-tooltip="<?php echo esc_attr($chart_tooltips['next_jobs']); ?>">
                         <div
                           class="2xl:w-11 lg:w-[3vw] sm:w-[4.2vw] w-[10.5vw] aspect-square flex items-center justify-center 2xl:rounded-lg lg:rounded-[0.6vw] sm:rounded-[0.8vw] rounded-[2vw] sm:p-[3.5%] p-[3%]"
                           style="background:#F7DD52">
@@ -418,22 +431,29 @@
                         </div>
 
                         <div class="flex-1 flex flex-col justify-between 2xl:gap-1 lg:gap-[0.5vw] sm:gap-[1vw] gap-[1.5vw]">
-                          <div class="bg-white/20 2xl:h-4 lg:h-[1vw] sm:h-[1.55vw] h-[3.65vw] rounded-full w-full overflow-hidden">
-                            <span
-                              class="progress block h-full rounded-full"
-                              data-theme="job"
-                              style="background:#F7DD52; width:0%"></span>
+                          <div class="relative w-full overflow-visible">
+                            <div class="bg-white/20 2xl:h-4 lg:h-[1vw] sm:h-[1.55vw] h-[3.65vw] rounded-full w-full overflow-hidden">
+                              <span
+                                class="progress block h-full rounded-full"
+                                data-theme="next_jobs"
+                                style="background:#F7DD52; width:<?php echo esc_attr((float) ($chart_data['percent']['next_jobs'] ?? 0)); ?>%"></span>
+                            </div>
                           </div>
 
                           <div class="flex items-center justify-between text-white font-medium 2xl:text-fs14 lg:text-[1vw] sm:text-[1.57vw] text-[3.4vw]">
-                            <div>อาชีพ</div>
-                            <div><span class="counter-hours" data-theme="job">0</span> ชั่วโมง</div>
+                            <div>Next Jobs</div>
+                            <div><span class="counter-hours" data-theme="next_jobs"><?php echo (int) ($chart_data['next_jobs'] ?? 0); ?></span> ชั่วโมง</div>
                           </div>
                         </div>
                       </div>
 
-                      <!-- DIGITAL -->
-                      <div class="flex items-start gap-2">
+                      <!-- NEXT SKILLS -->
+                      <div
+                        class="relative flex items-start gap-2 cursor-help focus:outline-none"
+                        data-chart-tooltip-trigger
+                        tabindex="0"
+                        aria-label="<?php echo esc_attr($chart_tooltips['next_skills']); ?>"
+                        data-chart-tooltip="<?php echo esc_attr($chart_tooltips['next_skills']); ?>">
                         <div
                           class="2xl:w-11 lg:w-[3vw] sm:w-[4.2vw] w-[10.5vw] aspect-square flex items-center justify-center 2xl:rounded-lg lg:rounded-[0.6vw] sm:rounded-[0.8vw] rounded-[2vw] sm:p-[3.5%] p-[3%]"
                           style="background:#EA3DA9">
@@ -441,22 +461,29 @@
                         </div>
 
                         <div class="flex-1 flex flex-col justify-between 2xl:gap-1 lg:gap-[0.5vw] sm:gap-[1vw] gap-[1.5vw]">
-                          <div class="bg-white/20 2xl:h-4 lg:h-[1vw] sm:h-[1.55vw] h-[3.65vw] rounded-full w-full overflow-hidden">
-                            <span
-                              class="progress block h-full rounded-full"
-                              data-theme="digital"
-                              style="background:#EA3DA9; width:0%"></span>
+                          <div class="relative w-full overflow-visible">
+                            <div class="bg-white/20 2xl:h-4 lg:h-[1vw] sm:h-[1.55vw] h-[3.65vw] rounded-full w-full overflow-hidden">
+                              <span
+                                class="progress block h-full rounded-full"
+                                data-theme="next_skills"
+                                style="background:#EA3DA9; width:<?php echo esc_attr((float) ($chart_data['percent']['next_skills'] ?? 0)); ?>%"></span>
+                            </div>
                           </div>
 
                           <div class="flex items-center justify-between text-white font-medium 2xl:text-fs14 lg:text-[1vw] sm:text-[1.57vw] text-[3.4vw]">
-                            <div>ไอที</div>
-                            <div><span class="counter-hours" data-theme="digital">0</span> ชั่วโมง</div>
+                            <div>Next Skills</div>
+                            <div><span class="counter-hours" data-theme="next_skills"><?php echo (int) ($chart_data['next_skills'] ?? 0); ?></span> ชั่วโมง</div>
                           </div>
                         </div>
                       </div>
 
-                      <!-- LANGUAGE -->
-                      <div class="flex items-start gap-2">
+                      <!-- OTHERS -->
+                      <div
+                        class="relative flex items-start gap-2 cursor-help focus:outline-none"
+                        data-chart-tooltip-trigger
+                        tabindex="0"
+                        aria-label="<?php echo esc_attr($chart_tooltips['other']); ?>"
+                        data-chart-tooltip="<?php echo esc_attr($chart_tooltips['other']); ?>">
                         <div
                           class="2xl:w-11 lg:w-[3vw] sm:w-[4.2vw] w-[10.5vw] aspect-square flex items-center justify-center 2xl:rounded-lg lg:rounded-[0.6vw] sm:rounded-[0.8vw] rounded-[2vw] sm:p-[3.5%] p-[3%]"
                           style="background:#0972CE">
@@ -464,16 +491,18 @@
                         </div>
 
                         <div class="flex-1 flex flex-col justify-between 2xl:gap-1 lg:gap-[0.5vw] sm:gap-[1vw] gap-[1.5vw]">
-                          <div class="bg-white/20 2xl:h-4 lg:h-[1vw] sm:h-[1.55vw] h-[3.65vw] rounded-full w-full overflow-hidden">
-                            <span
-                              class="progress block h-full rounded-full"
-                              data-theme="language"
-                              style="background:#0972CE; width:0%"></span>
+                          <div class="relative w-full overflow-visible">
+                            <div class="bg-white/20 2xl:h-4 lg:h-[1vw] sm:h-[1.55vw] h-[3.65vw] rounded-full w-full overflow-hidden">
+                              <span
+                                class="progress block h-full rounded-full"
+                                data-theme="other"
+                                style="background:#0972CE; width:<?php echo esc_attr((float) ($chart_data['percent']['other'] ?? 0)); ?>%"></span>
+                            </div>
                           </div>
 
                           <div class="flex items-center justify-between text-white font-medium 2xl:text-fs14 lg:text-[1vw] sm:text-[1.57vw] text-[3.4vw]">
-                            <div>ภาษา</div>
-                            <div><span class="counter-hours" data-theme="language">0</span> ชั่วโมง</div>
+                            <div>อื่นๆ</div>
+                            <div><span class="counter-hours" data-theme="other"><?php echo (int) ($chart_data['other'] ?? 0); ?></span> ชั่วโมง</div>
                           </div>
                         </div>
                       </div>
@@ -1403,6 +1432,97 @@
                 <div class="icon-close"></div>
             </button>
         </div>
+        <script>
+          (function () {
+            var triggers = document.querySelectorAll("[data-chart-tooltip-trigger]");
+            if (!triggers.length) return;
+
+            var tooltip = document.createElement("div");
+            tooltip.setAttribute("hidden", "");
+            tooltip.style.position = "fixed";
+            tooltip.style.left = "0";
+            tooltip.style.top = "0";
+            tooltip.style.zIndex = "9999";
+            tooltip.style.pointerEvents = "none";
+            tooltip.style.maxWidth = "220px";
+            tooltip.style.padding = "8px 10px";
+            tooltip.style.borderRadius = "12px";
+            tooltip.style.background = "#ffffff";
+            tooltip.style.color = "#005A3A";
+            tooltip.style.fontSize = "11px";
+            tooltip.style.fontWeight = "600";
+            tooltip.style.lineHeight = "1.35";
+            tooltip.style.boxShadow = "0 10px 30px rgba(0, 0, 0, 0.18)";
+            tooltip.style.whiteSpace = "normal";
+            tooltip.style.opacity = "0";
+            tooltip.style.transform = "translateY(4px)";
+            tooltip.style.transition = "opacity 160ms ease, transform 160ms ease";
+            document.body.appendChild(tooltip);
+
+            var activeTrigger = null;
+            var hideTimer = null;
+
+            var move = function (event) {
+              if (!activeTrigger) return;
+
+              var offsetX = 14;
+              var offsetY = 18;
+              var left = event.clientX + offsetX;
+              var top = event.clientY - offsetY - tooltip.offsetHeight;
+              var maxLeft = window.innerWidth - tooltip.offsetWidth - 12;
+
+              if (left > maxLeft) {
+                left = Math.max(12, maxLeft);
+              }
+
+              if (top < 12) {
+                top = event.clientY + 18;
+              }
+
+              tooltip.style.left = left + "px";
+              tooltip.style.top = top + "px";
+            };
+
+            triggers.forEach(function (trigger) {
+              var content = trigger.getAttribute("data-chart-tooltip");
+              if (!content) return;
+
+              var show = function (event) {
+                if (hideTimer) {
+                  window.clearTimeout(hideTimer);
+                  hideTimer = null;
+                }
+                activeTrigger = trigger;
+                tooltip.textContent = content;
+                tooltip.hidden = false;
+                if (event) move(event);
+                window.requestAnimationFrame(function () {
+                  tooltip.style.opacity = "1";
+                  tooltip.style.transform = "translateY(0)";
+                });
+              };
+
+              var hide = function () {
+                if (activeTrigger === trigger) {
+                  activeTrigger = null;
+                }
+                tooltip.style.opacity = "0";
+                tooltip.style.transform = "translateY(4px)";
+                hideTimer = window.setTimeout(function () {
+                  if (!activeTrigger) {
+                    tooltip.hidden = true;
+                  }
+                }, 170);
+              };
+
+              trigger.addEventListener("mouseenter", show);
+              trigger.addEventListener("mousemove", move);
+              trigger.addEventListener("mouseleave", hide);
+              trigger.addEventListener("focus", show);
+              trigger.addEventListener("blur", hide);
+            });
+          })();
+        </script>
         <div class="modal-content relative z-10 max-lg:overflow-y-auto! group max-h-screen h-full">
             <div class="flex lg:flex-row flex-col h-full">
                 <div class="lg:flex-[40%] max-lg:h-[300px] max-sm:h-[275px] h-full">

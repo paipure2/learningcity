@@ -5,13 +5,13 @@ echarts.use([SVGRenderer, CanvasRenderer]);
 
 /**
  * Read chart values injected by WordPress (PHP) via:
- * window.__BLC__ = { chart: { job, language, digital, target } }
+ * window.__BLC__ = { chart: { next_jobs, next_skills, other, target } }
  */
 function getChartValues() {
   const fallback = {
-    job: 0,
-    language: 0,
-    digital: 0,
+    next_jobs: 0,
+    next_skills: 0,
+    other: 0,
     target: 1000000,
   };
 
@@ -19,9 +19,9 @@ function getChartValues() {
     const c = window.__BLC__.chart;
 
     return {
-      job: Number(c.job ?? fallback.job),
-      language: Number(c.language ?? fallback.language),
-      digital: Number(c.digital ?? fallback.digital),
+      next_jobs: Number(c.next_jobs ?? fallback.next_jobs),
+      next_skills: Number(c.next_skills ?? fallback.next_skills),
+      other: Number(c.other ?? fallback.other),
       target: Number(c.target ?? fallback.target),
     };
   }
@@ -47,7 +47,7 @@ export function chart() {
   const values = getChartValues();
 
   // total hours from WP
-  const sum = values.job + values.language + values.digital;
+  const sum = values.next_jobs + values.next_skills + values.other;
 
   // remaining to reach target (1,000,000)
   const remaining = Math.max(values.target - sum, 0);
@@ -86,9 +86,9 @@ export function chart() {
           padding: [4, 2, 4, 4],
           borderRadius: 4,
           formatter: ({ name }) => {
-            if (name === "อาชีพ") return "{career|} อาชีพ";
-            if (name === "ภาษา") return "{lang|} ภาษา";
-            if (name === "ไอที") return "{it|} ไอที";
+            if (name === "Next Jobs") return "{career|} Next Jobs";
+            if (name === "Next Skills") return "{it|} Next Skills";
+            if (name === "อื่นๆ") return "{lang|} อื่นๆ";
             return "";
           },
           rich: {
@@ -120,40 +120,25 @@ export function chart() {
         },
 
         data: [
-          // job
+          // next jobs
           {
-            value: values.job,
-            name: "อาชีพ",
+            value: values.next_jobs,
+            name: "Next Jobs",
             itemStyle: { color: "#F7DD52" },
-            // label: {
-            //   backgroundColor: "#F7DD52",
-            //   color: "#000",
-            //   offset: [48, -10],
-            // },
           },
 
-          // language
+          // next skills
           {
-            value: values.language,
-            name: "ภาษา",
-            itemStyle: { color: "#0972CE" },
-            // label: {
-            //   backgroundColor: "#0972CE",
-            //   color: "#fff",
-            //   offset: [50, 25],
-            // },
-          },
-
-          // digital
-          {
-            value: values.digital,
-            name: "ไอที",
+            value: values.next_skills,
+            name: "Next Skills",
             itemStyle: { color: "#EA3DA9" },
-            // label: {
-            //   backgroundColor: "#EA3DA9",
-            //   color: "#fff",
-            //   offset: [-35, -25],
-            // },
+          },
+
+          // other
+          {
+            value: values.other,
+            name: "อื่นๆ",
+            itemStyle: { color: "#0972CE" },
           },
 
           // remaining to target 1,000,000
@@ -209,17 +194,26 @@ export function startClock() {
 
 import gsap from "gsap";
 
+function safeNumber(value) {
+  const normalized = String(value ?? "")
+    .replace(/,/g, "")
+    .trim();
+
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 function getData() {
   const c = window.__BLC__?.chart || {};
-  return {
-    job: Number(c.job || 0),
-    language: Number(c.language || 0),
-    digital: Number(c.digital || 0),
+    return {
+    next_jobs: Number(c.next_jobs || 0),
+    next_skills: Number(c.next_skills || 0),
+    other: Number(c.other || 0),
     total: Number(c.total || 0),
     percent: {
-      job: Number(c.percent?.job || 0),
-      language: Number(c.percent?.language || 0),
-      digital: Number(c.percent?.digital || 0),
+      next_jobs: Number(c.percent?.next_jobs || 0),
+      next_skills: Number(c.percent?.next_skills || 0),
+      other: Number(c.percent?.other || 0),
     },
   };
 }
@@ -229,19 +223,20 @@ export function renderBarsWithGsap() {
   const d = getData();
 
   // 1) ใส่เลขรวม
-  const totalEl = document.querySelector("#total-hours");
-  if (totalEl) totalEl.textContent = String(d.total);
+  document.querySelectorAll("#total-hours").forEach((el) => {
+    el.textContent = String(d.total);
+  });
 
   // 2) ใส่เลขรายธีม + ตั้ง width เป้าหมาย
-  ["job", "digital", "language"].forEach((t) => {
-    const hoursEl = document.querySelector(`.counter-hours[data-theme="${t}"]`);
-    if (hoursEl) hoursEl.textContent = String(d[t]);
+  ["next_jobs", "next_skills", "other"].forEach((t) => {
+    document.querySelectorAll(`.counter-hours[data-theme="${t}"]`).forEach((el) => {
+      el.textContent = String(d[t]);
+    });
 
-    const barEl = document.querySelector(`.progress[data-theme="${t}"]`);
-    if (barEl) {
-      const w = Math.max(0, Math.min(100, d.percent[t]));
-      barEl.style.width = `${w}%`; // ✅ ปลายทาง
-    }
+    document.querySelectorAll(`.progress[data-theme="${t}"]`).forEach((el) => {
+      const w = Math.max(0, Math.min(100, safeNumber(d.percent[t])));
+      el.style.width = `${w}%`;
+    });
   });
 
   // 3) Animate (ของคุณเดิมเลย)
@@ -262,7 +257,7 @@ export function renderBarsWithGsap() {
     ease: "power4.out",
     modifiers: {
       textContent: (value) =>
-        Number(value).toLocaleString(undefined, {
+        safeNumber(value).toLocaleString(undefined, {
           minimumFractionDigits: 0,
           maximumFractionDigits: 0,
         }),

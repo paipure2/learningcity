@@ -126,12 +126,22 @@ if (!defined('ABSPATH')) exit;
     }
   }
   #btnLocate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 999px !important;
     border: 0 !important;
     background: linear-gradient(180deg, #1893ff 12%, #0045ad 100%) !important;
     font-size: 14px;
     font-weight: 600;
     min-height: 42px;
+    line-height: 1;
+  }
+  #btnLocate .icon-20 {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
   }
   .blm-near-switch-wrap {
     display: inline-flex;
@@ -829,7 +839,7 @@ if (!defined('ABSPATH')) exit;
     }
     .blm-mobile-locate-fab {
       position: fixed;
-      right: calc(env(safe-area-inset-right) * -1);
+      right: calc(env(safe-area-inset-right) + 12px);
       bottom: calc(32svh + env(safe-area-inset-bottom) + 12px);
       width: 46px;
       height: 46px;

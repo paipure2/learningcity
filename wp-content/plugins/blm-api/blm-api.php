@@ -13,6 +13,44 @@ function blm_float_or_null($v) {
   return is_numeric($v) ? floatval($v) : null;
 }
 
+function blm_get_location_total_views_map() {
+  global $wpdb;
+
+  $table = $wpdb->prefix . 'lc_analytics_events';
+  $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+  if ($table_exists !== $table) {
+    return [];
+  }
+
+  $rows = $wpdb->get_results(
+    $wpdb->prepare(
+      "
+        SELECT object_id, COUNT(*) AS total
+        FROM {$table}
+        WHERE object_type = %s
+          AND event_type = %s
+          AND object_id > 0
+        GROUP BY object_id
+      ",
+      'location',
+      'location_view'
+    )
+  );
+
+  if (!is_array($rows) || empty($rows)) {
+    return [];
+  }
+
+  $map = [];
+  foreach ($rows as $row) {
+    $object_id = isset($row->object_id) ? (int) $row->object_id : 0;
+    if ($object_id <= 0) continue;
+    $map[$object_id] = isset($row->total) ? (int) $row->total : 0;
+  }
+
+  return $map;
+}
+
 function blm_location_full_cache_key($location_id) {
   return 'blm_location_full_v3_' . intval($location_id);
 }
@@ -353,6 +391,7 @@ function blm_rest_guard(callable $fn) {
 
 function blm_build_locations_light_payload() {
   $location_course_categories = blm_build_location_course_categories_map();
+  $location_views_map = blm_get_location_total_views_map();
   $q = new WP_Query([
     'post_type'              => 'location',
     'post_status'            => 'publish',
@@ -391,6 +430,7 @@ function blm_build_locations_light_payload() {
     $places[] = [
       'id'        => intval($post_id),
       'name'      => get_the_title($post_id),
+      'views_count' => (int) ($location_views_map[$post_id] ?? 0),
       'district'  => (string)$district,
       // Keep single category for backward compatibility, but include all categories
       'category'  => (string)($category ?: ($categories[0] ?? '')),
@@ -406,11 +446,22 @@ function blm_build_locations_light_payload() {
     ];
   }
 
+  usort($places, function ($a, $b) {
+    $views_a = isset($a['views_count']) ? (int) $a['views_count'] : 0;
+    $views_b = isset($b['views_count']) ? (int) $b['views_count'] : 0;
+    if ($views_a !== $views_b) {
+      return $views_b <=> $views_a;
+    }
+
+    return ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
+  });
+
   return [
     'places' => $places,
     'meta' => [
       'count' => count($places),
       'schema_version' => 9,
+      'sort' => 'views_desc',
       'generated_at' => time(),
     ],
   ];

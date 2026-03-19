@@ -9,6 +9,8 @@ $blm_pages = get_posts([
     'fields'         => 'ids',
 ]);
 $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
+$blog_page_id = (int) get_option('page_for_posts');
+$blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
 $partners_title = function_exists('get_field') ? get_field('partners_title', $front_page_id) : '';
 $partners_title = trim((string) $partners_title);
 if ($partners_title === '') {
@@ -37,7 +39,7 @@ if (!is_array($partners_gallery) || empty($partners_gallery)) {
                          <ul class="menu-footer">
                              <li><a href="nextlearn.html" class="active">Next Learn</a></li>
                              <li><a href="<?php echo esc_url($blm_url); ?>">แหล่งเรียนรู้</a></li>
-                             <li><a href="#!" disabled>บทความ<span>เร็วๆนี้</span></a></li>
+                             <li><a href="<?php echo esc_url($blog_url); ?>">บทความ</a></li>
                          </ul>
                      </div>
 

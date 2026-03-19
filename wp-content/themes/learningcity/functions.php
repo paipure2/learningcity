@@ -2051,18 +2051,34 @@ function lc_get_visible_course_provider_terms() {
     return [];
   }
 
+  $visible_term_ids = array_fill_keys(array_map('intval', $term_ids), true);
+
   $terms = get_terms([
     'taxonomy'   => 'course_provider',
     'hide_empty' => false,
-    'include'    => array_map('intval', $term_ids),
-    'orderby'    => 'name',
-    'order'      => 'ASC',
   ]);
 
   if (is_wp_error($terms) || !is_array($terms)) {
     $cache[$cache_key] = [];
     return [];
   }
+
+  $terms = array_values(array_filter($terms, static function ($term) use ($visible_term_ids, $can_view_hidden) {
+    if (!$term instanceof WP_Term) {
+      return false;
+    }
+
+    $term_id = (int) $term->term_id;
+    if ($term_id <= 0 || !isset($visible_term_ids[$term_id])) {
+      return false;
+    }
+
+    if (!$can_view_hidden && lc_is_course_provider_hidden($term_id)) {
+      return false;
+    }
+
+    return true;
+  }));
 
   $cache[$cache_key] = $terms;
   return $terms;
@@ -2470,6 +2486,98 @@ add_action('template_redirect', function () {
 /* =========================================================
  * [FRONT] Hour Chart data (transient)
  * ========================================================= */
+function blc_get_course_hours_chart_data() {
+  $theme_alias_map = [
+    'next_jobs'   => ['next-jobs'],
+    'next_skills' => ['next-skills'],
+    'other'       => ['อื่นๆ'],
+  ];
+
+  $cache_key = 'blc_course_hours_by_theme_v6';
+  $data = get_transient($cache_key);
+
+  if ($data !== false) {
+    return $data;
+  }
+
+  $totals = [
+    'next_jobs' => 0,
+    'next_skills' => 0,
+    'other' => 0,
+  ];
+
+  $ids = get_posts([
+    'post_type'      => 'course',
+    'post_status'    => 'publish',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+    'no_found_rows'  => true,
+  ]);
+
+  foreach ($ids as $id) {
+    $hours = get_post_meta($id, 'total_attendance_hours', true);
+    $hours = is_numeric($hours) ? (float) $hours : 0;
+    if ($hours <= 0) {
+      continue;
+    }
+
+    $terms = wp_get_post_terms($id, 'key-theme');
+    if (is_wp_error($terms) || empty($terms)) {
+      continue;
+    }
+
+    $course_term_values = [];
+    foreach ($terms as $term) {
+      $slug = isset($term->slug) ? (string) $term->slug : '';
+      $name = isset($term->name) ? (string) $term->name : '';
+
+      if ($slug !== '') {
+        $course_term_values[] = $slug;
+        $course_term_values[] = rawurldecode($slug);
+      }
+
+      if ($name !== '') {
+        $course_term_values[] = $name;
+      }
+    }
+
+    $course_term_values = array_unique(array_filter($course_term_values, static function ($value) {
+      return $value !== '';
+    }));
+
+    foreach ($theme_alias_map as $bucket => $aliases) {
+      foreach ($aliases as $alias) {
+        if (in_array($alias, $course_term_values, true)) {
+          $totals[$bucket] += $hours;
+          break;
+        }
+      }
+    }
+  }
+
+  $next_jobs = (int) round($totals['next_jobs']);
+  $next_skills = (int) round($totals['next_skills']);
+  $others = (int) round($totals['other']);
+  $total = $next_jobs + $next_skills + $others;
+
+  $data = [
+    'next_jobs'   => $next_jobs,
+    'next_skills' => $next_skills,
+    'other'       => $others,
+    'total'       => $total,
+    'target'      => 1000000,
+    'percent'     => [
+      'next_jobs'   => $total ? round(($next_jobs / $total) * 100, 2) : 0,
+      'next_skills' => $total ? round(($next_skills / $total) * 100, 2) : 0,
+      'other'       => $total ? round(($others / $total) * 100, 2) : 0,
+    ],
+  ];
+
+  set_transient($cache_key, $data, 10 * MINUTE_IN_SECONDS);
+
+  return $data;
+}
+
 add_action('wp_enqueue_scripts', function () {
 
   wp_enqueue_script(
@@ -2492,59 +2600,7 @@ add_action('wp_enqueue_scripts', function () {
     return str_replace('<script ', '<script type="module" ', $tag);
   }, 10, 2);
 
-  $wanted = ['job', 'language', 'digital'];
-
-  $cache_key = 'blc_course_hours_by_theme_v1';
-  $data = get_transient($cache_key);
-
-  if ($data === false) {
-    $totals = array_fill_keys($wanted, 0);
-
-    $ids = get_posts([
-      'post_type'      => 'course',
-      'post_status'    => 'publish',
-      'posts_per_page' => -1,
-      'fields'         => 'ids',
-      'no_found_rows'  => true,
-    ]);
-
-    foreach ($ids as $id) {
-      $hours = get_post_meta($id, 'total_attendance_hours', true);
-      $hours = is_numeric($hours) ? (float)$hours : 0;
-      if ($hours <= 0) continue;
-
-      $slugs = wp_get_post_terms($id, 'key-theme', ['fields' => 'slugs']);
-      if (is_wp_error($slugs) || empty($slugs)) continue;
-
-      foreach ($wanted as $slug) {
-        if (in_array($slug, $slugs, true)) {
-          $totals[$slug] += $hours;
-        }
-      }
-    }
-
-    $job = (int)round($totals['job']);
-    $language = (int)round($totals['language']);
-    $digital = (int)round($totals['digital']);
-    $total = $job + $language + $digital;
-
-    $percent = [
-      'job'      => $total ? round(($job / $total) * 100, 2) : 0,
-      'language' => $total ? round(($language / $total) * 100, 2) : 0,
-      'digital'  => $total ? round(($digital / $total) * 100, 2) : 0,
-    ];
-
-    $data = [
-      'job'      => $job,
-      'language' => $language,
-      'digital'  => $digital,
-      'total'    => $total,
-      'target'   => 1000000,
-      'percent'  => $percent,
-    ];
-
-    set_transient($cache_key, $data, 10 * MINUTE_IN_SECONDS);
-  }
+  $data = blc_get_course_hours_chart_data();
 
   wp_add_inline_script(
     'theme-app',

@@ -8,6 +8,8 @@ $blm_pages = get_posts([
    'fields'         => 'ids',
 ]);
 $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learning-map/');
+$blog_page_id = (int) get_option('page_for_posts');
+$blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
 ?>
  <div class="site-status-banner" role="status" aria-live="polite">
     <p>ขณะนี้เว็บไซต์อยู่ในช่วง Soft Launch ข้อมูลบางส่วนอาจยังไม่สมบูรณ์หรือมีการเปลี่ยนแปลงได้</p>
@@ -32,13 +34,18 @@ $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learni
                   Next Learn
                   </a>
                </li>
-                <li>
+               <li>
                   <a href="<?php echo esc_url($blm_url); ?>"
                      class="<?php echo esc_attr( nav_active(['page_template' => 'page-blm.php']) ); ?>">
                   แหล่งเรียนรู้
                   </a>
                </li>
-               <li><a href="#!" disabled>บทความ<span>เร็วๆนี้</span></a></li>
+               <li>
+                  <a href="<?php echo esc_url($blog_url); ?>"
+                     class="<?php echo esc_attr( nav_active(['blog' => true]) ); ?>">
+                  บทความ
+                  </a>
+               </li>
              </ul>
           </nav>
           <div class="box-right">
@@ -79,7 +86,12 @@ $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learni
                 แหล่งเรียนรู้
              </a>
              </li>
-             <li><a href="#!" disabled>บทความ<span>เร็วๆนี้</span></a></li>
+             <li>
+             <a href="<?php echo esc_url($blog_url); ?>"
+                class="<?php echo esc_attr( nav_active(['blog' => true]) ); ?>">
+                บทความ
+             </a>
+             </li>
           </ul>
           <a href="<?php echo site_url('/') ?>"><span class="logo-site"></span></a>
        </div>
