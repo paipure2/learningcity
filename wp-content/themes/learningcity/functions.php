@@ -2492,8 +2492,13 @@ function blc_get_course_hours_chart_data() {
     'next_skills' => ['next-skills'],
     'other'       => ['อื่นๆ'],
   ];
+  $display_baseline = [
+    'next_jobs'   => 299398,
+    'next_skills' => 31093,
+    'other'       => 251,
+  ];
 
-  $cache_key = 'blc_course_hours_by_theme_v6';
+  $cache_key = 'blc_course_hours_by_theme_v7';
   $data = get_transient($cache_key);
 
   if ($data !== false) {
@@ -2555,9 +2560,9 @@ function blc_get_course_hours_chart_data() {
     }
   }
 
-  $next_jobs = (int) round($totals['next_jobs']);
-  $next_skills = (int) round($totals['next_skills']);
-  $others = (int) round($totals['other']);
+  $next_jobs = max(0, (int) round($totals['next_jobs']) - $display_baseline['next_jobs']);
+  $next_skills = max(0, (int) round($totals['next_skills']) - $display_baseline['next_skills']);
+  $others = max(0, (int) round($totals['other']) - $display_baseline['other']);
   $total = $next_jobs + $next_skills + $others;
 
   $data = [

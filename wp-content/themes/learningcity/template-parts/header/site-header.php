@@ -11,9 +11,6 @@ $blm_url = !empty($blm_pages) ? get_permalink($blm_pages[0]) : home_url('/learni
 $blog_page_id = (int) get_option('page_for_posts');
 $blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
 ?>
- <div class="site-status-banner" role="status" aria-live="polite">
-    <p>ขณะนี้เว็บไซต์อยู่ในช่วง Soft Launch ข้อมูลบางส่วนอาจยังไม่สมบูรณ์หรือมีการเปลี่ยนแปลงได้</p>
- </div>
  <header>
     <div class="container">
        <div class="header">
@@ -53,7 +50,7 @@ $blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
                 <div class="xl:w-[136px] lg:w-[110px] w-32"><img src="<?php echo THEME_URI ?>//assets/images/logo-bkk-head.png" alt=""></div>
              </div>
              <div class="flex items-center gap-4">
-                <!-- <button class="icon-search xl:w-7 lg:w-5 w-7" data-modal-id="modal-search"></button> -->
+                <button class="icon-search xl:w-7 lg:w-5 w-7" data-modal-id="modal-search" aria-label="เปิดค้นหา"></button>
                 <button class="hamburger-menu">
                    <span></span>
                    <span></span>
