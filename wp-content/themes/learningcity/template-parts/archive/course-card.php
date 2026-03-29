@@ -47,20 +47,18 @@ if (preg_match('/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/', $hex_color)) {
 }
 
 // 2. ข้อมูลผู้จัดสอน (Provider)
-$provider_name = '';
-$provider_logo_url = 'https://dummyimage.com/100x100/ddd/aaa'; // Placeholder
-$provider_terms = get_the_terms($post_id, 'course_provider');
-
-if (!empty($provider_terms) && !is_wp_error($provider_terms)) {
-    $provider = $provider_terms[0];
-    $provider_name = $provider->name;
-    $logo = get_field('image', $provider);
-    
-    if (!empty($logo)) {
-        if (is_array($logo)) $provider_logo_url = $logo['url'];
-        elseif (is_numeric($logo)) $provider_logo_url = wp_get_attachment_image_url($logo, 'thumbnail');
-        else $provider_logo_url = $logo;
-    }
+$provider_ctx = function_exists('course_get_provider_context') ? course_get_provider_context($post_id) : [];
+$provider_name = !empty($provider_ctx['name']) ? (string) $provider_ctx['name'] : '';
+$provider_extra_count = !empty($provider_ctx['extra_count']) ? (int) $provider_ctx['extra_count'] : 0;
+$provider_badge_text = $provider_name;
+if ($provider_name && $provider_extra_count > 0) {
+    $provider_badge_text .= ' +' . $provider_extra_count;
+}
+$provider_logos = [];
+if (!empty($provider_ctx['providers']) && is_array($provider_ctx['providers'])) {
+    $provider_logos = array_slice(array_values(array_filter($provider_ctx['providers'], function ($provider) {
+        return !empty($provider['img_src']);
+    })), 0, 3);
 }
 
 // 3. ระยะเวลาเรียน (Duration)
@@ -115,10 +113,14 @@ $thumb = get_the_post_thumbnail_url($post_id, 'medium') ?: THEME_URI . '/assets/
 
             <?php if ($provider_name) : ?>
                 <div class="flex items-center gap-2 mt-1.5">
-                    <img src="<?php echo esc_url($provider_logo_url); ?>" 
-                         alt="<?php echo esc_attr($provider_name); ?>" 
-                         class="sm:w-6 w-5 aspect-square rounded-full object-cover">
-                    <h3 class="text-fs14"><?php echo esc_html($provider_name); ?></h3>
+                    <div class="flex items-center">
+                        <?php foreach ($provider_logos as $index => $provider_logo) : ?>
+                            <img src="<?php echo esc_url($provider_logo['img_src']); ?>"
+                                 alt="<?php echo esc_attr($provider_logo['name']); ?>"
+                                 class="sm:w-6 w-5 aspect-square rounded-full object-cover border border-white bg-white <?php echo $index > 0 ? '-ml-2' : ''; ?>">
+                        <?php endforeach; ?>
+                    </div>
+                    <h3 class="text-fs14 truncate"><?php echo esc_html($provider_badge_text); ?></h3>
                 </div>
             <?php endif; ?>
         </div>

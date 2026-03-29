@@ -50,28 +50,48 @@ function course_get_primary_category_context($post_id) {
 
 function course_get_provider_context($post_id) {
   $provider_terms = get_the_terms($post_id, 'course_provider');
-  $name = '';
-  $term_link = '';
-  $img_src = 'https://learning.bangkok.go.th/wp-content/themes/learningcity/assets/images/placeholder-gray.png';
+  $placeholder = 'https://learning.bangkok.go.th/wp-content/themes/learningcity/assets/images/placeholder-gray.png';
+  $providers = [];
 
   if (!empty($provider_terms) && !is_wp_error($provider_terms)) {
-    $t = $provider_terms[0];
-    $name = $t->name;
-    $term_link = get_term_link($t);
+    foreach ($provider_terms as $term) {
+      if (!($term instanceof WP_Term)) continue;
 
-    $logo = get_field('image', $t);
-    $logo_url = '';
-    if (is_array($logo) && !empty($logo['url'])) $logo_url = $logo['url'];
-    elseif (is_string($logo) && !empty($logo)) $logo_url = $logo;
-    elseif (is_numeric($logo)) $logo_url = wp_get_attachment_image_url((int)$logo, 'thumbnail');
+      $logo = get_field('image', $term);
+      $logo_url = '';
+      if (is_array($logo) && !empty($logo['url'])) $logo_url = $logo['url'];
+      elseif (is_string($logo) && !empty($logo)) $logo_url = $logo;
+      elseif (is_numeric($logo)) $logo_url = wp_get_attachment_image_url((int)$logo, 'thumbnail');
 
-    if (!empty($logo_url)) $img_src = $logo_url;
+      $providers[] = [
+        'name' => (string) $term->name,
+        'term_link' => get_term_link($term),
+        'img_src' => !empty($logo_url) ? $logo_url : $placeholder,
+        'term_id' => (int) $term->term_id,
+      ];
+    }
   }
 
+  $primary = !empty($providers) ? $providers[0] : [
+    'name' => '',
+    'term_link' => '',
+    'img_src' => $placeholder,
+    'term_id' => 0,
+  ];
+
   return [
-    'name' => $name,
-    'term_link' => $term_link,
-    'img_src' => $img_src,
+    'name' => $primary['name'],
+    'term_link' => $primary['term_link'],
+    'img_src' => $primary['img_src'],
+    'providers' => $providers,
+    'names' => array_values(array_filter(array_map(function ($provider) {
+      return (string) ($provider['name'] ?? '');
+    }, $providers))),
+    'names_text' => implode(', ', array_values(array_filter(array_map(function ($provider) {
+      return (string) ($provider['name'] ?? '');
+    }, $providers)))),
+    'count' => count($providers),
+    'extra_count' => max(0, count($providers) - 1),
   ];
 }
 

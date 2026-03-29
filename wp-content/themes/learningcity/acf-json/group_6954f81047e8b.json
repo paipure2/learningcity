@@ -32,7 +32,7 @@
             "preview_size": "medium"
         },
         {
-            "key": "field_69a26dfab3d5d",
+            "key": "field_69a268add1137",
             "label": "Show course",
             "name": "show_course",
             "aria-label": "",
@@ -47,11 +47,11 @@
             },
             "message": "",
             "default_value": 1,
-            "style": "",
             "allow_in_bindings": 0,
             "ui_on_text": "",
             "ui_off_text": "",
-            "ui": 1
+            "ui": 1,
+            "style": ""
         }
     ],
     "location": [
@@ -79,5 +79,5 @@
     "acfe_form": 0,
     "acfe_meta": "",
     "acfe_note": "",
-    "modified": 1772252687
+    "modified": 1772251389
 }

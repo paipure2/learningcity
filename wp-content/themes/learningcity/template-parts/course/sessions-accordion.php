@@ -48,16 +48,46 @@ if ($course_mode === '' && function_exists('get_field')) {
   $course_mode = sanitize_key((string) get_field('course_mode', $course_id));
 }
 
-$render_info_card = function($title, $value) {
+$allowed_rich_text_tags = [
+  'div' => ['class' => true],
+  'a' => [
+    'href' => true,
+    'target' => true,
+    'rel' => true,
+    'class' => true,
+  ],
+  'br' => [],
+  'em' => [],
+  'strong' => [],
+  'b' => [],
+  'i' => [],
+  'p' => ['class' => true],
+  'ul' => ['class' => true],
+  'ol' => ['class' => true],
+  'li' => ['class' => true],
+];
+
+$render_info_card = function($title, $value) use ($allowed_rich_text_tags) {
   if (!$value) return;
   ?>
   <div class="bg-[#DEF6EE] rounded-lg py-2 px-4">
     <div>
       <div class="sm:text-fs16 text-fs14 font-semibold"><?php echo esc_html($title); ?></div>
-      <div class="text-fs16 font-normal"><?php echo wp_kses_post($value); ?></div>
+      <div class="text-fs16 font-normal"><?php echo wp_kses($value, $allowed_rich_text_tags); ?></div>
     </div>
   </div>
   <?php
+};
+
+$format_session_details = function ($value) use ($allowed_rich_text_tags) {
+  $value = trim((string) $value);
+  if ($value === '') return '';
+
+  if ($value !== wp_strip_all_tags($value)) {
+    return wp_kses($value, $allowed_rich_text_tags);
+  }
+
+  return nl2br(esc_html($value));
 };
 
 // ===== Mode-specific rendering (new flow) =====
@@ -179,7 +209,7 @@ if ($course_mode === 'onsite_single') {
                 <?php if ($reg_start || $reg_end) $render_info_card('วันที่รับสมัคร', esc_html(lc_thai_short_date($reg_start)) . ($reg_end ? ' - ' . esc_html(lc_thai_short_date($reg_end)) : '')); ?>
                 <?php if ($start_date || $end_date) $render_info_card('วันที่เรียน', esc_html(lc_thai_short_date($start_date)) . ($end_date ? ' - ' . esc_html(lc_thai_short_date($end_date)) : '')); ?>
                 <?php if ($time_period) $render_info_card('ช่วงเวลาเรียน', esc_html($time_period)); ?>
-                <?php if ($session_details) $render_info_card('ข้อมูลเพิ่มเติม', nl2br(esc_html($session_details))); ?>
+                <?php if ($session_details) $render_info_card('ข้อมูลเพิ่มเติม', '<div class="session-details-content space-y-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_li]:ml-1 [&_p]:mb-2 [&_p:last-child]:mb-0">' . $format_session_details($session_details) . '</div>'); ?>
               </div>
 
               <?php if (!empty($apply_url)): ?>
@@ -409,7 +439,7 @@ $learning_link = function_exists('get_field') ? get_field('learning_link', get_t
                       <div>
                         <div class="sm:text-fs16 text-fs14 font-semibold">ข้อมูลเพิ่มเติม</div>
                         <div class="text-fs16 font-normal">
-                          <?php echo wp_kses_post($session_details); ?>
+                          <?php echo wp_kses('<div class="session-details-content space-y-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_li]:ml-1 [&_p]:mb-2 [&_p:last-child]:mb-0">' . $format_session_details($session_details) . '</div>', $allowed_rich_text_tags); ?>
                         </div>
                       </div>
                     </div>

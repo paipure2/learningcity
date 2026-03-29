@@ -301,8 +301,6 @@ add_action('acf/validate_save_post', function () {
         $provider_count = lcaw_course_provider_count_in_request_or_saved($post_id);
         if ($provider_count <= 0) {
             acf_add_validation_error('', 'กรุณาเลือก Course Provider ก่อนบันทึกคอร์ส');
-        } elseif ($provider_count > 1) {
-            acf_add_validation_error('', 'Course Provider เลือกได้เพียง 1 รายการต่อคอร์ส');
         }
     }
 
@@ -626,6 +624,9 @@ add_action('admin_enqueue_scripts', function ($hook) {
               $allBoxes.hide();
               $pinnedAlways.show();
               $sessionsBox.show();
+              if (typeof window.lcawLoadCourseSessionRows === "function") {
+                window.lcawLoadCourseSessionRows();
+              }
             } else {
               $allBoxes.show();
               $sessionsBox.hide();
@@ -707,6 +708,21 @@ add_action('admin_enqueue_scripts', function ($hook) {
           function getCheckedCourseProviderIds() {
             const ids = [];
             const seen = new Set();
+
+            const $singleSelect = $("#lc-course-provider-select");
+            if ($singleSelect.length) {
+              const rawVal = $singleSelect.val();
+              const selectedIds = Array.isArray(rawVal)
+                ? rawVal
+                : (String(rawVal || "").trim() ? [rawVal] : []);
+              selectedIds.forEach(function(v){
+                const value = String(v || "").trim();
+                if (!value || seen.has(value)) return;
+                seen.add(value);
+                ids.push(value);
+              });
+            }
+
             getProviderChecklistCheckboxes().filter(":checked").each(function(){
               const v = String($(this).val() || "").trim();
               if (!v || seen.has(v)) return;
@@ -719,36 +735,19 @@ add_action('admin_enqueue_scripts', function ($hook) {
           function syncInlineCourseProviderSelectFromChecklist() {
             if (!$inlineProviderSearchSelect.length) return;
             const ids = getCheckedCourseProviderIds();
-            const selected = ids.length ? ids[0] : "";
-            if (String($inlineProviderSearchSelect.val() || "") === String(selected)) return;
-            $inlineProviderSearchSelect.val(selected).trigger("change.select2");
-          }
+            const currentVal = $inlineProviderSearchSelect.val();
+            const currentIds = Array.isArray(currentVal)
+              ? currentVal.map(function(v){ return String(v || "").trim(); }).filter(Boolean)
+              : (String(currentVal || "").trim() ? [String(currentVal || "").trim()] : []);
 
-          function enforceSingleCourseProviderSelection($changed) {
-            const $all = getProviderChecklistCheckboxes();
-            if (!$all.length) return;
-
-            if ($changed && $changed.length && $changed.is(":checked")) {
-              const selectedVal = String($changed.val() || "");
-              $all.each(function(){
-                const $cb = $(this);
-                if (String($cb.val() || "") !== selectedVal && $cb.is(":checked")) {
-                  $cb.prop("checked", false);
-                }
-              });
+            if (currentIds.length === ids.length && currentIds.every(function(v, idx){ return String(v) === String(ids[idx]); })) {
               return;
             }
 
-            const $checked = $all.filter(":checked");
-            if ($checked.length <= 1) return;
-            const keepVal = String($checked.first().val() || "");
-            $checked.each(function(index){
-              const $cb = $(this);
-              if (index === 0) return;
-              if (String($cb.val() || "") !== keepVal) {
-                $cb.prop("checked", false);
-              }
-            });
+            $inlineProviderSearchSelect.val(ids).trigger("change.select2");
+          }
+
+          function enforceSingleCourseProviderSelection($changed) {
             syncInlineCourseProviderSelectFromChecklist();
           }
 
@@ -892,8 +891,7 @@ add_action('admin_enqueue_scripts', function ($hook) {
             const $wrap = $(
               '<div class="lc-inline-provider-select-wrap">' +
                 '<label class="lc-inline-provider-select-label" for="lc-inline-course-provider-select">เลือก Course Provider</label>' +
-                '<select id="lc-inline-course-provider-select" style="width:100%">' +
-                  '<option value="">-- เลือก Course Provider --</option>' +
+                '<select id="lc-inline-course-provider-select" multiple="multiple" style="width:100%">' +
                 '</select>' +
               '</div>'
             );
@@ -909,25 +907,26 @@ add_action('admin_enqueue_scripts', function ($hook) {
             if ($.fn.selectWoo) {
               $select.selectWoo({
                 width: "100%",
-                allowClear: true,
-                placeholder: "-- เลือก Course Provider --"
+                placeholder: "เลือก Course Provider ได้หลายรายการ"
               });
             } else if ($.fn.select2) {
               $select.select2({
                 width: "100%",
-                allowClear: true,
-                placeholder: "-- เลือก Course Provider --"
+                placeholder: "เลือก Course Provider ได้หลายรายการ"
               });
             }
 
             syncInlineCourseProviderSelectFromChecklist();
 
             $select.on("change", function(){
-              const selected = String($(this).val() || "");
+              const rawSelected = $(this).val();
+              const selectedValues = Array.isArray(rawSelected)
+                ? rawSelected.map(function(v){ return String(v || "").trim(); }).filter(Boolean)
+                : (String(rawSelected || "").trim() ? [String(rawSelected || "").trim()] : []);
               const $all = getProviderChecklistCheckboxes();
               $all.each(function(){
                 const $cb = $(this);
-                $cb.prop("checked", selected !== "" && String($cb.val() || "") === selected);
+                $cb.prop("checked", selectedValues.indexOf(String($cb.val() || "")) !== -1);
               });
               enforceSingleCourseProviderSelection();
               refreshSessionGuard();
@@ -1316,67 +1315,15 @@ function lc_render_location_courses_metabox($post) {
     echo '<button type="button" class="button button-primary" id="lc-location-session-add-open">+ Add Session</button>';
     echo '</p>';
 
-    $session_ids = get_posts([
-        'post_type'      => 'session',
-        'post_status'    => ['publish', 'draft', 'private', 'pending', 'future'],
-        'posts_per_page' => -1,
-        'fields'         => 'ids',
-        'orderby'        => 'date',
-        'order'          => 'DESC',
-        'meta_query'     => [
-            'relation' => 'OR',
-            [
-                'key'     => 'location',
-                'value'   => (string) $location_id,
-                'compare' => '=',
-            ],
-            [
-                'key'     => 'location',
-                'value'   => '"' . (string) $location_id . '"',
-                'compare' => 'LIKE',
-            ],
-        ],
-    ]);
+    echo '<p id="lc-location-session-empty-note" style="display:none;">ยังไม่มีคอร์สที่ผูกกับสถานที่นี้</p>';
+    echo '<p id="lc-location-session-loading-note" style="margin:8px 0 0;color:#666;">กดแท็บนี้เพื่อโหลดรายการคอร์สและ sessions</p>';
 
-    $has_sessions = !empty($session_ids);
-    if (!$has_sessions) {
-        echo '<p id="lc-location-session-empty-note">ยังไม่มีคอร์สที่ผูกกับสถานที่นี้</p>';
-    }
-
-    echo '<table id="lc-location-sessions-table" class="widefat striped" style="margin-top:8px;' . ($has_sessions ? '' : 'display:none;') . '">';
+    echo '<table id="lc-location-sessions-table" class="widefat striped" style="margin-top:8px;display:none;">';
     echo '<thead><tr>';
     echo '<th>คอร์ส</th>';
     echo '<th style="width:260px;">การจัดการ</th>';
     echo '</tr></thead><tbody id="lc-location-sessions-tbody">';
-
-    foreach ($session_ids as $sid) {
-        echo lc_render_location_session_row_html($sid);
-    }
     echo '</tbody></table>';
-
-    $course_query_args = [
-        'post_type'      => 'course',
-        'post_status'    => ['publish', 'draft', 'private', 'pending', 'future'],
-        'posts_per_page' => -1,
-        'orderby'        => 'title',
-        'order'          => 'ASC',
-        'no_found_rows'  => true,
-    ];
-
-    $location_type_slugs = lc_get_location_type_term_slugs($location_id);
-    if (!empty($location_type_slugs)) {
-        $course_query_args['tax_query'] = [[
-            'taxonomy' => 'course_provider',
-            'field' => 'slug',
-            'terms' => $location_type_slugs,
-            'operator' => 'IN',
-        ]];
-    }
-    $course_options = get_posts($course_query_args);
-    $course_select_html = '<option value="">-- เลือกคอร์ส --</option>';
-    foreach ($course_options as $c) {
-        $course_select_html .= '<option value="' . (int) $c->ID . '">' . esc_html($c->post_title) . '</option>';
-    }
 
     $js_cfg = wp_json_encode([
         'ajaxUrl' => admin_url('admin-ajax.php'),
@@ -1398,7 +1345,7 @@ function lc_render_location_courses_metabox($post) {
 
     echo '<div id="lc-location-session-add-modal" style="display:none;"><div class="lc-location-session-add-backdrop"></div><div class="lc-location-session-add-dialog">';
     echo '<h3 style="margin-top:0;">Add Session</h3><table class="form-table" style="margin-top:0;">';
-    echo '<tr><th><label for="lc-location-add-course">คอร์ส</label></th><td><select id="lc-location-add-course" class="regular-text">' . $course_select_html . '</select></td></tr>';
+    echo '<tr><th><label for="lc-location-add-course">คอร์ส</label></th><td><select id="lc-location-add-course" class="regular-text"><option value="">-- กำลังโหลดคอร์ส --</option></select></td></tr>';
     echo '<tr><th><label for="lc-location-add-post-status">สถานะ</label></th><td><select id="lc-location-add-post-status" class="regular-text"><option value="draft">draft</option><option value="publish">publish</option></select></td></tr>';
     echo '<tr><th><label for="lc-location-add-reg-start">วันที่รับสมัครเริ่ม</label></th><td><input type="date" id="lc-location-add-reg-start" class="regular-text"></td></tr>';
     echo '<tr><th><label for="lc-location-add-reg-end">วันที่รับสมัครสิ้นสุด</label></th><td><input type="date" id="lc-location-add-reg-end" class="regular-text"></td></tr>';
@@ -1416,9 +1363,17 @@ function lc_render_location_courses_metabox($post) {
       #lc-location-session-quick-modal .form-table th, #lc-location-session-add-modal .form-table th { width: 190px; }
     </style>';
 
-    echo '<script>(function($){const cfg=' . $js_cfg . ';const $qm=$("#lc-location-session-quick-modal"),$am=$("#lc-location-session-add-modal"),$qmsg=$("#lc-location-session-quick-message"),$amsg=$("#lc-location-session-add-message");
+    echo '<script>(function($){const cfg=' . $js_cfg . ';const $qm=$("#lc-location-session-quick-modal"),$am=$("#lc-location-session-add-modal"),$qmsg=$("#lc-location-session-quick-message"),$amsg=$("#lc-location-session-add-message"),$locationRows=$("#lc-location-sessions-tbody"),$locationTable=$("#lc-location-sessions-table"),$locationEmpty=$("#lc-location-session-empty-note"),$locationLoading=$("#lc-location-session-loading-note"),$courseSelect=$("#lc-location-add-course"); let locationRowsLoaded=false,locationCoursesLoaded=false;
       function setQ(t,e){$qmsg.text(t||"").css("color",e?"#b42318":"#2f7a1f")} function setA(t,e){$amsg.text(t||"").css("color",e?"#b42318":"#2f7a1f")}
-      $("#lc-location-session-add-open").on("click",()=>{$am.show()});
+      function loadLocationRows(force){ if(locationRowsLoaded&&!force)return; $locationLoading.text("กำลังโหลดรายการ sessions...").show();
+        $.post(cfg.ajaxUrl,{action:"lcaw_load_location_session_rows",nonce:cfg.nonce,location_id:cfg.locationId}).done(function(res){ if(!res||!res.success||!res.data){$locationLoading.text("โหลดรายการ sessions ไม่สำเร็จ");return;}
+          $locationRows.html(res.data.rows_html||""); locationRowsLoaded=true; if(res.data.count>0){$locationTable.show();$locationEmpty.hide();$locationLoading.hide();}else{$locationTable.hide();$locationEmpty.show();$locationLoading.hide();}
+        }).fail(function(){$locationLoading.text("โหลดรายการ sessions ไม่สำเร็จ");}); }
+      function loadLocationCourses(callback){ if(locationCoursesLoaded){ if(typeof callback==="function") callback(); return; } $courseSelect.prop("disabled",true).html("<option value=\"\">-- กำลังโหลดคอร์ส --</option>");
+        $.post(cfg.ajaxUrl,{action:"lcaw_load_location_course_options",nonce:cfg.nonce,location_id:cfg.locationId}).done(function(res){ if(!res||!res.success||!res.data||typeof res.data.options_html!=="string"){ $courseSelect.html("<option value=\"\">-- โหลดคอร์สไม่สำเร็จ --</option>"); return; }
+          $courseSelect.html(res.data.options_html); locationCoursesLoaded=true; if(typeof callback==="function") callback();
+        }).fail(function(){ $courseSelect.html("<option value=\"\">-- โหลดคอร์สไม่สำเร็จ --</option>"); }).always(function(){ $courseSelect.prop("disabled",false);}); }
+      $("#lc-location-session-add-open").on("click",()=>{loadLocationCourses(function(){$am.show();});});
       $("#lc-location-session-add-cancel,#lc-location-session-add-modal .lc-location-session-add-backdrop").on("click",()=>{$am.hide();setA("",false)});
       $("#lc-location-session-quick-cancel,#lc-location-session-quick-modal .lc-location-session-quick-backdrop").on("click",()=>{$qm.hide();setQ("",false)});
       $(document).on("click",".lc-location-session-quick-edit",function(){const sid=$(this).data("session-id"); if(!sid)return; setQ("กำลังโหลดข้อมูล...",false); $qm.show();
@@ -1445,10 +1400,11 @@ function lc_render_location_courses_metabox($post) {
       $("#lc-location-session-add-save").on("click",function(){const payload={action:"lc_course_session_create",nonce:cfg.nonce,location_id:cfg.locationId,course_id:$("#lc-location-add-course").val(),post_status:$("#lc-location-add-post-status").val(),reg_start:$("#lc-location-add-reg-start").val(),reg_end:$("#lc-location-add-reg-end").val(),start_date:$("#lc-location-add-start-date").val(),end_date:$("#lc-location-add-end-date").val(),time_period:$("#lc-location-add-time-period").val(),apply_url:$("#lc-location-add-apply-url").val(),session_details:$("#lc-location-add-session-details").val()};
         if(!payload.course_id){setA("กรุณาเลือกคอร์ส",true);return;} $(this).prop("disabled",true); setA("กำลังสร้าง session...",false);
         $.post(cfg.ajaxUrl,payload).done(function(res){if(!res||!res.success||!res.data||!res.data.row_html_location){setA("สร้าง session ไม่สำเร็จ",true);return;}
-          $("#lc-location-sessions-tbody").prepend(res.data.row_html_location); $("#lc-location-sessions-table").show(); $("#lc-location-session-empty-note").hide();
+          $("#lc-location-sessions-tbody").prepend(res.data.row_html_location); $("#lc-location-sessions-table").show(); $("#lc-location-session-empty-note").hide(); $("#lc-location-session-loading-note").hide();
           $("#lc-location-add-course").val(""); $("#lc-location-add-post-status").val("draft"); $("#lc-location-add-reg-start,#lc-location-add-reg-end,#lc-location-add-start-date,#lc-location-add-end-date,#lc-location-add-time-period,#lc-location-add-apply-url,#lc-location-add-session-details").val("");
           $am.hide(); setA("",false);
         }).fail(()=>setA("สร้าง session ไม่สำเร็จ",true)).always(()=>$("#lc-location-session-add-save").prop("disabled",false));});
+      window.lcawLoadLocationRows = loadLocationRows;
     })(jQuery);</script>';
 }
 
@@ -1512,6 +1468,9 @@ add_action('admin_enqueue_scripts', function ($hook) {
               $pinnedAlways.show();
               if ($coursesBox.length) {
                 $coursesBox.show();
+              }
+              if (typeof window.lcawLoadLocationRows === "function") {
+                window.lcawLoadLocationRows();
               }
             } else {
               $allBoxes.show();
@@ -1593,17 +1552,45 @@ function lc_get_course_provider_term_slugs($course_id) {
     return array_values(array_filter(array_map('sanitize_title', $slugs)));
 }
 
+function lcaw_get_course_provider_location_type_term_ids_from_term_ids($provider_term_ids) {
+    $provider_term_ids = array_values(array_filter(array_map('intval', (array) $provider_term_ids)));
+    if (empty($provider_term_ids) || !taxonomy_exists('course_provider')) return [];
+
+    $location_type_term_ids = [];
+
+    foreach ($provider_term_ids as $provider_term_id) {
+        $mapped_ids = get_term_meta($provider_term_id, 'lcaw_location_type_term_ids', true);
+        if (!is_array($mapped_ids)) {
+            $mapped_ids = ($mapped_ids !== '' && $mapped_ids !== null) ? [$mapped_ids] : [];
+        }
+        $mapped_ids = array_values(array_filter(array_map('intval', $mapped_ids)));
+
+        // Backward-compatible fallback for existing providers that relied on identical slugs.
+        if (empty($mapped_ids)) {
+            $provider_term = get_term($provider_term_id, 'course_provider');
+            if ($provider_term instanceof WP_Term && taxonomy_exists('location-type')) {
+                $location_type_term = get_term_by('slug', $provider_term->slug, 'location-type');
+                if ($location_type_term instanceof WP_Term) {
+                    $mapped_ids = [(int) $location_type_term->term_id];
+                }
+            }
+        }
+
+        if (!empty($mapped_ids)) {
+            $location_type_term_ids = array_merge($location_type_term_ids, $mapped_ids);
+        }
+    }
+
+    return array_values(array_unique(array_filter(array_map('intval', $location_type_term_ids))));
+}
+
 function lc_location_matches_course_provider($course_id, $location_id) {
     if (!taxonomy_exists('location-type')) return true;
 
-    $course_terms = lc_get_course_provider_term_slugs($course_id);
-    if (empty($course_terms)) return true;
+    $provider_term_ids = wp_get_post_terms((int) $course_id, 'course_provider', ['fields' => 'ids']);
+    if (is_wp_error($provider_term_ids) || !is_array($provider_term_ids) || empty($provider_term_ids)) return true;
 
-    $location_terms = wp_get_post_terms((int) $location_id, 'location-type', ['fields' => 'slugs']);
-    if (is_wp_error($location_terms) || !is_array($location_terms) || empty($location_terms)) return false;
-
-    $location_terms = array_values(array_filter(array_map('sanitize_title', $location_terms)));
-    return !empty(array_intersect($course_terms, $location_terms));
+    return lcaw_location_matches_provider_term_ids($location_id, $provider_term_ids);
 }
 
 function lcaw_get_course_provider_slugs_from_term_ids($provider_term_ids) {
@@ -1625,16 +1612,18 @@ function lcaw_get_course_provider_slugs_from_term_ids($provider_term_ids) {
 }
 
 function lcaw_location_matches_provider_term_ids($location_id, $provider_term_ids) {
+    $provider_term_ids = array_values(array_filter(array_map('intval', (array) $provider_term_ids)));
     if (!taxonomy_exists('location-type')) return true;
+    if (empty($provider_term_ids)) return true;
 
-    $provider_slugs = lcaw_get_course_provider_slugs_from_term_ids($provider_term_ids);
-    if (empty($provider_slugs)) return true;
+    $provider_location_type_term_ids = lcaw_get_course_provider_location_type_term_ids_from_term_ids($provider_term_ids);
+    if (empty($provider_location_type_term_ids)) return false;
 
-    $location_terms = wp_get_post_terms((int) $location_id, 'location-type', ['fields' => 'slugs']);
+    $location_terms = wp_get_post_terms((int) $location_id, 'location-type', ['fields' => 'ids']);
     if (is_wp_error($location_terms) || !is_array($location_terms) || empty($location_terms)) return false;
 
-    $location_terms = array_values(array_filter(array_map('sanitize_title', $location_terms)));
-    return !empty(array_intersect($provider_slugs, $location_terms));
+    $location_terms = array_values(array_filter(array_map('intval', $location_terms)));
+    return !empty(array_intersect($provider_location_type_term_ids, $location_terms));
 }
 
 function lcaw_get_location_options_for_course_provider_term_ids($provider_term_ids = []) {
@@ -1650,28 +1639,15 @@ function lcaw_get_location_options_for_course_provider_term_ids($provider_term_i
     ];
 
     if (!empty($provider_term_ids) && taxonomy_exists('course_provider')) {
-        $provider_terms = get_terms([
-            'taxonomy' => 'course_provider',
-            'include' => $provider_term_ids,
-            'hide_empty' => false,
-        ]);
-        if (!is_wp_error($provider_terms) && is_array($provider_terms)) {
-            $provider_slugs = [];
-            foreach ($provider_terms as $term) {
-                if ($term instanceof WP_Term) {
-                    $provider_slugs[] = (string) $term->slug;
-                }
-            }
-            $provider_slugs = array_values(array_filter(array_unique($provider_slugs)));
-            if (!empty($provider_slugs)) {
-                $location_query_args['tax_query'] = [[
-                    'taxonomy' => 'location-type',
-                    'field' => 'slug',
-                    'terms' => $provider_slugs,
-                    'operator' => 'IN',
-                ]];
-            }
-        }
+        $provider_location_type_term_ids = lcaw_get_course_provider_location_type_term_ids_from_term_ids($provider_term_ids);
+        if (empty($provider_location_type_term_ids)) return [];
+
+        $location_query_args['tax_query'] = [[
+            'taxonomy' => 'location-type',
+            'field' => 'term_id',
+            'terms' => $provider_location_type_term_ids,
+            'operator' => 'IN',
+        ]];
     }
 
     return get_posts($location_query_args);
@@ -1685,6 +1661,96 @@ function lcaw_render_location_select_options_html($locations) {
     }
     return $html;
 }
+
+function lcaw_get_location_type_term_options() {
+    if (!taxonomy_exists('location-type')) return [];
+
+    $terms = get_terms([
+        'taxonomy' => 'location-type',
+        'hide_empty' => false,
+        'orderby' => 'name',
+        'order' => 'ASC',
+    ]);
+
+    if (is_wp_error($terms) || !is_array($terms)) return [];
+    return array_values(array_filter($terms, static function($term) {
+        return $term instanceof WP_Term;
+    }));
+}
+
+function lcaw_render_course_provider_location_type_multiselect($selected_ids = []) {
+    $selected_ids = array_values(array_filter(array_map('intval', (array) $selected_ids)));
+    $terms = lcaw_get_location_type_term_options();
+
+    echo '<div id="lcaw-location-type-term-ids" style="max-height:220px; overflow:auto; min-width:320px; padding:10px 12px; border:1px solid #ccd0d4; border-radius:6px; background:#fff;">';
+    if (empty($terms)) {
+        echo '<p style="margin:0;">ไม่พบ Location Type</p>';
+    }
+    foreach ($terms as $term) {
+        $term_id = (int) $term->term_id;
+        $input_id = 'lcaw-location-type-term-' . $term_id;
+        echo '<label for="' . esc_attr($input_id) . '" style="display:block; margin:0 0 8px;">';
+        echo '<input type="checkbox" id="' . esc_attr($input_id) . '" name="lcaw_location_type_term_ids[]" value="' . $term_id . '"' . checked(in_array($term_id, $selected_ids, true), true, false) . '> ';
+        echo esc_html($term->name);
+        echo '</label>';
+    }
+    echo '</div>';
+    echo '<p class="description">เลือก Location Type ที่เชื่อมกับ Course Provider นี้ได้มากกว่า 1 รายการ เช่น สวนสาธารณะ และ ลานกีฬา</p>';
+}
+
+add_action('course_provider_add_form_fields', function () {
+    if (!current_user_can('manage_categories')) return;
+    wp_nonce_field('lcaw_course_provider_location_type_meta', 'lcaw_course_provider_location_type_meta_nonce');
+    echo '<div class="form-field term-group">';
+    echo '<label for="lcaw-location-type-term-ids">Location Types</label>';
+    lcaw_render_course_provider_location_type_multiselect([]);
+    echo '</div>';
+});
+
+add_action('course_provider_edit_form_fields', function ($term) {
+    if (!($term instanceof WP_Term) || !current_user_can('manage_categories')) return;
+    $selected_ids = get_term_meta($term->term_id, 'lcaw_location_type_term_ids', true);
+    if (!is_array($selected_ids)) {
+        $selected_ids = ($selected_ids !== '' && $selected_ids !== null) ? [$selected_ids] : [];
+    }
+    $selected_ids = array_values(array_filter(array_map('intval', $selected_ids)));
+
+    wp_nonce_field('lcaw_course_provider_location_type_meta', 'lcaw_course_provider_location_type_meta_nonce');
+    echo '<tr class="form-field term-group-wrap">';
+    echo '<th scope="row"><label for="lcaw-location-type-term-ids">Location Types</label></th>';
+    echo '<td>';
+    lcaw_render_course_provider_location_type_multiselect($selected_ids);
+    echo '</td>';
+    echo '</tr>';
+});
+
+function lcaw_save_course_provider_location_type_meta($term_id) {
+    $term_id = (int) $term_id;
+    if ($term_id <= 0 || !current_user_can('manage_categories')) return;
+    if (!isset($_POST['lcaw_course_provider_location_type_meta_nonce'])) return;
+
+    $nonce = sanitize_text_field(wp_unslash($_POST['lcaw_course_provider_location_type_meta_nonce']));
+    if (!wp_verify_nonce($nonce, 'lcaw_course_provider_location_type_meta')) return;
+
+    $raw_ids = isset($_POST['lcaw_location_type_term_ids']) ? wp_unslash($_POST['lcaw_location_type_term_ids']) : [];
+    if (!is_array($raw_ids)) {
+        $raw_ids = ($raw_ids !== '' && $raw_ids !== null) ? [$raw_ids] : [];
+    }
+
+    $valid_ids = [];
+    foreach ($raw_ids as $raw_id) {
+        $location_type_term_id = (int) $raw_id;
+        if ($location_type_term_id > 0 && term_exists($location_type_term_id, 'location-type')) {
+            $valid_ids[] = $location_type_term_id;
+        }
+    }
+
+    $valid_ids = array_values(array_unique($valid_ids));
+    update_term_meta($term_id, 'lcaw_location_type_term_ids', $valid_ids);
+}
+
+add_action('created_course_provider', 'lcaw_save_course_provider_location_type_meta');
+add_action('edited_course_provider', 'lcaw_save_course_provider_location_type_meta');
 
 function lc_render_course_session_row_html($sid) {
     $sid = (int) $sid;
@@ -1742,57 +1808,20 @@ function lc_render_course_sessions_metabox($post) {
     echo '<button type="button" class="button button-primary" id="lc-session-add-open">+ Add Session</button>';
     echo '</p>';
 
-    $session_ids = get_posts([
-        'post_type'      => 'session',
-        'post_status'    => ['publish', 'draft', 'private', 'pending', 'future'],
-        'posts_per_page' => -1,
-        'fields'         => 'ids',
-        'orderby'        => 'date',
-        'order'          => 'DESC',
-        'meta_query'     => [
-            'relation' => 'OR',
-            [
-                'key'     => 'course',
-                'value'   => (string) $course_id,
-                'compare' => '=',
-            ],
-            [
-                'key'     => 'course',
-                'value'   => '"' . (string) $course_id . '"',
-                'compare' => 'LIKE',
-            ],
-        ],
-    ]);
+    echo '<p id="lc-session-empty-note" style="display:none;">ยังไม่มี session ที่ผูกกับคอร์สนี้</p>';
+    echo '<p id="lc-session-loading-note" style="margin:8px 0 0;color:#666;">กดแท็บ Sessions เพื่อโหลดรายการ</p>';
 
-    $has_sessions = !empty($session_ids);
-    if (!$has_sessions) {
-        echo '<p id="lc-session-empty-note">ยังไม่มี session ที่ผูกกับคอร์สนี้</p>';
-    }
-
-    echo '<table id="lc-course-sessions-table" class="widefat striped" style="margin-top:8px;' . ($has_sessions ? '' : 'display:none;') . '">';
+    echo '<table id="lc-course-sessions-table" class="widefat striped" style="margin-top:8px;display:none;">';
     echo '<thead><tr>';
     echo '<th>สถานที่</th>';
     echo '<th style="width:260px;">การจัดการ</th>';
     echo '</tr></thead><tbody id="lc-course-sessions-tbody">';
-
-    foreach ($session_ids as $sid) {
-        echo lc_render_course_session_row_html($sid);
-    }
-
     echo '</tbody></table>';
     $js_cfg = wp_json_encode([
         'ajaxUrl' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('lc_course_session_quick_edit'),
         'courseId' => $course_id,
     ]);
-
-    $saved_provider_ids = [];
-    if (taxonomy_exists('course_provider')) {
-        $saved_provider_ids = wp_get_post_terms($course_id, 'course_provider', ['fields' => 'ids']);
-        if (is_wp_error($saved_provider_ids) || !is_array($saved_provider_ids)) $saved_provider_ids = [];
-    }
-    $location_options = lcaw_get_location_options_for_course_provider_term_ids($saved_provider_ids);
-    $location_select_html = lcaw_render_location_select_options_html($location_options);
 
     echo '<div id="lc-session-quick-modal" style="display:none;">';
     echo '  <div class="lc-session-quick-backdrop"></div>';
@@ -1822,7 +1851,7 @@ function lc_render_course_sessions_metabox($post) {
     echo '  <div class="lc-session-add-dialog">';
     echo '    <h3 style="margin-top:0;">Add Session</h3>';
     echo '    <table class="form-table" style="margin-top:0;">';
-    echo '      <tr><th><label for="lc-add-location">สถานที่</label></th><td><select id="lc-add-location" class="regular-text">' . $location_select_html . '</select></td></tr>';
+    echo '      <tr><th><label for="lc-add-location">สถานที่</label></th><td><select id="lc-add-location" class="regular-text"><option value="">-- เลือกสถานที่ --</option></select></td></tr>';
     echo '      <tr><th><label for="lc-add-post-status">สถานะ</label></th><td><select id="lc-add-post-status" class="regular-text"><option value="draft">draft</option><option value="publish">publish</option></select></td></tr>';
     echo '      <tr><th><label for="lc-add-reg-start">วันที่รับสมัครเริ่ม</label></th><td><input type="date" id="lc-add-reg-start" class="regular-text"></td></tr>';
     echo '      <tr><th><label for="lc-add-reg-end">วันที่รับสมัครสิ้นสุด</label></th><td><input type="date" id="lc-add-reg-end" class="regular-text"></td></tr>';
@@ -1859,6 +1888,11 @@ function lc_render_course_sessions_metabox($post) {
         const $addModal = $("#lc-session-add-modal");
         const $addMsg = $("#lc-session-add-message");
         const $addLocation = $("#lc-add-location");
+        const $courseRows = $("#lc-course-sessions-tbody");
+        const $courseTable = $("#lc-course-sessions-table");
+        const $courseEmpty = $("#lc-session-empty-note");
+        const $courseLoading = $("#lc-session-loading-note");
+        let courseRowsLoaded = false;
 
         function setMessage(text, isError) {
           $msg.text(text || "");
@@ -1886,14 +1920,50 @@ function lc_render_course_sessions_metabox($post) {
           setAddMessage("", false);
         }
 
-        function getSelectedCourseProviderIdsFromPage() {
-          const ids = [];
-          const seen = new Set();
-          $("#course_providerchecklist input[type=\"checkbox\"]:checked, #course_providerchecklist-pop input[type=\"checkbox\"]:checked").each(function(){
-            const v = String($(this).val() || "").trim();
-            if (!v || seen.has(v)) return;
-            seen.add(v);
-            ids.push(v);
+        function initAddLocationSearch() {
+          if (!$addLocation.length) return;
+
+          if ($addLocation.hasClass("select2-hidden-accessible")) {
+            $addLocation.select2("destroy");
+          }
+          if ($addLocation.hasClass("select2-hidden-accessible") && $.fn.selectWoo) {
+            $addLocation.selectWoo("destroy");
+          }
+
+          const config = {
+            width: "100%",
+            dropdownParent: $addModal.find(".lc-session-add-dialog"),
+            placeholder: "-- เลือกสถานที่ --"
+          };
+
+          if ($.fn.selectWoo) {
+            $addLocation.selectWoo(config);
+          } else if ($.fn.select2) {
+            $addLocation.select2(config);
+          }
+        }
+
+	        function getSelectedCourseProviderIdsFromPage() {
+	          const ids = [];
+	          const seen = new Set();
+	          const $singleSelect = $("#lc-course-provider-select");
+	          if ($singleSelect.length) {
+	            const rawVal = $singleSelect.val();
+	            const selectedIds = Array.isArray(rawVal)
+	              ? rawVal
+	              : (String(rawVal || "").trim() ? [rawVal] : []);
+	            selectedIds.forEach(function(v){
+	              const value = String(v || "").trim();
+	              if (!value || seen.has(value)) return;
+	              seen.add(value);
+	              ids.push(value);
+	            });
+	          }
+	          $("#course_providerchecklist input[type=\"checkbox\"]:checked, #course_providerchecklist-pop input[type=\"checkbox\"]:checked").each(function(){
+	            const v = String($(this).val() || "").trim();
+	            if (!v || seen.has(v)) return;
+	            seen.add(v);
+	            ids.push(v);
           });
           return ids;
         }
@@ -1922,12 +1992,42 @@ function lc_render_course_sessions_metabox($post) {
             if (currentVal && $addLocation.find("option").filter(function(){ return String($(this).val() || "") === currentVal; }).length) {
               $addLocation.val(currentVal);
             }
+            initAddLocationSearch();
             setAddMessage("", false);
           }).fail(function(){
             setAddMessage("โหลดรายการสถานที่ไม่สำเร็จ", true);
           }).always(function(){
             $addLocation.prop("disabled", false);
             if (typeof callback === "function") callback();
+          });
+        }
+
+        function loadCourseSessionRows(force) {
+          if (courseRowsLoaded && !force) return;
+          $courseLoading.text("กำลังโหลดรายการ sessions...").show();
+
+          $.post(cfg.ajaxUrl, {
+            action: "lcaw_load_course_session_rows",
+            nonce: cfg.nonce,
+            course_id: cfg.courseId
+          }).done(function(res){
+            if (!res || !res.success || !res.data) {
+              $courseLoading.text("โหลดรายการ sessions ไม่สำเร็จ");
+              return;
+            }
+            $courseRows.html(res.data.rows_html || "");
+            courseRowsLoaded = true;
+            if (res.data.count > 0) {
+              $courseTable.show();
+              $courseEmpty.hide();
+              $courseLoading.hide();
+            } else {
+              $courseTable.hide();
+              $courseEmpty.show();
+              $courseLoading.hide();
+            }
+          }).fail(function(){
+            $courseLoading.text("โหลดรายการ sessions ไม่สำเร็จ");
           });
         }
 
@@ -1974,6 +2074,7 @@ function lc_render_course_sessions_metabox($post) {
 
         $("#lc-session-add-open").on("click", function(){
           refreshAddSessionLocationOptions(function(){
+            initAddLocationSearch();
             openAddModal();
           });
         });
@@ -2129,6 +2230,7 @@ function lc_render_course_sessions_metabox($post) {
             $("#lc-course-sessions-tbody").prepend(res.data.row_html);
             $("#lc-course-sessions-table").show();
             $("#lc-session-empty-note").hide();
+            $("#lc-session-loading-note").hide();
 
             $("#lc-add-location").val("");
             $("#lc-add-post-status").val("draft");
@@ -2159,6 +2261,7 @@ function lc_render_course_sessions_metabox($post) {
             refreshAddSessionLocationOptions();
           }
         });
+        window.lcawLoadCourseSessionRows = loadCourseSessionRows;
       })(jQuery);
     </script>';
 }
@@ -2190,6 +2293,138 @@ add_action('wp_ajax_lc_course_session_quick_get', function () {
         'time_period' => (string) get_field('time_period', $session_id, false),
         'apply_url' => (string) get_field('apply_url', $session_id, false),
         'session_details' => (string) get_field('session_details', $session_id, false),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_load_course_session_rows', function () {
+    check_ajax_referer('lc_course_session_quick_edit', 'nonce');
+
+    $course_id = isset($_POST['course_id']) ? (int) $_POST['course_id'] : 0;
+    if (!$course_id || get_post_type($course_id) !== 'course') {
+        wp_send_json_error(['message' => 'invalid_course'], 400);
+    }
+    if (!current_user_can('edit_post', $course_id)) {
+        wp_send_json_error(['message' => 'forbidden'], 403);
+    }
+
+    $session_ids = get_posts([
+        'post_type'      => 'session',
+        'post_status'    => ['publish', 'draft', 'private', 'pending', 'future'],
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'meta_query'     => [
+            'relation' => 'OR',
+            [
+                'key'     => 'course',
+                'value'   => (string) $course_id,
+                'compare' => '=',
+            ],
+            [
+                'key'     => 'course',
+                'value'   => '"' . (string) $course_id . '"',
+                'compare' => 'LIKE',
+            ],
+        ],
+        'no_found_rows'  => true,
+    ]);
+
+    $rows_html = '';
+    foreach ($session_ids as $sid) {
+        $rows_html .= lc_render_course_session_row_html($sid);
+    }
+
+    wp_send_json_success([
+        'rows_html' => $rows_html,
+        'count' => count($session_ids),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_load_location_session_rows', function () {
+    check_ajax_referer('lc_course_session_quick_edit', 'nonce');
+
+    $location_id = isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0;
+    if (!$location_id || get_post_type($location_id) !== 'location') {
+        wp_send_json_error(['message' => 'invalid_location'], 400);
+    }
+    if (!current_user_can('edit_post', $location_id)) {
+        wp_send_json_error(['message' => 'forbidden'], 403);
+    }
+
+    $session_ids = get_posts([
+        'post_type'      => 'session',
+        'post_status'    => ['publish', 'draft', 'private', 'pending', 'future'],
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'meta_query'     => [
+            'relation' => 'OR',
+            [
+                'key'     => 'location',
+                'value'   => (string) $location_id,
+                'compare' => '=',
+            ],
+            [
+                'key'     => 'location',
+                'value'   => '"' . (string) $location_id . '"',
+                'compare' => 'LIKE',
+            ],
+        ],
+        'no_found_rows'  => true,
+    ]);
+
+    $rows_html = '';
+    foreach ($session_ids as $sid) {
+        $rows_html .= lc_render_location_session_row_html($sid);
+    }
+
+    wp_send_json_success([
+        'rows_html' => $rows_html,
+        'count' => count($session_ids),
+    ]);
+});
+
+add_action('wp_ajax_lcaw_load_location_course_options', function () {
+    check_ajax_referer('lc_course_session_quick_edit', 'nonce');
+
+    $location_id = isset($_POST['location_id']) ? (int) $_POST['location_id'] : 0;
+    if (!$location_id || get_post_type($location_id) !== 'location') {
+        wp_send_json_error(['message' => 'invalid_location'], 400);
+    }
+    if (!current_user_can('edit_post', $location_id)) {
+        wp_send_json_error(['message' => 'forbidden'], 403);
+    }
+
+    $course_query_args = [
+        'post_type'      => 'course',
+        'post_status'    => ['publish', 'draft', 'private', 'pending', 'future'],
+        'posts_per_page' => -1,
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'no_found_rows'  => true,
+    ];
+
+    $location_type_slugs = lc_get_location_type_term_slugs($location_id);
+    if (!empty($location_type_slugs)) {
+        $course_query_args['tax_query'] = [[
+            'taxonomy' => 'course_provider',
+            'field' => 'slug',
+            'terms' => $location_type_slugs,
+            'operator' => 'IN',
+        ]];
+    }
+
+    $course_options = get_posts($course_query_args);
+    $options_html = '<option value="">-- เลือกคอร์ส --</option>';
+    foreach ($course_options as $c) {
+        $options_html .= '<option value="' . (int) $c->ID . '">' . esc_html($c->post_title) . '</option>';
+    }
+
+    wp_send_json_success([
+        'options_html' => $options_html,
+        'count' => count($course_options),
     ]);
 });
 
@@ -2378,8 +2613,9 @@ add_action('wp_ajax_lc_course_session_create', function () {
     // If the user changed provider in the page but has not clicked Update yet, sync it here
     // so session validation and the course stay aligned.
     if (!empty($provider_term_ids) && taxonomy_exists('course_provider')) {
-        wp_set_post_terms($course_id, array_slice($provider_term_ids, 0, 1), 'course_provider', false);
-        $effective_provider_ids = array_slice($provider_term_ids, 0, 1);
+        $provider_term_ids = array_values(array_unique(array_filter(array_map('intval', $provider_term_ids))));
+        wp_set_post_terms($course_id, $provider_term_ids, 'course_provider', false);
+        $effective_provider_ids = $provider_term_ids;
     }
 
     if (!lcaw_location_matches_provider_term_ids($location_id, $effective_provider_ids)) {
