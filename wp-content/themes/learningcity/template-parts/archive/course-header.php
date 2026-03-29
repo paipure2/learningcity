@@ -13,10 +13,57 @@ $bg_color = function_exists('hex_to_rgba') ? hex_to_rgba('#D6EBE0', 1) : '#D6EBE
 
 $show_description = false;
 $show_thumbnail = false;
+$learning_mode = isset($_GET['learning_mode']) ? sanitize_key(wp_unslash($_GET['learning_mode'])) : '';
+$learning_mode_taxonomy = function_exists('lc_resolve_learning_mode_taxonomy') ? lc_resolve_learning_mode_taxonomy() : '';
+$learning_mode_term = null;
+
+if (
+    $learning_mode !== '' &&
+    in_array($learning_mode, ['online', 'onsite'], true) &&
+    $learning_mode_taxonomy !== '' &&
+    function_exists('lc_get_learning_mode_term_slug')
+) {
+    $learning_mode_term_slug = lc_get_learning_mode_term_slug($learning_mode);
+    if ($learning_mode_term_slug !== '') {
+        $maybe_term = get_term_by('slug', $learning_mode_term_slug, $learning_mode_taxonomy);
+        if ($maybe_term instanceof WP_Term) {
+            $learning_mode_term = $maybe_term;
+        }
+    }
+}
 
 /** 1) Search page */
 if ($is_search) {
     $title = sprintf('Search results for: "%s"', get_search_query());
+
+/** 1.5) Learning mode archive via query param */
+} elseif ($learning_mode_term instanceof WP_Term) {
+
+    $title = !empty($learning_mode_term->name) ? $learning_mode_term->name : '';
+    $description = term_description($learning_mode_term);
+
+    $show_description = !empty($description);
+    $show_thumbnail = true;
+
+    $thumbnail = function_exists('get_term_acf_inherit') ? get_term_acf_inherit($learning_mode_term, 'thumbnail') : '';
+    $term_color = function_exists('get_term_acf_inherit') ? get_term_acf_inherit($learning_mode_term, 'color') : '';
+
+    if (!empty($term_color) && function_exists('hex_to_rgba')) {
+        $bg_color = hex_to_rgba($term_color, 0.2);
+    }
+
+    if (!empty($thumbnail)) {
+        if (is_array($thumbnail) && !empty($thumbnail['url'])) {
+            $thumbnail_url = $thumbnail['url'];
+        } elseif (is_numeric($thumbnail)) {
+            $img = wp_get_attachment_image_url((int) $thumbnail, 'full');
+            if (!empty($img)) {
+                $thumbnail_url = $img;
+            }
+        } elseif (is_string($thumbnail)) {
+            $thumbnail_url = $thumbnail;
+        }
+    }
 
 /** 2) Term archive (category/tag/custom tax) */
 } elseif (is_category() || is_tag() || is_tax()) {

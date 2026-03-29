@@ -23,6 +23,18 @@ require_once 'inc/constants.php';
 /* =========================================================
  * [FRONT] Enqueue library styles and scripts properly
  * ========================================================= */
+function lc_page_uses_fancybox_assets() {
+  if (is_front_page() || is_singular('course') || is_page_template('page-nextlearn.php') || is_page_template('page-blm.php')) {
+    return true;
+  }
+
+  if (function_exists('lc_is_course_archive_context') && lc_is_course_archive_context()) {
+    return true;
+  }
+
+  return false;
+}
+
 function blc_enqueue_libraries() {
 
   // ===== Swiper =====
@@ -41,21 +53,23 @@ function blc_enqueue_libraries() {
     true
   );
 
-  // ===== Fancybox =====
-  wp_enqueue_style(
-    'fancybox-css',
-    'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5/dist/fancybox/fancybox.css',
-    array(),
-    '5.0'
-  );
+  if (lc_page_uses_fancybox_assets()) {
+    // ===== Fancybox =====
+    wp_enqueue_style(
+      'fancybox-css',
+      'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5/dist/fancybox/fancybox.css',
+      array(),
+      '5.0'
+    );
 
-  wp_enqueue_script(
-    'fancybox-js',
-    'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5/dist/fancybox/fancybox.umd.js',
-    array(),
-    '5.0',
-    true
-  );
+    wp_enqueue_script(
+      'fancybox-js',
+      'https://cdn.jsdelivr.net/npm/@fancyapps/ui@5/dist/fancybox/fancybox.umd.js',
+      array(),
+      '5.0',
+      true
+    );
+  }
 
   // ===== Theme CSS =====
   wp_enqueue_style(
@@ -66,6 +80,62 @@ function blc_enqueue_libraries() {
   );
 }
 add_action('wp_enqueue_scripts', 'blc_enqueue_libraries');
+
+function lc_current_query_content_has_shortcode($tag) {
+  $tag = trim((string) $tag);
+  if ($tag === '' || !is_singular()) {
+    return false;
+  }
+
+  $post = get_queried_object();
+  if (!($post instanceof WP_Post)) {
+    return false;
+  }
+
+  return has_shortcode((string) $post->post_content, $tag);
+}
+
+function lc_page_uses_waitlist_assets() {
+  if (is_singular('course') || is_page_template('page-nextlearn.php')) {
+    return true;
+  }
+
+  if (function_exists('lc_is_course_archive_context') && lc_is_course_archive_context()) {
+    return true;
+  }
+
+  return false;
+}
+
+function lc_page_uses_brevo_form_assets() {
+  if (get_query_var('sib_form')) {
+    return true;
+  }
+
+  if (lc_current_query_content_has_shortcode('sibwp_form')) {
+    return true;
+  }
+
+  if (function_exists('is_active_widget') && is_active_widget(false, false, 'sib_subscribe_form', true)) {
+    return true;
+  }
+
+  return false;
+}
+
+add_action('wp_enqueue_scripts', function () {
+  if (!is_admin()) {
+    if (!lc_page_uses_waitlist_assets()) {
+      wp_dequeue_style('lcw-waitlist');
+      wp_dequeue_script('lcw-waitlist');
+    }
+
+    if (!lc_page_uses_brevo_form_assets()) {
+      wp_dequeue_style('sib-front-css');
+      wp_dequeue_script('sib-front-js');
+    }
+  }
+}, 1001);
 
 
 /* =========================================================
@@ -224,6 +294,24 @@ add_action('wp_enqueue_scripts', function () {
 }, 35);
 
 if (!function_exists('lc_modal_search_collect_sections')) {
+  function lc_modal_search_table_exists($table_name) {
+    global $wpdb;
+
+    $table_name = trim((string) $table_name);
+    if ($table_name === '') return false;
+
+    $cache_key = 'lc_table_exists_' . md5($table_name);
+    $cached = get_transient($cache_key);
+    if ($cached !== false) {
+      return $cached === '1';
+    }
+
+    $exists = ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)) === $table_name);
+    set_transient($cache_key, $exists ? '1' : '0', 10 * MINUTE_IN_SECONDS);
+
+    return $exists;
+  }
+
   function lc_modal_search_get_popular_keywords($limit = 6) {
     global $wpdb;
 
@@ -231,9 +319,7 @@ if (!function_exists('lc_modal_search_collect_sections')) {
     $keywords = [];
 
     $table = $wpdb->prefix . 'lc_analytics_events';
-    $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
-
-    if ($table_exists === $table) {
+    if (lc_modal_search_table_exists($table)) {
       $rows = $wpdb->get_results(
         $wpdb->prepare(
           "SELECT keyword, COUNT(*) AS total
@@ -297,6 +383,11 @@ if (!function_exists('lc_modal_search_collect_sections')) {
     $query = trim((string) $query);
     $limit = 6;
     $has_query = ($query !== '');
+    $cache_key = 'lc_modal_search_sections_v1_' . md5(mb_strtolower($query, 'UTF-8') . '|' . $limit);
+    $cached = get_transient($cache_key);
+    if (is_array($cached)) {
+      return $cached;
+    }
 
     $popular_keywords = lc_modal_search_get_popular_keywords($limit);
     $blm_pages = get_posts([
@@ -314,6 +405,11 @@ if (!function_exists('lc_modal_search_collect_sections')) {
 
       $post_type = sanitize_key((string) $post_type);
       $limit = max(1, min(30, absint($limit)));
+      $cache_key = 'lc_modal_top_viewed_' . $post_type . '_' . $limit;
+      $cached = get_transient($cache_key);
+      if (is_array($cached)) {
+        return $cached;
+      }
 
       if ($post_type === 'course') {
         $object_type = 'course';
@@ -326,8 +422,7 @@ if (!function_exists('lc_modal_search_collect_sections')) {
       }
 
       $table = $wpdb->prefix . 'lc_analytics_events';
-      $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
-      if ($table_exists !== $table) return [];
+      if (!lc_modal_search_table_exists($table)) return [];
 
       $rows = $wpdb->get_col(
         $wpdb->prepare(
@@ -349,7 +444,9 @@ if (!function_exists('lc_modal_search_collect_sections')) {
         )
       );
 
-      return array_values(array_filter(array_map('absint', (array) $rows)));
+      $result = array_values(array_filter(array_map('absint', (array) $rows)));
+      set_transient($cache_key, $result, 10 * MINUTE_IN_SECONDS);
+      return $result;
     };
 
     $collect_items = function ($post_type, $taxonomies = []) use ($query, $limit, $has_query, $learning_map_url, $get_top_viewed_ids) {
@@ -380,6 +477,14 @@ if (!function_exists('lc_modal_search_collect_sections')) {
         foreach ((array) $taxonomies as $taxonomy) {
           $taxonomy = sanitize_key((string) $taxonomy);
           if ($taxonomy === '') continue;
+
+          // Focus on the taxonomies that are actually useful for search suggestions.
+          if ($post_type === 'course' && !in_array($taxonomy, ['course_category', 'course_provider', 'audience', 'skill-level', 'post_tag'], true)) {
+            continue;
+          }
+          if ($post_type === 'location' && !in_array($taxonomy, ['location-type', 'district', 'facility', 'age_range', 'admission_policy'], true)) {
+            continue;
+          }
 
           $term_ids = get_terms([
             'taxonomy'   => $taxonomy,
@@ -466,24 +571,26 @@ if (!function_exists('lc_modal_search_collect_sections')) {
           }
         }
 
-        global $wpdb;
-        $like = '%' . $wpdb->esc_like($query) . '%';
-        $sql = $wpdb->prepare(
-          "SELECT DISTINCT p.ID
-           FROM {$wpdb->posts} p
-           INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
-           WHERE p.post_type = %s
-             AND p.post_status = 'publish'
-             AND pm.meta_key NOT LIKE %s
-             AND pm.meta_value LIKE %s
-           ORDER BY p.post_date DESC
-           LIMIT %d",
-          $post_type,
-          '\_%',
-          $like,
-          $search_pool_limit
-        );
-        $meta_hit_ids = array_values(array_filter(array_map('absint', (array) $wpdb->get_col($sql))));
+        if (mb_strlen($query, 'UTF-8') >= 2) {
+          global $wpdb;
+          $like = '%' . $wpdb->esc_like($query) . '%';
+          $sql = $wpdb->prepare(
+            "SELECT DISTINCT p.ID
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+             WHERE p.post_type = %s
+               AND p.post_status = 'publish'
+               AND pm.meta_key NOT LIKE %s
+               AND pm.meta_value LIKE %s
+             ORDER BY p.post_date DESC
+             LIMIT %d",
+            $post_type,
+            '\_%',
+            $like,
+            $search_pool_limit
+          );
+          $meta_hit_ids = array_values(array_filter(array_map('absint', (array) $wpdb->get_col($sql))));
+        }
         if (!empty($meta_hit_ids)) {
           $ids = array_merge((array) $ids, $meta_hit_ids);
         }
@@ -548,11 +655,14 @@ if (!function_exists('lc_modal_search_collect_sections')) {
     $nextlearn = $collect_items('course', $course_taxonomies);
     $locations = $collect_items('location', $location_taxonomies);
 
-    return [
+    $result = [
       'popular_keywords' => $popular_keywords,
       'nextlearn'   => $nextlearn,
       'locations'   => $locations,
     ];
+    set_transient($cache_key, $result, $has_query ? 10 * MINUTE_IN_SECONDS : 15 * MINUTE_IN_SECONDS);
+
+    return $result;
   }
 }
 
@@ -590,8 +700,93 @@ add_action('wp_enqueue_scripts', function () {
  * ========================================================= */
 add_action('init', function () {
 
-    $get_analytics_count = function ($post_id, array $event_types) {
+    $analytics_table_exists = function () {
         global $wpdb;
+
+        static $resolved = null;
+        if ($resolved !== null) {
+            return $resolved;
+        }
+
+        $table = $wpdb->prefix . 'lc_analytics_events';
+        $resolved = ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table);
+        return $resolved;
+    };
+
+    $get_current_list_post_ids = function () {
+        global $wp_query;
+
+        static $cache = null;
+        if (is_array($cache)) {
+            return $cache;
+        }
+
+        $cache = [];
+        if (!($wp_query instanceof WP_Query) || empty($wp_query->posts) || !is_array($wp_query->posts)) {
+            return $cache;
+        }
+
+        foreach ($wp_query->posts as $post) {
+            if ($post instanceof WP_Post) {
+                $cache[] = (int) $post->ID;
+            } elseif (is_numeric($post)) {
+                $cache[] = (int) $post;
+            }
+        }
+
+        $cache = array_values(array_filter(array_unique($cache)));
+        return $cache;
+    };
+
+    $get_analytics_counts_bulk = function (array $post_ids, array $event_types) use ($analytics_table_exists) {
+        global $wpdb;
+
+        static $cache = [];
+
+        $post_ids = array_values(array_filter(array_map('intval', $post_ids)));
+        $normalized_events = array_values(array_filter(array_map('sanitize_key', $event_types)));
+
+        if (empty($post_ids) || empty($normalized_events)) {
+            return [];
+        }
+
+        sort($post_ids);
+        sort($normalized_events);
+        $cache_key = implode(',', $post_ids) . '|' . implode(',', $normalized_events);
+        if (isset($cache[$cache_key])) {
+            return $cache[$cache_key];
+        }
+
+        if (!$analytics_table_exists()) {
+            $cache[$cache_key] = [];
+            return [];
+        }
+
+        $table = $wpdb->prefix . 'lc_analytics_events';
+        $post_placeholders = implode(', ', array_fill(0, count($post_ids), '%d'));
+        $event_placeholders = implode(', ', array_fill(0, count($normalized_events), '%s'));
+
+        $sql = "SELECT object_id, COUNT(*) AS cnt
+                FROM {$table}
+                WHERE object_id IN ({$post_placeholders})
+                  AND event_type IN ({$event_placeholders})
+                GROUP BY object_id";
+
+        $params = array_merge($post_ids, $normalized_events);
+        $rows = $wpdb->get_results($wpdb->prepare($sql, $params));
+        $counts = [];
+
+        if (is_array($rows)) {
+            foreach ($rows as $row) {
+                $counts[(int) $row->object_id] = (int) $row->cnt;
+            }
+        }
+
+        $cache[$cache_key] = $counts;
+        return $counts;
+    };
+
+    $get_analytics_count = function ($post_id, array $event_types) use ($get_current_list_post_ids, $get_analytics_counts_bulk) {
         static $cache = [];
 
         $post_id = (int) $post_id;
@@ -603,22 +798,19 @@ add_action('init', function () {
         $cache_key = $post_id . '|' . implode(',', $normalized_events);
         if (isset($cache[$cache_key])) return (int) $cache[$cache_key];
 
-        $table = $wpdb->prefix . 'lc_analytics_events';
-        $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
-        if ($table_exists !== $table) {
-            $cache[$cache_key] = 0;
-            return 0;
+        $post_ids = $get_current_list_post_ids();
+        if (empty($post_ids)) {
+            $post_ids = [$post_id];
         }
 
-        $placeholders = implode(', ', array_fill(0, count($normalized_events), '%s'));
-        $sql = "SELECT COUNT(*) FROM {$table}
-                WHERE object_id = %d
-                  AND event_type IN ({$placeholders})";
-        $params = array_merge([$post_id], $normalized_events);
-        $count = (int) $wpdb->get_var($wpdb->prepare($sql, $params));
+        $counts = $get_analytics_counts_bulk($post_ids, $normalized_events);
+        foreach ($post_ids as $visible_post_id) {
+            $visible_post_id = (int) $visible_post_id;
+            $visible_key = $visible_post_id . '|' . implode(',', $normalized_events);
+            $cache[$visible_key] = isset($counts[$visible_post_id]) ? (int) $counts[$visible_post_id] : 0;
+        }
 
-        $cache[$cache_key] = $count;
-        return $count;
+        return isset($cache[$cache_key]) ? (int) $cache[$cache_key] : 0;
     };
 
     add_filter('manage_course_posts_columns', function ($columns) {
@@ -1626,6 +1818,36 @@ function lc_is_session_open_for_reg($sid, $today_ts) {
   return ($today_ts >= $start_ts && $today_ts <= $end_ts);
 }
 
+function lc_course_is_online($course_id) {
+  $course_id = (int) $course_id;
+  if ($course_id <= 0) return false;
+
+  static $cache = [];
+  if (array_key_exists($course_id, $cache)) return $cache[$course_id];
+
+  $mode_raw = get_post_meta($course_id, 'course_mode', true);
+  $mode_values = is_array($mode_raw) ? array_map('strval', $mode_raw) : [(string) $mode_raw];
+  $mode_values = array_filter(array_map('sanitize_key', $mode_values));
+
+  if (in_array('online', $mode_values, true)) {
+    $cache[$course_id] = true;
+    return true;
+  }
+
+  $taxonomy = lc_resolve_learning_mode_taxonomy();
+  $online_slug = lc_get_learning_mode_term_slug('online');
+  if ($taxonomy !== '' && $online_slug !== '') {
+    $term_slugs = wp_get_post_terms($course_id, $taxonomy, ['fields' => 'slugs']);
+    if (!is_wp_error($term_slugs) && in_array($online_slug, array_map('strval', $term_slugs), true)) {
+      $cache[$course_id] = true;
+      return true;
+    }
+  }
+
+  $cache[$course_id] = false;
+  return false;
+}
+
 /**
  * Runtime guard for course cards on archive/tax pages.
  * Show course only when:
@@ -1642,8 +1864,9 @@ function lc_course_should_show_in_archive($course_id) {
   $has_session = (int) get_post_meta($course_id, '_lc_has_session', true);
   $open_reg = (int) get_post_meta($course_id, '_lc_open_reg', true);
   $learning_link = trim((string) get_post_meta($course_id, 'learning_link', true));
+  $is_online = lc_course_is_online($course_id);
 
-  $is_visible = ($open_reg === 1) || ($has_session === 0 && $learning_link !== '');
+  $is_visible = ($open_reg === 1) || ($has_session === 0 && ($learning_link !== '' || $is_online));
   $cache[$course_id] = $is_visible;
   return $is_visible;
 }
@@ -1698,7 +1921,7 @@ function lc_recalc_course_flags($course_id) {
   }
   update_post_meta($course_id, '_lc_open_reg', $open_reg);
   update_post_meta($course_id, '_lc_reg_missing', $has_missing_reg_info);
-  delete_transient('lc_open_course_ids_runtime_v2');
+  delete_transient('lc_open_course_ids_runtime_v3');
   lc_invalidate_frontend_course_caches();
 }
 
@@ -2017,6 +2240,61 @@ function lc_is_course_visible_for_public($course_id) {
   return true;
 }
 
+function lc_resolve_learning_mode_taxonomy() {
+  static $resolved = null;
+  if ($resolved !== null) return $resolved;
+
+  foreach (['learning-mode', 'learning_mode', 'learning_modes'] as $taxonomy) {
+    if (taxonomy_exists($taxonomy)) {
+      $resolved = $taxonomy;
+      return $resolved;
+    }
+  }
+
+  $resolved = '';
+  return $resolved;
+}
+
+function lc_get_learning_mode_term_slug($mode_key) {
+  $mode_key = sanitize_key((string) $mode_key);
+  $taxonomy = lc_resolve_learning_mode_taxonomy();
+  if ($taxonomy === '' || $mode_key === '') return '';
+
+  $targets = [];
+  if ($mode_key === 'online') {
+    $targets = ['online'];
+  } elseif ($mode_key === 'onsite') {
+    $targets = ['onsite', 'on-site', 'on site'];
+  }
+
+  if (empty($targets)) return '';
+
+  foreach ($targets as $target) {
+    $term = get_term_by('slug', sanitize_title($target), $taxonomy);
+    if ($term instanceof WP_Term) {
+      return (string) $term->slug;
+    }
+  }
+
+  foreach ($targets as $target) {
+    $term = get_term_by('name', $target, $taxonomy);
+    if ($term instanceof WP_Term) {
+      return (string) $term->slug;
+    }
+  }
+
+  return '';
+}
+
+function lc_get_learning_mode_link($mode_key) {
+  $mode_key = sanitize_key((string) $mode_key);
+  $archive_link = get_post_type_archive_link('course');
+  if (!$archive_link) {
+    $archive_link = home_url('/course/');
+  }
+  return add_query_arg('learning_mode', $mode_key, $archive_link);
+}
+
 function lc_get_frontend_course_cache_version() {
   $version = (int) get_option('lc_frontend_course_cache_version', 1);
   return $version > 0 ? $version : 1;
@@ -2025,7 +2303,7 @@ function lc_get_frontend_course_cache_version() {
 function lc_bump_frontend_course_cache_version() {
   $next_version = lc_get_frontend_course_cache_version() + 1;
   update_option('lc_frontend_course_cache_version', $next_version, false);
-  delete_transient('lc_open_course_ids_runtime_v2');
+  delete_transient('lc_open_course_ids_runtime_v3');
   return $next_version;
 }
 
@@ -2119,12 +2397,15 @@ add_action('pre_get_posts', function ($q) {
   if (is_admin() || !$q->is_main_query()) return;
   if (!empty($_GET['show_all'])) return;
 
+  $learning_mode_taxonomy = lc_resolve_learning_mode_taxonomy();
+
   $is_course_context = (
     $q->is_post_type_archive('course') ||
     $q->is_tax('course_category') ||
     $q->is_tax('course_provider') ||
     $q->is_tax('skill-level') ||
     $q->is_tax('audience') ||
+    ($learning_mode_taxonomy !== '' && $q->is_tax($learning_mode_taxonomy)) ||
     lc_is_course_tag_context($q)
   );
 
@@ -2134,18 +2415,40 @@ add_action('pre_get_posts', function ($q) {
   if (isset($_GET['q']) && $_GET['q'] !== '') {
     $q->set('s', sanitize_text_field(wp_unslash($_GET['q'])));
   }
-  $open_ids = lc_get_open_course_ids_runtime();
-  $q->set('post__in', empty($open_ids) ? [0] : $open_ids);
+  if (!empty($_GET['learning_mode'])) {
+    $learning_mode = sanitize_key(wp_unslash($_GET['learning_mode']));
+    if (in_array($learning_mode, ['online', 'onsite'], true)) {
+      $term_slug = lc_get_learning_mode_term_slug($learning_mode);
+      if ($learning_mode_taxonomy !== '' && $term_slug !== '') {
+        $tax_query = $q->get('tax_query');
+        if (!is_array($tax_query)) $tax_query = [];
+        if (empty($tax_query['relation'])) $tax_query['relation'] = 'AND';
+        $tax_query[] = [
+          'taxonomy' => $learning_mode_taxonomy,
+          'field'    => 'slug',
+          'terms'    => [$term_slug],
+        ];
+        $q->set('tax_query', $tax_query);
+      }
+    }
+  }
+  $open_only = isset($_GET['open_only']) && (int) $_GET['open_only'] !== 0;
+  if ($open_only) {
+    $open_ids = lc_get_open_course_ids_runtime();
+    $q->set('post__in', empty($open_ids) ? [0] : $open_ids);
+  }
   $q->set('tax_query', lc_add_hidden_provider_constraint_to_tax_query($q->get('tax_query')));
 }, 20);
 
 function lc_is_course_archive_context() {
+  $learning_mode_taxonomy = lc_resolve_learning_mode_taxonomy();
   return (
     is_post_type_archive('course') ||
     is_tax('course_category') ||
     is_tax('course_provider') ||
     is_tax('audience') ||
     is_tax('skill-level') ||
+    ($learning_mode_taxonomy !== '' && is_tax($learning_mode_taxonomy)) ||
     lc_is_course_tag_context()
   );
 }
@@ -2167,7 +2470,7 @@ function lc_get_open_course_ids_runtime() {
   static $request_cache = null;
   if (is_array($request_cache)) return $request_cache;
 
-  $cache_key = 'lc_open_course_ids_runtime_v2_v' . lc_get_frontend_course_cache_version();
+  $cache_key = 'lc_open_course_ids_runtime_v3_v' . lc_get_frontend_course_cache_version();
   $cached = get_transient($cache_key);
   if (is_array($cached)) {
     $request_cache = $cached;
@@ -2203,7 +2506,59 @@ function lc_get_open_course_ids_runtime() {
     ],
   ]);
 
-  $ids = array_values(array_unique(array_map('intval', is_array($open_ids) ? $open_ids : [])));
+  $online_meta_ids = get_posts([
+    'post_type'      => 'course',
+    'post_status'    => 'publish',
+    'posts_per_page' => -1,
+    'fields'         => 'ids',
+    'no_found_rows'  => true,
+    'meta_query'     => [
+      'relation' => 'AND',
+      [
+        'key'     => '_lc_has_session',
+        'value'   => '1',
+        'compare' => '!=',
+      ],
+      [
+        'key'     => 'course_mode',
+        'value'   => 'online',
+        'compare' => '=',
+      ],
+    ],
+  ]);
+
+  $online_tax_ids = [];
+  $learning_mode_taxonomy = lc_resolve_learning_mode_taxonomy();
+  $online_term_slug = lc_get_learning_mode_term_slug('online');
+  if ($learning_mode_taxonomy !== '' && $online_term_slug !== '') {
+    $online_tax_ids = get_posts([
+      'post_type'      => 'course',
+      'post_status'    => 'publish',
+      'posts_per_page' => -1,
+      'fields'         => 'ids',
+      'no_found_rows'  => true,
+      'meta_query'     => [
+        [
+          'key'     => '_lc_has_session',
+          'value'   => '1',
+          'compare' => '!=',
+        ],
+      ],
+      'tax_query'      => [
+        [
+          'taxonomy' => $learning_mode_taxonomy,
+          'field'    => 'slug',
+          'terms'    => [$online_term_slug],
+        ],
+      ],
+    ]);
+  }
+
+  $ids = array_values(array_unique(array_map('intval', array_merge(
+    is_array($open_ids) ? $open_ids : [],
+    is_array($online_meta_ids) ? $online_meta_ids : [],
+    is_array($online_tax_ids) ? $online_tax_ids : []
+  ))));
   set_transient($cache_key, $ids, 5 * MINUTE_IN_SECONDS);
   $request_cache = $ids;
   return $ids;
@@ -2212,9 +2567,14 @@ function lc_get_open_course_ids_runtime() {
 function lc_course_filter_build_query_args($payload = []) {
   $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
   $allowed_context_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
+  $learning_mode_taxonomy = lc_resolve_learning_mode_taxonomy();
+  if ($learning_mode_taxonomy !== '') {
+    $allowed_context_taxonomies[] = $learning_mode_taxonomy;
+  }
+  $allowed_learning_modes = ['online', 'onsite'];
 
   $page      = isset($payload['page']) ? max(1, (int) $payload['page']) : 1;
-  $open_only = !isset($payload['open_only']) || (int) $payload['open_only'] !== 0;
+  $open_only = isset($payload['open_only']) && (int) $payload['open_only'] !== 0;
 
   $context_taxonomy = isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '';
   $context_term     = isset($payload['context_term']) ? sanitize_title($payload['context_term']) : '';
@@ -2228,6 +2588,10 @@ function lc_course_filter_build_query_args($payload = []) {
     'course_provider' => isset($payload['course_provider']) ? sanitize_title($payload['course_provider']) : '',
     'audience'        => isset($payload['audience']) ? sanitize_title($payload['audience']) : '',
   ];
+  $learning_mode = isset($payload['learning_mode']) ? sanitize_key($payload['learning_mode']) : '';
+  if (!in_array($learning_mode, $allowed_learning_modes, true)) {
+    $learning_mode = '';
+  }
   $keyword = isset($payload['q']) ? sanitize_text_field($payload['q']) : '';
 
   $tax_query = ['relation' => 'AND'];
@@ -2269,6 +2633,34 @@ function lc_course_filter_build_query_args($payload = []) {
   }
   $args['tax_query'] = lc_add_hidden_provider_constraint_to_tax_query($args['tax_query'] ?? []);
 
+  if ($learning_mode !== '') {
+    $term_slug = lc_get_learning_mode_term_slug($learning_mode);
+    if ($learning_mode_taxonomy !== '' && $term_slug !== '') {
+      $args['tax_query'] = $args['tax_query'] ?? ['relation' => 'AND'];
+      $args['tax_query'][] = [
+        'taxonomy' => $learning_mode_taxonomy,
+        'field'    => 'slug',
+        'terms'    => [$term_slug],
+      ];
+    } else {
+      $args['meta_query'] = $args['meta_query'] ?? ['relation' => 'AND'];
+
+      if ($learning_mode === 'online') {
+        $args['meta_query'][] = [
+          'key'     => 'course_mode',
+          'value'   => 'online',
+          'compare' => '=',
+        ];
+      } else {
+        $args['meta_query'][] = [
+          'key'     => 'course_mode',
+          'value'   => ['onsite_single', 'onsite_multi'],
+          'compare' => 'IN',
+        ];
+      }
+    }
+  }
+
   if ($open_only) {
     $open_ids = lc_get_open_course_ids_runtime();
     $args['post__in'] = empty($open_ids) ? [0] : $open_ids;
@@ -2284,7 +2676,15 @@ function lc_course_filter_get_facet_options($payload = []) {
   static $request_cache = [];
   $allowed_taxonomies = ['course_category', 'course_provider', 'audience'];
   $allowed_context_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
+  $learning_mode_taxonomy = lc_resolve_learning_mode_taxonomy();
+  if ($learning_mode_taxonomy !== '') {
+    $allowed_context_taxonomies[] = $learning_mode_taxonomy;
+  }
   $can_view_hidden = lc_current_user_can_view_hidden_courses();
+  $course_ids_cache = [];
+  $term_ids_cache = [];
+  $terms_cache = [];
+  $selected_term_cache = [];
 
   $normalized_payload = [
     'context_taxonomy' => isset($payload['context_taxonomy']) ? sanitize_key($payload['context_taxonomy']) : '',
@@ -2292,7 +2692,8 @@ function lc_course_filter_get_facet_options($payload = []) {
     'course_category'  => isset($payload['course_category']) ? sanitize_title($payload['course_category']) : '',
     'course_provider'  => isset($payload['course_provider']) ? sanitize_title($payload['course_provider']) : '',
     'audience'         => isset($payload['audience']) ? sanitize_title($payload['audience']) : '',
-    'open_only'        => !isset($payload['open_only']) || (int) $payload['open_only'] !== 0 ? 1 : 0,
+    'learning_mode'    => isset($payload['learning_mode']) ? sanitize_key($payload['learning_mode']) : '',
+    'open_only'        => isset($payload['open_only']) && (int) $payload['open_only'] !== 0 ? 1 : 0,
     'q'                => isset($payload['q']) ? sanitize_text_field($payload['q']) : '',
   ];
   $request_cache_key = md5(wp_json_encode([$normalized_payload, $can_view_hidden ? 'editor' : 'public']));
@@ -2340,6 +2741,7 @@ function lc_course_filter_get_facet_options($payload = []) {
       'course_category'  => $selected['course_category'],
       'course_provider'  => $selected['course_provider'],
       'audience'         => $selected['audience'],
+      'learning_mode'    => $normalized_payload['learning_mode'],
       'q'                => $keyword,
     ];
     // intersection: keep other selected filters, clear only the current facet key
@@ -2352,19 +2754,36 @@ function lc_course_filter_get_facet_options($payload = []) {
     $args['orderby'] = 'none';
     $args['paged'] = 1;
 
-    $course_ids = get_posts($args);
+    $args_signature = md5(wp_json_encode($args));
+    if (!array_key_exists($args_signature, $course_ids_cache)) {
+      $course_ids_cache[$args_signature] = get_posts($args);
+    }
+    $course_ids = $course_ids_cache[$args_signature];
     $terms = [];
 
     if (!empty($course_ids)) {
-      $term_ids = wp_get_object_terms($course_ids, $taxonomy, ['fields' => 'ids']);
+      $term_ids_cache_key = $taxonomy . ':' . md5(implode(',', array_map('intval', $course_ids)));
+      if (!array_key_exists($term_ids_cache_key, $term_ids_cache)) {
+        $term_ids_cache[$term_ids_cache_key] = wp_get_object_terms($course_ids, $taxonomy, ['fields' => 'ids']);
+      }
+      $term_ids = $term_ids_cache[$term_ids_cache_key];
+
       if (!is_wp_error($term_ids) && !empty($term_ids)) {
-        $terms = get_terms([
-          'taxonomy'   => $taxonomy,
-          'hide_empty' => false,
-          'include'    => array_map('intval', $term_ids),
-          'orderby'    => 'name',
-          'order'      => 'ASC',
-        ]);
+        $normalized_term_ids = array_values(array_unique(array_map('intval', $term_ids)));
+        sort($normalized_term_ids);
+        $terms_cache_key = $taxonomy . ':' . implode(',', $normalized_term_ids);
+
+        if (!array_key_exists($terms_cache_key, $terms_cache)) {
+          $terms_cache[$terms_cache_key] = get_terms([
+            'taxonomy'   => $taxonomy,
+            'hide_empty' => false,
+            'include'    => $normalized_term_ids,
+            'orderby'    => 'name',
+            'order'      => 'ASC',
+          ]);
+        }
+
+        $terms = $terms_cache[$terms_cache_key];
       }
     }
 
@@ -2377,7 +2796,11 @@ function lc_course_filter_get_facet_options($payload = []) {
         }
       }
       if (!$exists) {
-        $selected_term = get_term_by('slug', $selected[$taxonomy], $taxonomy);
+        $selected_term_cache_key = $taxonomy . ':' . $selected[$taxonomy];
+        if (!array_key_exists($selected_term_cache_key, $selected_term_cache)) {
+          $selected_term_cache[$selected_term_cache_key] = get_term_by('slug', $selected[$taxonomy], $taxonomy);
+        }
+        $selected_term = $selected_term_cache[$selected_term_cache_key];
         if ($selected_term && !is_wp_error($selected_term)) {
           $can_append_selected = true;
           if ($taxonomy === 'course_provider' && !$can_view_hidden) {
@@ -3643,6 +4066,12 @@ add_action('restrict_manage_posts', function ($post_type) {
 
     $query_var = 'session_location_filter';
     $selected  = isset($_GET[$query_var]) ? (int) $_GET[$query_var] : 0;
+    $should_load_locations = $selected > 0 || (!empty($_GET['load_session_locations']) && (int) $_GET['load_session_locations'] === 1);
+
+    if (!$should_load_locations) {
+        echo '<button type="submit" class="button" name="load_session_locations" value="1" style="margin-left:8px;">Load Locations</button>';
+        return;
+    }
 
     $ids = lc_get_used_location_ids_for_sessions();
 

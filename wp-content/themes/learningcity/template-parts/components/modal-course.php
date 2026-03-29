@@ -3,7 +3,7 @@
 
   <div class="card-modal max-w-full">
     <div class="absolute top-4 right-4 z-20">
-      <button class="close-modal bg-black rounded-full size-8 flex gap-2 justify-center items-center p-2.5">
+      <button class="close-modal bg-black rounded-full size-8 flex gap-2 justify-center items-center p-2.5" type="button" aria-label="ปิดหน้าต่างคอร์ส">
         <div class="icon-close"></div>
       </button>
     </div>

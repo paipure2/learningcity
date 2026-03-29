@@ -54,10 +54,10 @@ if (!is_array($partners_gallery) || empty($partners_gallery)) {
                  <div class="lg:ml-auto">
                      <h2 class="lg:text-fs20 text-fs18 font-semibold">ติดตามเรา</h2>
                      <div class="flex gap-4 items-center mt-3">
-                         <a href="https://web.facebook.com/bangkokbma" target="_blank" class="w-8 aspect-square icon-social-facebook"></a>
-                         <a href="https://www.youtube.com/@bangkok_bma"  target="_blank" class="w-8 aspect-square icon-social-youtube"></a>
-                         <a href="https://www.instagram.com/bangkok_bma/" target="_blank"  class="w-8 aspect-square icon-social-instagram"></a>
-                         <a href="https://x.com/bangkokbma"  target="_blank" class="w-8 aspect-square icon-social-x"></a>
+                         <a href="https://web.facebook.com/bangkokbma" target="_blank" rel="noopener noreferrer" aria-label="Bangkok BMA บน Facebook" class="w-8 aspect-square icon-social-facebook"></a>
+                         <a href="https://www.youtube.com/@bangkok_bma" target="_blank" rel="noopener noreferrer" aria-label="Bangkok BMA บน YouTube" class="w-8 aspect-square icon-social-youtube"></a>
+                         <a href="https://www.instagram.com/bangkok_bma/" target="_blank" rel="noopener noreferrer" aria-label="Bangkok BMA บน Instagram" class="w-8 aspect-square icon-social-instagram"></a>
+                         <a href="https://x.com/bangkokbma" target="_blank" rel="noopener noreferrer" aria-label="Bangkok BMA บน X" class="w-8 aspect-square icon-social-x"></a>
                      </div>
                  </div>
              </div>
@@ -66,17 +66,16 @@ if (!is_array($partners_gallery) || empty($partners_gallery)) {
                  <div class="min-w-[300px]">
                      <h3 class="text-fs16 font-semibold font-anuphan">Organized by</h3>
                      <div class="flex items-center lg:gap-3 gap-1.5 mt-4">
-                         <a href="#!"
+                         <div
                              class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
                              <img src="<?php echo THEME_URI ?>/assets/images/logo/logo01.jpg" alt="" class="w-full h-full object-cover
                                ">
-                         </a>
-                         </a>
-                         <a href="#!"
+                         </div>
+                         <div
                              class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]!  px-1h-[50px]!">
                              <img src="<?php echo THEME_URI ?>/assets/images/logo/logo02.jpg" alt="" class="w-full h-full object-cover
                                ">
-                         </a>
+                         </div>
                      </div>
                  </div>
 
@@ -95,10 +94,10 @@ if (!is_array($partners_gallery) || empty($partners_gallery)) {
                                  $partner_alt = isset($partner_item['alt']) ? (string) $partner_item['alt'] : '';
                              ?>
                                  <div class="swiper-slide w-auto!">
-                                     <a href="#!"
+                                     <div
                                          class="shadow-logo overflow-hidden rounded-xl block lg:w-[90px]! w-[74px]! lg:h-[68px]! px-1h-[50px]!">
                                          <img src="<?php echo esc_url($partner_img); ?>" alt="<?php echo esc_attr($partner_alt); ?>" class="w-full h-full object-cover">
-                                     </a>
+                                     </div>
                                  </div>
                              <?php endforeach; ?>
                          </div>

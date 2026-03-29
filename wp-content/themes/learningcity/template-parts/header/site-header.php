@@ -15,7 +15,7 @@ $blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
     <div class="container">
        <div class="header">
           <div class="flex-1">
-             <a href="<?php echo site_url('/') ?>" class="logo-site"></a>
+             <a href="<?php echo site_url('/') ?>" class="logo-site" aria-label="Bangkok Learning City หน้าแรก"></a>
           </div>
           <nav class="navbar">
              <ul>
@@ -51,7 +51,7 @@ $blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
              </div>
              <div class="flex items-center gap-4">
                 <button class="icon-search xl:w-7 lg:w-5 w-7" data-modal-id="modal-search" aria-label="เปิดค้นหา"></button>
-                <button class="hamburger-menu">
+                <button class="hamburger-menu" type="button" aria-label="เปิดเมนู">
                    <span></span>
                    <span></span>
                    <span></span>
@@ -61,7 +61,7 @@ $blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
        </div>
     </div>
     <div class="expand-menu">
-       <button class="btn-close icon-close"></button>
+       <button class="btn-close icon-close" type="button" aria-label="ปิดเมนู"></button>
        <div class="flex flex-col px-6 pt-24 pb-12 h-full justify-between overflow-auto">
           <ul class="list-menu">
             <li>
@@ -90,7 +90,7 @@ $blog_url = $blog_page_id ? get_permalink($blog_page_id) : home_url('/');
              </a>
              </li>
           </ul>
-          <a href="<?php echo site_url('/') ?>"><span class="logo-site"></span></a>
+          <a href="<?php echo site_url('/') ?>" aria-label="Bangkok Learning City หน้าแรก"><span class="logo-site"></span></a>
        </div>
     </div>
  </header>

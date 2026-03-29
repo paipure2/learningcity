@@ -1,4 +1,4 @@
-const STORAGE_KEY = "lc_course_open_only";
+const STORAGE_KEY = "lc_course_open_only_v2";
 
 function asInt(value, fallback = 1) {
   const n = parseInt(String(value ?? ""), 10);
@@ -58,6 +58,9 @@ function buildUrlFromState({ selectors, openOnly, page }) {
   if (selectors.q) url.searchParams.set("q", selectors.q);
   else url.searchParams.delete("q");
 
+  if (selectors.learning_mode) url.searchParams.set("learning_mode", selectors.learning_mode);
+  else url.searchParams.delete("learning_mode");
+
   if (page > 1) url.searchParams.set("paged", String(page));
   else url.searchParams.delete("paged");
 
@@ -76,6 +79,7 @@ function initCourseArchiveFilter() {
 
   const contextTaxonomy = root.dataset.contextTaxonomy || "";
   const contextTerm = root.dataset.contextTerm || "";
+  const learningMode = root.dataset.learningMode || "";
   const openDefault = root.dataset.openDefault !== "0";
 
   const toggle = document.getElementById("lc-open-only-toggle");
@@ -110,6 +114,7 @@ function initCourseArchiveFilter() {
       course_category: selectors.course_category?.value || "",
       course_provider: selectors.course_provider?.value || "",
       audience: selectors.audience?.value || "",
+      learning_mode: learningMode,
       q: keywordInput?.value?.trim() || "",
     };
   }
@@ -191,6 +196,7 @@ function initCourseArchiveFilter() {
     body.set("course_category", state.course_category);
     body.set("course_provider", state.course_provider);
     body.set("audience", state.audience);
+    body.set("learning_mode", state.learning_mode);
     body.set("q", state.q);
 
     try {
@@ -229,6 +235,7 @@ function initCourseArchiveFilter() {
             course_category: state.course_category,
             course_provider: state.course_provider,
             audience: state.audience,
+            learning_mode: state.learning_mode,
             q: state.q,
           },
           openOnly: state.openOnly,
@@ -308,6 +315,7 @@ function initCourseArchiveFilter() {
   });
 
   const hasPresetFilters = Object.values(selectors).some((el) => !!(el && el.value))
+    || !!learningMode
     || !!(keywordInput && keywordInput.value.trim());
   if (mobileMq.matches) {
     root.classList.add("is-mobile-collapsible");

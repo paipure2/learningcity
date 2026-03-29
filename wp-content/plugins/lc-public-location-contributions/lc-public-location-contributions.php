@@ -1871,28 +1871,40 @@ final class LC_Public_Place_Photo_Upload {
     }
 
     private static function get_pending_change_requests_count() {
-        $q = new WP_Query([
-            'post_type' => self::change_request_post_types(),
-            'post_status' => ['pending', 'publish', 'draft'],
-            'posts_per_page' => -1,
-            'fields' => 'ids',
-            'no_found_rows' => true,
-        ]);
-        if (!$q->have_posts()) {
+        global $wpdb;
+
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+
+        $post_types = array_values(array_filter(array_map('sanitize_key', (array) self::change_request_post_types())));
+        if (empty($post_types)) {
+            $cache = 0;
             return 0;
         }
-        $count = 0;
-        foreach ((array) $q->posts as $rid) {
-            $rid = (int) $rid;
-            if ($rid <= 0) {
-                continue;
-            }
-            $status = (string) get_post_meta($rid, '_lc_change_status', true);
-            if ($status === '' || $status === 'pending') {
-                $count++;
-            }
-        }
-        return max(0, (int) $count);
+
+        $post_type_placeholders = implode(', ', array_fill(0, count($post_types), '%s'));
+        $meta_key = '_lc_change_status';
+
+        $sql = "
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            LEFT JOIN {$wpdb->postmeta} pm
+              ON pm.post_id = p.ID
+             AND pm.meta_key = %s
+            WHERE p.post_type IN ({$post_type_placeholders})
+              AND p.post_status IN ('pending', 'publish', 'draft')
+              AND (
+                pm.post_id IS NULL
+                OR pm.meta_value = ''
+                OR pm.meta_value = 'pending'
+              )
+        ";
+
+        $params = array_merge([$meta_key], $post_types);
+        $cache = max(0, (int) $wpdb->get_var($wpdb->prepare($sql, $params)));
+        return $cache;
     }
 
     private static function admin_notice_transient_key($user_id = 0) {

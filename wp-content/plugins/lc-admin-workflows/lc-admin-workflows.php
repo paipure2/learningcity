@@ -128,6 +128,12 @@ function lcaw_prefill_course_mode_value_if_legacy_empty($value, $post_id) {
     if (is_string($value) && trim($value) !== '') return $value;
     if (is_array($value) && !empty($value)) return $value;
 
+    global $pagenow;
+    if (!in_array($pagenow, ['post.php', 'post-new.php'], true)) return $value;
+
+    $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+    if (!$screen || $screen->post_type !== 'course') return $value;
+
     $course_id = lcaw_resolve_course_id_from_acf_post_id($post_id);
     if ($course_id <= 0 || get_post_type($course_id) !== 'course') return $value;
 

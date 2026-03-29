@@ -2,7 +2,7 @@
     <div class="overlay-modal"></div>
     <div class="card-modal rounded-none! max-w-full">
         <div class="absolute top-4 right-4 z-20">
-            <button class="close-modal bg-black  rounded-full size-8 flex gap-2 justify-center items-center p-2.5">
+            <button class="close-modal bg-black rounded-full size-8 flex gap-2 justify-center items-center p-2.5" type="button" aria-label="ปิดเมนูหมวดหมู่">
                 <div class="icon-close"></div>
             </button>
         </div>
@@ -88,6 +88,37 @@
 
                 </div>
                 <div class="py-6 border-t border-gray-200">
+                    <h2 class="text-fs12 font-bold mb-3 flex items-center gap-2">รูปแบบการเรียน <span
+                            class="icon-arrow-down block w-2.5"></span></h2>
+
+                    <div class="items -ml-2 flex flex-col gap-0">
+                        <a
+                            href="<?php echo esc_url(function_exists('lc_get_learning_mode_link') ? lc_get_learning_mode_link('online') : add_query_arg('learning_mode', 'online', get_post_type_archive_link('course'))); ?>"
+                            class="flex w-full gap-2 items-center text-fs16 font-normal px-2 py-1.5 hover:bg-black/5 rounded-lg transition-colors"
+                        >
+                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#DEF6EE] shrink-0 text-primary">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M4 6.75C4 5.7835 4.7835 5 5.75 5H18.25C19.2165 5 20 5.7835 20 6.75V15.25C20 16.2165 19.2165 17 18.25 17H13.75L15.5 19H17C17.4142 19 17.75 19.3358 17.75 19.75C17.75 20.1642 17.4142 20.5 17 20.5H7C6.58579 20.5 6.25 20.1642 6.25 19.75C6.25 19.3358 6.58579 19 7 19H8.5L10.25 17H5.75C4.7835 17 4 16.2165 4 15.25V6.75ZM5.75 6.5C5.61193 6.5 5.5 6.61193 5.5 6.75V15.25C5.5 15.3881 5.61193 15.5 5.75 15.5H18.25C18.3881 15.5 18.5 15.3881 18.5 15.25V6.75C18.5 6.61193 18.3881 6.5 18.25 6.5H5.75Z" fill="currentColor"/>
+                                </svg>
+                            </span>
+                            <span class="inline-block truncate">ออนไลน์</span>
+                        </a>
+
+                        <a
+                            href="<?php echo esc_url(function_exists('lc_get_learning_mode_link') ? lc_get_learning_mode_link('onsite') : add_query_arg('learning_mode', 'onsite', get_post_type_archive_link('course'))); ?>"
+                            class="flex w-full gap-2 items-center text-fs16 font-normal px-2 py-1.5 hover:bg-black/5 rounded-lg transition-colors"
+                        >
+                            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#DEF6EE] shrink-0 text-primary">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M12 21C11.8011 21 11.6103 20.921 11.4697 20.7803C10.1101 19.4207 5.5 14.5968 5.5 10.25C5.5 6.52208 8.27208 3.75 12 3.75C15.7279 3.75 18.5 6.52208 18.5 10.25C18.5 14.5968 13.8899 19.4207 12.5303 20.7803C12.3897 20.921 12.1989 21 12 21ZM12 5.25C9.10051 5.25 7 7.35051 7 10.25C7 13.4295 10.1844 17.2605 12 19.1425C13.8156 17.2605 17 13.4295 17 10.25C17 7.35051 14.8995 5.25 12 5.25ZM12 13.25C10.3431 13.25 9 11.9069 9 10.25C9 8.59315 10.3431 7.25 12 7.25C13.6569 7.25 15 8.59315 15 10.25C15 11.9069 13.6569 13.25 12 13.25ZM12 8.75C11.1716 8.75 10.5 9.42157 10.5 10.25C10.5 11.0784 11.1716 11.75 12 11.75C12.8284 11.75 13.5 11.0784 13.5 10.25C13.5 9.42157 12.8284 8.75 12 8.75Z" fill="currentColor"/>
+                                </svg>
+                            </span>
+                            <span class="inline-block truncate">เรียนนอกสถานที่</span>
+                        </a>
+                    </div>
+
+                </div>
+                <div class="py-6 border-t border-gray-200">
                     <h2 class="text-fs12 font-bold mb-3 flex items-center gap-2">สถานที่/หน่วยงาน <span
                             class="icon-arrow-down block w-2.5"></span></h2>
 
@@ -103,12 +134,33 @@
                             foreach ($providers as $provider) :
 
                                 $term_link = get_term_link($provider);
+                                $icon = get_field('image', $provider);
+                                $icon_url = '';
+
+                                if (is_array($icon) && !empty($icon['url'])) {
+                                    $icon_url = $icon['url'];
+                                } elseif (is_string($icon)) {
+                                    $icon_url = $icon;
+                                } elseif (is_numeric($icon)) {
+                                    $icon_url = wp_get_attachment_image_url((int) $icon, 'thumbnail');
+                                }
+
+                                $icon_placeholder = THEME_URI . '/assets/images/placeholder-gray.png';
+                                $icon_src = $icon_url ? $icon_url : $icon_placeholder;
                         ?>
 
                             <a
                                 href="<?php echo !is_wp_error($term_link) ? esc_url($term_link) : '#'; ?>"
                                 class="flex w-full  gap-2 items-center text-fs16 font-normal px-2 py-1.5 hover:bg-black/5 rounded-lg transition-colors"
                             >
+                                <div class="w-5 h-5 rounded-full overflow-hidden bg-black/5 shrink-0">
+                                    <img
+                                        src="<?php echo esc_url($icon_src); ?>"
+                                        alt="<?php echo esc_attr($provider->name); ?>"
+                                        class="w-full h-full object-cover"
+                                        loading="lazy"
+                                    >
+                                </div>
                                 <span class="inline-block truncate">
                                     <?php echo esc_html($provider->name); ?>
                                 </span>

@@ -2,6 +2,10 @@
 global $wp_query;
 
 $allowed_taxonomies = ['course_category', 'course_provider', 'audience', 'post_tag', 'skill-level'];
+$learning_mode_taxonomy = function_exists('lc_resolve_learning_mode_taxonomy') ? lc_resolve_learning_mode_taxonomy() : '';
+if ($learning_mode_taxonomy !== '') {
+    $allowed_taxonomies[] = $learning_mode_taxonomy;
+}
 $queried            = get_queried_object();
 
 $context_taxonomy = '';
@@ -16,10 +20,15 @@ $selected = [
     'course_provider' => isset($_GET['course_provider']) ? sanitize_title(wp_unslash($_GET['course_provider'])) : '',
     'audience'        => isset($_GET['audience']) ? sanitize_title(wp_unslash($_GET['audience'])) : '',
 ];
+$learning_mode = isset($_GET['learning_mode']) ? sanitize_key(wp_unslash($_GET['learning_mode'])) : '';
+$allowed_learning_modes = ['online', 'onsite'];
+if (!in_array($learning_mode, $allowed_learning_modes, true)) {
+    $learning_mode = '';
+}
 $keyword = isset($_GET['q']) ? sanitize_text_field(wp_unslash($_GET['q'])) : '';
 
 $found_posts = isset($wp_query->found_posts) ? (int) $wp_query->found_posts : 0;
-$open_only   = !isset($_GET['open_only']) || (int) $_GET['open_only'] !== 0;
+$open_only   = isset($_GET['open_only']) && (int) $_GET['open_only'] !== 0;
 
 $taxonomy_labels = [
     'course_category' => 'หมวดหมู่',
@@ -35,6 +44,7 @@ $facet_payload = [
     'course_category'  => $selected['course_category'],
     'course_provider'  => $selected['course_provider'],
     'audience'         => $selected['audience'],
+    'learning_mode'    => $learning_mode,
     'q'                => $keyword,
 ];
 $facet_options = function_exists('lc_course_filter_get_facet_options')
@@ -47,7 +57,8 @@ $facet_options = function_exists('lc_course_filter_get_facet_options')
     class="lc-archive-filters"
     data-context-taxonomy="<?php echo esc_attr($context_taxonomy); ?>"
     data-context-term="<?php echo esc_attr($context_term); ?>"
-    data-open-default="1"
+    data-learning-mode="<?php echo esc_attr($learning_mode); ?>"
+    data-open-default="0"
 >
     <div class="lc-archive-filters__head">
         <h3 class="lc-archive-filters__title">ตัวกรอง</h3>
