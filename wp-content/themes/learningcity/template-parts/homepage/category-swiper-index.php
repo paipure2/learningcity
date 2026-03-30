@@ -14,11 +14,30 @@ $args = [
 ];
 if ($parent_qv !== null) $args['parent'] = (int) $parent_qv;
 
-$terms = get_terms($args);
+$exclude_qv = get_query_var('cc_exclude_terms');
+if (is_array($exclude_qv) && !empty($exclude_qv)) {
+  $args['exclude'] = array_values(array_filter(array_map('intval', $exclude_qv)));
+}
 
-$default_img = get_query_var('cc_default_img') ?: (defined('THEME_URI') ? THEME_URI . '/assets/images/category/img01.png' : '');
-$all_link    = get_query_var('cc_all_link') ?: '#!';
-$all_text    = get_query_var('cc_all_text') ?: 'ดูกิจกรรมทั้งหมด';
+$terms = get_query_var('cc_terms');
+if (!is_array($terms)) {
+  $terms = get_terms($args);
+}
+
+$limit_qv = (int) get_query_var('cc_limit');
+if ($limit_qv > 0 && is_array($terms)) {
+  $terms = array_slice($terms, 0, $limit_qv);
+}
+
+$default_img_qv = get_query_var('cc_default_img');
+$default_img = ($default_img_qv !== null && $default_img_qv !== '')
+  ? $default_img_qv
+  : (defined('THEME_URI') ? THEME_URI . '/assets/images/category/img01.png' : '');
+
+$all_link_qv = get_query_var('cc_all_link');
+$all_text_qv = get_query_var('cc_all_text');
+$all_link = ($all_link_qv !== null) ? $all_link_qv : '#!';
+$all_text = ($all_text_qv !== null) ? $all_text_qv : 'ดูกิจกรรมทั้งหมด';
 ?>
 
 <div class="swiper overflow-visible! swiper-category-index">
@@ -43,9 +62,11 @@ $all_text    = get_query_var('cc_all_text') ?: 'ดูกิจกรรมท�
         <div class="swiper-button-prev"></div>
         <div class="swiper-button-next"></div>
       </div>
-      <a href="<?php echo esc_url($all_link); ?>" class="btn-link-v2 max-xl:text-fs18!">
-        <?php echo esc_html($all_text); ?>
-      </a>
+      <?php if ($all_link !== '' && $all_text !== '') : ?>
+        <a href="<?php echo esc_url($all_link); ?>" class="btn-link-v2 max-xl:text-fs18!">
+          <?php echo esc_html($all_text); ?>
+        </a>
+      <?php endif; ?>
     </div>
   </div>
 </div>

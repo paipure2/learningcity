@@ -352,7 +352,9 @@
                       );
                       $nl_term_slider_blocks[] = array(
                         'order' => (int) $slider['order'],
+                        'taxonomy' => (string) $taxonomy,
                         'title' => (string) $slider['title'],
+                        'settings' => $settings,
                         'cards' => $nl_build_hybrid_cards($taxonomy, $settings),
                       );
                     }
@@ -397,7 +399,7 @@
                         <div class="grid lg:grid-cols-2 grid-cols-1">
                             <div
                                 class="lg:w-[80%] sm:w-[500px] w-full lg:ml-0 mx-auto pl-8 lg:p-4 p-8 flex items-center justify-center lg:mb-[-5%]">
-                            <div class="logo-nextlearn w-[300px] md:w-auto drop-shadow-xl"></div>
+                            <div class="logo-nextlearn w-[220px] sm:w-[300px] md:w-auto drop-shadow-xl"></div>
                             </div>
                             <div class="lg:row-span-2 relative">
                             <div class="flex items-center justify-end max-sm:flex-col">
@@ -747,43 +749,64 @@
                         </div>
                     </div>
                     <?php foreach ($nl_term_slider_blocks as $block) : ?>
-                      <div class="xl:py-12 py-8 sec-category-other" data-aos="fade-in" style="<?php echo esc_attr('order:' . (int) $block['order'] . ';'); ?>">
+                      <div class="xl:py-12 py-8 sec-category-other <?php echo (($block['taxonomy'] ?? '') === 'course_category') ? 'sec-category-home-like' : ''; ?>" data-aos="fade-in" style="<?php echo esc_attr('order:' . (int) $block['order'] . ';'); ?>">
                           <h2 class="text-heading"><?php echo esc_html($block['title']); ?></h2>
-                          <div class="-m-4 xl:overflow-hidden! overflow-visible!">
-                              <div class="p-4">
-                                  <div class="swiper overflow-visible!">
-                                      <div class="swiper-wrapper">
-                                          <?php foreach ($block['cards'] as $item) : ?>
-                                            <?php
-                                            $item_url = isset($item['url']) ? (string) $item['url'] : '';
-                                            $item_title = isset($item['title']) ? (string) $item['title'] : '';
-                                            if ($item_url === '' || $item_title === '') {
-                                              continue;
-                                            }
-                                            $item_image = isset($item['image']) ? (string) $item['image'] : '';
-                                            ?>
-                                            <div class="swiper-slide">
-                                              <a href="<?php echo esc_url($item_url); ?>" class="card-category-other">
-                                                <?php if ($item_image !== '') : ?>
-                                                  <img src="<?php echo esc_url($item_image); ?>" alt="<?php echo esc_attr($item_title); ?>">
-                                                <?php endif; ?>
-                                                <div class="txt">
-                                                  <p><?php echo esc_html($item_title); ?></p>
-                                                </div>
-                                              </a>
+                          <?php if (($block['taxonomy'] ?? '') === 'course_category') : ?>
+                            <?php
+                            set_query_var('cc_taxonomy', 'course_category');
+                            set_query_var('cc_hide_empty', false);
+                            set_query_var('cc_parent', 0);
+                            set_query_var('cc_default_img', THEME_URI . '/assets/images/category/img01.png');
+                            set_query_var('cc_exclude_terms', null);
+                            set_query_var('cc_limit', 0);
+                            set_query_var('cc_all_link', '');
+                            set_query_var('cc_all_text', '');
+                            get_template_part('template-parts/homepage/category-swiper-index');
+                            set_query_var('cc_hide_empty', null);
+                            set_query_var('cc_parent', null);
+                            set_query_var('cc_default_img', null);
+                            set_query_var('cc_exclude_terms', null);
+                            set_query_var('cc_limit', null);
+                            set_query_var('cc_all_link', null);
+                            set_query_var('cc_all_text', null);
+                            ?>
+                          <?php else : ?>
+                            <div class="-m-4 xl:overflow-hidden! overflow-visible!">
+                                <div class="p-4">
+                                    <div class="swiper overflow-visible!">
+                                        <div class="swiper-wrapper">
+                                            <?php foreach ($block['cards'] as $item) : ?>
+                                              <?php
+                                              $item_url = isset($item['url']) ? (string) $item['url'] : '';
+                                              $item_title = isset($item['title']) ? (string) $item['title'] : '';
+                                              if ($item_url === '' || $item_title === '') {
+                                                continue;
+                                              }
+                                              $item_image = isset($item['image']) ? (string) $item['image'] : '';
+                                              ?>
+                                              <div class="swiper-slide">
+                                                <a href="<?php echo esc_url($item_url); ?>" class="card-category-other">
+                                                  <?php if ($item_image !== '') : ?>
+                                                    <img src="<?php echo esc_url($item_image); ?>" alt="<?php echo esc_attr($item_title); ?>">
+                                                  <?php endif; ?>
+                                                  <div class="txt">
+                                                    <p><?php echo esc_html($item_title); ?></p>
+                                                  </div>
+                                                </a>
+                                              </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <div class="swiper-control">
+                                            <div class="swiper-pagination"></div>
+                                            <div class="flex items-center justify-end gap-3">
+                                                <div class="swiper-button-prev"></div>
+                                                <div class="swiper-button-next"></div>
                                             </div>
-                                          <?php endforeach; ?>
-                                      </div>
-                                      <div class="swiper-control">
-                                          <div class="swiper-pagination"></div>
-                                          <div class="flex items-center justify-end gap-3">
-                                              <div class="swiper-button-prev"></div>
-                                              <div class="swiper-button-next"></div>
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                          <?php endif; ?>
                       </div>
                     <?php endforeach; ?>
 
@@ -896,6 +919,15 @@
 <style>
   .sec-category-other .swiper-slide {
     height: auto;
+  }
+  .sec-category-home-like {
+    overflow: hidden;
+  }
+  .sec-category-home-like .swiper-category-index .swiper {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
   }
   .sec-category-other .card-category-other {
     height: 100%;
