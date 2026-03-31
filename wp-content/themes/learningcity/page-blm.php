@@ -43,5 +43,6 @@ get_template_part('template-parts/header/site-header');
   ]);
   ?>
 </div>
+<?php get_template_part('template-parts/components/modal-search'); ?>
 <?php get_template_part('template-parts/auth/location-edit-auth-modal'); ?>
 <?php get_footer(); ?>
