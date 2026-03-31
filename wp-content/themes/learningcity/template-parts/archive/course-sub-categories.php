@@ -4,6 +4,7 @@ if (!$term || empty($term->term_id) || empty($term->taxonomy)) return;
 
 // ถ้าอยู่หน้า child ให้ใช้ parent ของมัน, ถ้าอยู่หน้า parent ก็ใช้ตัวมันเอง
 $parent_id = !empty($term->parent) ? (int) $term->parent : (int) $term->term_id;
+$is_child_term = !empty($term->parent);
 
 $sub_terms = get_terms([
     'taxonomy'   => $term->taxonomy,
@@ -22,6 +23,21 @@ if (!is_wp_error($sub_terms) && !empty($sub_terms)) :
 ?>
 <div class="xl:py-3 py-3 sec-category-highlight">
     <div class="lc-subcat-scroll" role="navigation" aria-label="หมวดย่อยของคอร์ส">
+            <?php if ($is_child_term && $parent_term && !is_wp_error($parent_term)) :
+                $parent_link = get_term_link($parent_term);
+                if (!is_wp_error($parent_link)) :
+            ?>
+                <div class="lc-subcat-item">
+                    <a href="<?php echo esc_url($parent_link); ?>"
+                       class="inline-flex items-center justify-center gap-2 sm:px-6 px-3 sm:py-4 py-2 rounded-full font-semibold sm:text-fs16 text-fs14 whitespace-nowrap transition-all hover:-translate-y-[1px] hover:shadow-md text-[#1C5D42]"
+                       style="background-color: <?php echo esc_attr($pill_bg); ?>;">
+                        <span aria-hidden="true">←</span>
+                        <span><?php echo esc_html($parent_term->name); ?></span>
+                    </a>
+                </div>
+            <?php
+                endif;
+            endif; ?>
             <?php foreach ($sub_terms as $sub) :
                 $sub_link = get_term_link($sub);
                 if (is_wp_error($sub_link)) continue;

@@ -92,7 +92,35 @@ if ($price !== null && $price !== '') {
 }
 
 // 7. รูป Thumbnail
-$thumb = get_the_post_thumbnail_url($post_id, 'medium') ?: THEME_URI . '/assets/images/placeholder-gray.png';
+$thumb = get_the_post_thumbnail_url($post_id, 'medium');
+if (!$thumb && function_exists('get_field')) {
+    $gallery_images = get_field('images', $post_id);
+    $first_gallery_image = is_array($gallery_images) ? reset($gallery_images) : null;
+
+    if (is_numeric($first_gallery_image)) {
+        $thumb = wp_get_attachment_image_url((int) $first_gallery_image, 'medium');
+        if (!$thumb) {
+            $thumb = wp_get_attachment_image_url((int) $first_gallery_image, 'thumbnail');
+        }
+    } elseif (is_array($first_gallery_image)) {
+        if (!empty($first_gallery_image['sizes']) && is_array($first_gallery_image['sizes'])) {
+            $thumb = $first_gallery_image['sizes']['medium']
+                ?? $first_gallery_image['sizes']['thumbnail']
+                ?? $first_gallery_image['sizes']['medium_large']
+                ?? '';
+        }
+
+        if (!$thumb && !empty($first_gallery_image['url'])) {
+            $thumb = (string) $first_gallery_image['url'];
+        }
+    } elseif (is_string($first_gallery_image) && $first_gallery_image !== '') {
+        $thumb = $first_gallery_image;
+    }
+}
+
+if (!$thumb) {
+    $thumb = THEME_URI . '/assets/images/placeholder-gray.png';
+}
 ?>
 
 <a class="card-course flex flex-col h-full"

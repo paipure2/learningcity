@@ -1,3 +1,29 @@
+<?php
+if (!function_exists('lc_unique_terms_by_name')) {
+    function lc_unique_terms_by_name($terms) {
+        $unique = [];
+        $seen = [];
+
+        foreach ((array) $terms as $term) {
+            if (!($term instanceof WP_Term)) {
+                continue;
+            }
+
+            $key = sanitize_title($term->name);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $term;
+        }
+
+        return $unique;
+    }
+}
+
+$aside_category_limit = 10;
+?>
  <aside class="aside">
      <div class="sticky top-0 bg-white mt-[-114px]">
          <a href="<?php echo site_url('/') ?>" class="logo-site p-6 block" aria-label="Bangkok Learning City หน้าแรก"></a>
@@ -21,74 +47,128 @@
                  </h2>
              </div>
              <div class="pl-3">
-                 <div class="py-6 border-t border-gray-200">
+                <div class="py-6 border-t border-gray-200">
+                    <div class="group">
+                        <h2 class="font-anuphan text-fs12 font-bold mb-3">
+                            <span>หมวดหมู่</span>
+                        </h2>
 
-                    <h2 class="text-fs12 font-bold mb-3 flex items-center gap-2">
-                        หมวดหมู่
-                        <span class="icon-arrow-down block w-2.5"></span>
-                    </h2>
+                        <div class="items -ml-2 flex flex-col gap-0">
 
-                    <div class="items -ml-2 flex flex-col gap-0">
+                            <?php
+                            // ดึงเฉพาะ parent category
+                            $parent_terms = get_terms([
+                                'taxonomy'   => 'course_category',
+                                'parent'     => 0,
+                                'hide_empty' => false,
+                            ]);
 
-                        <?php
-                        // ดึงเฉพาะ parent category
-                        $parent_terms = get_terms([
-                            'taxonomy'   => 'course_category',
-                            'parent'     => 0,
-                            'hide_empty' => false,
-                        ]);
+                            if (!empty($parent_terms) && !is_wp_error($parent_terms)) :
+                                $parent_terms = lc_unique_terms_by_name($parent_terms);
+                                $visible_parent_terms = array_slice($parent_terms, 0, $aside_category_limit);
+                                $hidden_parent_terms = array_slice($parent_terms, $aside_category_limit);
 
-                        if (!empty($parent_terms) && !is_wp_error($parent_terms)) :
-                            foreach ($parent_terms as $term) :
+                                foreach ($visible_parent_terms as $term) :
 
-                                $term_link = get_term_link($term);
+                                    $term_link = get_term_link($term);
 
-                                // ===== ACF icon field =====
-                                $icon = get_field('icon', $term); // image field
-                                $icon_url = '';
+                                    // ===== ACF icon field =====
+                                    $icon = get_field('icon', $term); // image field
+                                    $icon_url = '';
 
-                                if (is_array($icon) && !empty($icon['url'])) {
-                                    $icon_url = $icon['url'];
-                                } elseif (is_string($icon)) {
-                                    $icon_url = $icon;
-                                } elseif (is_numeric($icon)) {
-                                    $icon_url = wp_get_attachment_image_url((int)$icon, 'thumbnail');
-                                }
+                                    if (is_array($icon) && !empty($icon['url'])) {
+                                        $icon_url = $icon['url'];
+                                    } elseif (is_string($icon)) {
+                                        $icon_url = $icon;
+                                    } elseif (is_numeric($icon)) {
+                                        $icon_url = wp_get_attachment_image_url((int)$icon, 'thumbnail');
+                                    }
 
-                                // placeholder
-                                $icon_placeholder = THEME_URI . '/assets/images/placeholder.png';
-                                $icon_src = $icon_url ? $icon_url : $icon_placeholder;
-                        ?>
+                                    // placeholder
+                                    $icon_placeholder = THEME_URI . '/assets/images/placeholder.png';
+                                    $icon_src = $icon_url ? $icon_url : $icon_placeholder;
+                            ?>
 
-                            <a
-                                href="<?php echo !is_wp_error($term_link) ? esc_url($term_link) : '#'; ?>"
-                                class="flex w-full max-w-[240px] gap-2 items-center text-fs16 font-normal px-2 py-1.5 hover:bg-black/5 rounded-lg transition-colors"
+                                <a
+                                    href="<?php echo !is_wp_error($term_link) ? esc_url($term_link) : '#'; ?>"
+                                    class="flex w-full max-w-[240px] gap-2 items-center text-fs16 font-normal px-2 py-1.5 hover:bg-black/5 rounded-lg transition-colors"
+                                >
+                                    <div class="w-5.5 aspect-square rounded-sm overflow-hidden bg-black/5 shrink-0">
+                                        <img
+                                            src="<?php echo esc_url($icon_src); ?>"
+                                            alt="<?php echo esc_attr($term->name); ?>"
+                                            class="w-full h-full object-cover"
+                                            loading="lazy"
+                                        >
+                                    </div>
+                                    <span class="inline-block truncate">
+                                        <?php echo esc_html($term->name); ?>
+                                    </span>
+                                </a>
+
+                            <?php
+                                endforeach;
+                            endif;
+                            ?>
+
+                        </div>
+
+                        <?php if (!empty($hidden_parent_terms)) : ?>
+                            <?php $hidden_parent_terms_count = count($hidden_parent_terms); ?>
+                            <div class="items -ml-2 mt-2 flex-col gap-0 hidden overflow-hidden opacity-0 transition-all duration-300 ease-out" data-aside-expand-content="categories">
+                                    <?php foreach ($hidden_parent_terms as $term) :
+                                        $term_link = get_term_link($term);
+
+                                        $icon = get_field('icon', $term);
+                                        $icon_url = '';
+
+                                        if (is_array($icon) && !empty($icon['url'])) {
+                                            $icon_url = $icon['url'];
+                                        } elseif (is_string($icon)) {
+                                            $icon_url = $icon;
+                                        } elseif (is_numeric($icon)) {
+                                            $icon_url = wp_get_attachment_image_url((int) $icon, 'thumbnail');
+                                        }
+
+                                        $icon_placeholder = THEME_URI . '/assets/images/placeholder.png';
+                                        $icon_src = $icon_url ? $icon_url : $icon_placeholder;
+                                    ?>
+                                        <a
+                                            href="<?php echo !is_wp_error($term_link) ? esc_url($term_link) : '#'; ?>"
+                                            class="flex w-full max-w-[240px] gap-2 items-center text-fs16 font-normal px-2 py-1.5 hover:bg-black/5 rounded-lg transition-colors"
+                                        >
+                                            <div class="w-5.5 aspect-square rounded-sm overflow-hidden bg-black/5 shrink-0">
+                                                <img
+                                                    src="<?php echo esc_url($icon_src); ?>"
+                                                    alt="<?php echo esc_attr($term->name); ?>"
+                                                    class="w-full h-full object-cover"
+                                                    loading="lazy"
+                                                >
+                                            </div>
+                                            <span class="inline-block truncate">
+                                                <?php echo esc_html($term->name); ?>
+                                            </span>
+                                        </a>
+                                    <?php endforeach; ?>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="mt-3 inline-flex items-center text-fs14 font-semibold text-primary hover:text-primary-hover transition-colors"
+                                data-aside-expand-button="categories"
+                                data-label-open="ดูหมวดหมู่ทั้งหมด (<?php echo esc_attr((string) $hidden_parent_terms_count); ?>)"
+                                data-label-close="ซ่อน"
+                                aria-expanded="false"
                             >
-                                <div class="w-5.5 aspect-square rounded-sm overflow-hidden bg-black/5 shrink-0">
-                                    <img
-                                        src="<?php echo esc_url($icon_src); ?>"
-                                        alt="<?php echo esc_attr($term->name); ?>"
-                                        class="w-full h-full object-cover"
-                                        loading="lazy"
-                                    >
-                                </div>
-                                <span class="inline-block truncate">
-                                    <?php echo esc_html($term->name); ?>
-                                </span>
-                            </a>
-
-                        <?php
-                            endforeach;
-                        endif;
-                        ?>
-
+                                ดูหมวดหมู่ทั้งหมด (<?php echo esc_html((string) $hidden_parent_terms_count); ?>)
+                            </button>
+                        <?php endif; ?>
                     </div>
                  </div>
 
                 <div class="py-6 border-t border-gray-200">
-                    <h2 class="text-fs12 font-bold mb-3 flex items-center gap-2">
+                    <h2 class="font-anuphan text-fs12 font-bold mb-3">
                         รูปแบบการเรียน
-                        <span class="icon-arrow-down block w-2.5"></span>
                     </h2>
 
                     <div class="items -ml-2 flex flex-col gap-0">
@@ -119,9 +199,8 @@
                 </div>
 
                 <div class="py-6 border-t border-gray-200">
-                    <h2 class="text-fs12 font-bold mb-3 flex items-center gap-2">
+                    <h2 class="font-anuphan text-fs12 font-bold mb-3">
                         สถานที่/หน่วยงาน
-                        <span class="icon-arrow-down block w-2.5"></span>
                     </h2>
 
                     <div class="items -ml-2 flex flex-col gap-0">
@@ -133,6 +212,7 @@
                         ]);
 
                         if (!empty($providers) && !is_wp_error($providers)) :
+                            $providers = lc_unique_terms_by_name($providers);
                             foreach ($providers as $provider) :
 
                                 $term_link = get_term_link($provider);
@@ -177,9 +257,8 @@
                 </div>
 
                 <div class="py-6 border-t border-gray-200">
-                    <h2 class="text-fs12 font-bold mb-3 flex items-center gap-2">
+                    <h2 class="font-anuphan text-fs12 font-bold mb-3">
                         เหมาะสำหรับ
-                        <span class="icon-arrow-down block w-2.5"></span>
                     </h2>
 
                     <div class="items -ml-2 flex flex-col gap-0">
@@ -191,6 +270,7 @@
                         ]);
 
                         if (!empty($audiences) && !is_wp_error($audiences)) :
+                            $audiences = lc_unique_terms_by_name($audiences);
                             foreach ($audiences as $audience) :
 
                                 $term_link = get_term_link($audience);

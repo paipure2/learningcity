@@ -66,6 +66,7 @@
     width: 100%;
     max-width: 800px;
     border-radius: 20px;
+    border: solid 1px #0000000f;
     overflow: hidden;
     box-shadow: 0px 0px 15px -1px rgba(0 0 0 / 8%);
     background: #fff;

@@ -1166,10 +1166,19 @@
                     'item_bg' => '#FFECD1',
                   ),
                 );
+                $policy_col_display_order = array('col_4', 'col_2', 'col_3', 'col_1');
+                $policy_col_config_map = array();
+                foreach ($policy_col_configs as $policy_col_config) {
+                  $policy_col_config_map[$policy_col_config['key']] = $policy_col_config;
+                }
                 ?>
                 <div class="swiper swiper-activity-body overflow-visible! md:pb-12! pb-4!">
                   <div class="swiper-wrapper">
-                    <?php foreach ($policy_col_configs as $col_index => $col_config) :
+                    <?php foreach ($policy_col_display_order as $col_index => $policy_col_key) :
+                      if (empty($policy_col_config_map[$policy_col_key])) {
+                        continue;
+                      }
+                      $col_config = $policy_col_config_map[$policy_col_key];
                       $col_data = $policy_cols[$col_config['key']] ?? array();
                       $col_title_raw = !empty($col_data['title']) ? $col_data['title'] : $col_config['default_title'];
                       $col_items = !empty($col_data['items']) && is_array($col_data['items']) ? $col_data['items'] : array();

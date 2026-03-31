@@ -52,6 +52,15 @@ if (!defined('ABSPATH')) exit;
   body.page-template-page-blm header .expand-menu.is-active {
     z-index: 2147483646 !important;
   }
+  body.page-template-page-blm header,
+  body.page-template-page-blm header .navbar,
+  body.page-template-page-blm header .desktop-mega-menu,
+  body.page-template-page-blm header .desktop-mega-menu__panel {
+    z-index: 2147483646 !important;
+  }
+  body.page-template-page-blm header .desktop-mega-menu__backdrop {
+    z-index: 2147483645 !important;
+  }
 
   .me-dot{
     width:16px;height:16px;
