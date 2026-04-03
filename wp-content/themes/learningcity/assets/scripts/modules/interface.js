@@ -19,10 +19,12 @@ function header() {
 
   const handleOpenMenu = () => {
     expandMenu.classList.add("is-active");
+    document.body.classList.add("mobile-menu-open");
     setActivePanel("root");
   };
   const handleCloseMenu = () => {
     expandMenu.classList.remove("is-active");
+    document.body.classList.remove("mobile-menu-open");
     setActivePanel("root");
   };
 

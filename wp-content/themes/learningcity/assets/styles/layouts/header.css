@@ -9,7 +9,8 @@
     body.tax-course_category header .header > .flex-1 > .logo-site,
     body.tax-course_provider header .header > .flex-1 > .logo-site,
     body.tax-audience header .header > .flex-1 > .logo-site {
-      display: none;
+      display: block;
+      opacity: 0;
     }
   }
 

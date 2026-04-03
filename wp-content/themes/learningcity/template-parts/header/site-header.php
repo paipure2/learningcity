@@ -206,14 +206,14 @@ if (is_wp_error($mobile_course_providers)) {
                            <section class="desktop-mega-menu__column desktop-mega-menu__column--purpose">
                               <h3 class="desktop-mega-menu__title">เรียนเพื่ออะไร</h3>
                               <div class="desktop-mega-menu__list desktop-mega-menu__list--purpose">
-                                 <a href="<?php echo esc_url($next_jobs_url); ?>" class="desktop-mega-menu__link desktop-mega-menu__link--purpose-card" aria-label="Next Skills เพิ่มทักษะใหม่">
+                                 <a href="<?php echo esc_url($next_skills_url); ?>" class="desktop-mega-menu__link desktop-mega-menu__link--purpose-card" aria-label="Next Skills เพิ่มทักษะใหม่">
                                     <img
                                        src="<?php echo esc_url($next_skills_card_image); ?>"
                                        alt="Next Skills เพิ่มทักษะใหม่"
                                        loading="lazy"
                                     >
                                  </a>
-                                 <a href="<?php echo esc_url($next_skills_url); ?>" class="desktop-mega-menu__link desktop-mega-menu__link--purpose-card" aria-label="Next Jobs เรียนจบ พร้อมจ้าง">
+                                 <a href="<?php echo esc_url($next_jobs_url); ?>" class="desktop-mega-menu__link desktop-mega-menu__link--purpose-card" aria-label="Next Jobs เรียนจบ พร้อมจ้าง">
                                     <img
                                        src="<?php echo esc_url($next_jobs_card_image); ?>"
                                        alt="Next Jobs เรียนจบ พร้อมจ้าง"

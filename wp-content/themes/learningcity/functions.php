@@ -2986,10 +2986,10 @@ function blc_get_course_hours_chart_data() {
   $display_baseline = [
     'next_jobs'   => 299398,
     'next_skills' => 31093,
-    'other'       => 251,
+    'other'       => 494139,
   ];
 
-  $cache_key = 'blc_course_hours_by_theme_v7';
+  $cache_key = 'blc_course_hours_by_theme_v8';
   $data = get_transient($cache_key);
 
   if ($data !== false) {

@@ -52,14 +52,44 @@ if (!defined('ABSPATH')) exit;
   body.page-template-page-blm header .expand-menu.is-active {
     z-index: 2147483646 !important;
   }
-  body.page-template-page-blm header,
-  body.page-template-page-blm header .navbar,
-  body.page-template-page-blm header .desktop-mega-menu,
-  body.page-template-page-blm header .desktop-mega-menu__panel {
-    z-index: 2147483646 !important;
+
+  @media (min-width: 1024px) {
+    body.page-template-page-blm header,
+    body.page-template-page-blm header .navbar,
+    body.page-template-page-blm header .desktop-mega-menu,
+    body.page-template-page-blm header .desktop-mega-menu__panel {
+      z-index: 2147483646 !important;
+    }
+    body.page-template-page-blm header .desktop-mega-menu__backdrop {
+      z-index: 2147483645 !important;
+    }
   }
-  body.page-template-page-blm header .desktop-mega-menu__backdrop {
-    z-index: 2147483645 !important;
+
+  @media (max-width: 1023px) {
+    body.page-template-page-blm header {
+      z-index: 60 !important;
+    }
+    body.page-template-page-blm.mobile-menu-open header {
+      z-index: 2147483646 !important;
+    }
+    body.page-template-page-blm header .navbar,
+    body.page-template-page-blm header .desktop-mega-menu,
+    body.page-template-page-blm header .desktop-mega-menu__panel {
+      z-index: auto !important;
+    }
+    body.page-template-page-blm #searchOverlay,
+    body.page-template-page-blm #searchPanel,
+    body.page-template-page-blm #listSectionMobile,
+    body.page-template-page-blm #drawer,
+    body.page-template-page-blm .blm-mobile-locate-fab {
+      position: fixed !important;
+    }
+    body.page-template-page-blm #catModal,
+    body.page-template-page-blm #facilityModal,
+    body.page-template-page-blm #courseCatModal,
+    body.page-template-page-blm #photoUploadModal {
+      z-index: 2147483645 !important;
+    }
   }
 
   .me-dot{
@@ -871,7 +901,7 @@ if (!defined('ABSPATH')) exit;
     #searchOverlay {
       left: 12px !important;
       right: 12px !important;
-      top: 16px !important;
+      top: calc(var(--lc-header-h) + 12px) !important;
       bottom: auto !important;
       z-index: 90 !important;
     }
