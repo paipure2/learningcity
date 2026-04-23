@@ -287,6 +287,274 @@
         );
 
         $home_banner_modals = array();
+
+        $home_loop_gallery_items = array(
+          array(
+            'title' => 'ผลงานคอร์สบาริสต้า',
+            'youtube' => 'https://youtu.be/-pMQIy9xHck?si=FlL8U5bqpzIwTyst',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-1.jpg',
+            'aspect' => 'aspect-[16/10]',
+            'width' => 'w-[290px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สแปรรูปสมุนไพร',
+            'youtube' => 'https://youtu.be/sjgfBZZw8H0?si=WQ75Vs8ewyMxQMb2',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-2.jpg',
+            'aspect' => 'aspect-[3/4]',
+            'width' => 'w-[190px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สบาริสต้าเบื้องต้น',
+            'youtube' => 'https://youtu.be/fB4Cujc3KmE?si=4Rt2SRY2ipb2-vNk',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-3.jpg',
+            'aspect' => 'aspect-square',
+            'width' => 'w-[210px] sm:w-[240px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สบาริสต้า',
+            'youtube' => 'https://youtu.be/dnMUcO64mBQ?si=r0WbnMtKgr3WLKno',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-4.jpg',
+            'aspect' => 'aspect-[5/3]',
+            'width' => 'w-[250px] sm:w-[300px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สนวดไทยเพื่อสุขภาพ',
+            'youtube' => 'https://youtu.be/qke-bGOctuo?si=4QiTN14ucBEljM_J',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-5.jpg',
+            'aspect' => 'aspect-[4/5]',
+            'width' => 'w-[180px] sm:w-[210px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สอาหารนานาชาติ',
+            'youtube' => 'https://youtu.be/D87EMIky3XQ?si=MTpmOaEfDndqvW6W',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-6.jpg',
+            'aspect' => 'aspect-[7/5]',
+            'width' => 'w-[270px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สสร้างแบบเสื้อผ้าสตรี',
+            'youtube' => 'https://youtu.be/KxMoW_S-AcI?si=ZfxmfWFpmXeu1cup',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group1-7.jpg',
+            'aspect' => 'aspect-[2/3]',
+            'width' => 'w-[180px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สช่างเครื่องทำความเย็นและปรับอากาศ',
+            'youtube' => 'https://youtu.be/iE8lrXThzvs?si=RZV_GvCyYdbry0Wf',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-1.jpg',
+            'aspect' => 'aspect-[4/3]',
+            'width' => 'w-[220px] sm:w-[250px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สเสริมสวยสตรี',
+            'youtube' => 'https://youtu.be/08sZsWhQK24?si=nDg7DMfP8HnPZnwf',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-2.jpg',
+            'aspect' => 'aspect-[16/10]',
+            'width' => 'w-[290px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สนวดแผนไทย',
+            'youtube' => 'https://youtu.be/hW_ZMMpCwFU?si=kGRqmrDQsWRuQE1l',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-3.jpg',
+            'aspect' => 'aspect-[3/4]',
+            'width' => 'w-[190px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สเสริมสวย',
+            'youtube' => 'https://youtu.be/Sdsj1f6Ndlk?si=zdrjkQLIFlpnWMiv',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-4.jpg',
+            'aspect' => 'aspect-square',
+            'width' => 'w-[210px] sm:w-[240px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สนวดเพื่อสุขภาพ',
+            'youtube' => 'https://youtu.be/3dS8TpXsWAo?si=a55JNwmOKOw2QDLu',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-5.jpg',
+            'aspect' => 'aspect-[5/3]',
+            'width' => 'w-[250px] sm:w-[300px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สนวดไทยเพื่อสุขภาพ และการนวดด้วยน้ำมันหอมระเหย',
+            'youtube' => 'https://youtu.be/q70mo63-JeE?si=zja8ugIVljIDtwEJ',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-6.jpg',
+            'aspect' => 'aspect-[4/5]',
+            'width' => 'w-[180px] sm:w-[210px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สจัดดอกไม้เพื่ออาชีพ',
+            'youtube' => 'https://youtu.be/zLBOjSG8Oho?si=Vi1XuewmK6wZb4cM',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group2-7.jpg',
+            'aspect' => 'aspect-[7/5]',
+            'width' => 'w-[270px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สโหราศาสตร์ประยุกต์',
+            'youtube' => 'https://youtu.be/ZvnLpv7mjl8?si=mGrpmHa6_oEttU8v',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-1.jpg',
+            'aspect' => 'aspect-[2/3]',
+            'width' => 'w-[180px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สบาริสต้าเบื้องต้นและชั้นสูง',
+            'youtube' => 'https://youtu.be/ZvAc2nDOwsE?si=33a1b3GVsKocEzkN',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-2.jpg',
+            'aspect' => 'aspect-[4/3]',
+            'width' => 'w-[220px] sm:w-[250px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สตัดผมสุภาพบุรุษ',
+            'youtube' => 'https://youtu.be/bPYdexRBScw?si=dDMlBbwIwzCLGSTP',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-3.jpg',
+            'aspect' => 'aspect-[16/10]',
+            'width' => 'w-[290px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สการทำตัวเรือนเครื่องประดับ',
+            'youtube' => 'https://youtu.be/O1167tRDgYA?si=tKcy-08Zz1d4yDLh',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-4.jpg',
+            'aspect' => 'aspect-[3/4]',
+            'width' => 'w-[190px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สการทำตัวเรือนเครื่องประดับ',
+            'youtube' => 'https://youtu.be/8MFD3ShpInA?si=eYC-GDBt-GST8mDP',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-5.jpg',
+            'aspect' => 'aspect-square',
+            'width' => 'w-[210px] sm:w-[240px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สการเจียระไนพลอย',
+            'youtube' => 'https://youtu.be/9cB6KWhY1cU?si=C241g0Flj52lQoCq',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-6.jpg',
+            'aspect' => 'aspect-[5/3]',
+            'width' => 'w-[250px] sm:w-[300px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สเครื่องปรับอากาศ',
+            'youtube' => 'https://youtu.be/5E0FgqXGUFo?si=stsLcUEVRpAhhBIB',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-7.jpg',
+            'aspect' => 'aspect-[4/5]',
+            'width' => 'w-[180px] sm:w-[210px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สซอยผมสุภาพบุรุษ',
+            'youtube' => 'https://youtu.be/jDIIHcPhw4I?si=bMUQbofv4ZZpUq_u',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-8.jpg',
+            'aspect' => 'aspect-[7/5]',
+            'width' => 'w-[270px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สการตัดแต่งขนสุนัข',
+            'youtube' => 'https://youtu.be/UJzxl8Tyecc?si=HwVrVyCMRL7G5HEY',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-9.jpg',
+            'aspect' => 'aspect-[2/3]',
+            'width' => 'w-[180px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สอินเตอร์เน็ตสำหรับงานอีคอมเมิร์ซ',
+            'youtube' => 'https://youtu.be/5n1Jg-xNksY?si=te232sDyexy59CVy',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-10.jpg',
+            'aspect' => 'aspect-[4/3]',
+            'width' => 'w-[220px] sm:w-[250px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สนวดไทยเพื่อสุขภาพ',
+            'youtube' => 'https://youtu.be/NQoXAWxnsgU?si=k7RcmuWwdCZZRSnx',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-11.jpg',
+            'aspect' => 'aspect-[16/10]',
+            'width' => 'w-[290px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สสปาผิวหน้า',
+            'youtube' => 'https://youtu.be/464d16l2vVE?si=48N1bsI-9qm0uJKl',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-12.jpg',
+            'aspect' => 'aspect-[3/4]',
+            'width' => 'w-[190px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สการแปรรูปสมุนไพร',
+            'youtube' => 'https://youtu.be/ruTd3hV_UYY?si=i3MO9yAz8w1DD-NL',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-13.jpg',
+            'aspect' => 'aspect-square',
+            'width' => 'w-[210px] sm:w-[240px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สการแปรรูปสมุนไพร',
+            'youtube' => 'https://youtu.be/Btqy5_rkT04?si=i-_f6ujge5QgKZ1T',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group3-14.jpg',
+            'aspect' => 'aspect-[5/3]',
+            'width' => 'w-[250px] sm:w-[300px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สโหราศาสตร์ประยุกต์',
+            'youtube' => 'https://www.youtube.com/shorts/Zy5ZL-kUqdk',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group4-1.jpg',
+            'aspect' => 'aspect-[4/5]',
+            'width' => 'w-[180px] sm:w-[210px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สนวดน้ำมันหอมระเหย และคอร์สนวดฝ่าเท้าเพื่อสุขภาพ',
+            'youtube' => 'https://www.youtube.com/shorts/QIdzh7uUYsw',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group4-2.jpg',
+            'aspect' => 'aspect-[7/5]',
+            'width' => 'w-[270px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สเสริมสวย',
+            'youtube' => 'https://www.youtube.com/shorts/0vYgzPJW2N4',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group4-3.jpg',
+            'aspect' => 'aspect-[2/3]',
+            'width' => 'w-[180px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สช่างตัดผม',
+            'youtube' => 'https://www.youtube.com/shorts/4GalHNfyKj0',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group4-4.jpg',
+            'aspect' => 'aspect-[4/3]',
+            'width' => 'w-[220px] sm:w-[250px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สภาษาอังกฤษในงานธุรกิจบริการ',
+            'youtube' => 'https://www.youtube.com/shorts/j5nMiH8Abi8',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group4-5.jpg',
+            'aspect' => 'aspect-[16/10]',
+            'width' => 'w-[290px] sm:w-[320px]',
+          ),
+          array(
+            'title' => 'ผลงานคอร์สซอยผมบุรุษ',
+            'youtube' => 'https://www.youtube.com/shorts/_8HNgE_j4gA',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group4-6.jpg',
+            'aspect' => 'aspect-[3/4]',
+            'width' => 'w-[190px] sm:w-[220px]',
+          ),
+          array(
+            'title' => 'คอร์สอาหารนานาชาติ',
+            'youtube' => 'https://youtu.be/P_SZppqD90Y?si=2bk3mvNd0JPD27iQ',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group5-1.jpg',
+            'aspect' => 'aspect-square',
+            'width' => 'w-[210px] sm:w-[240px]',
+          ),
+          array(
+            'title' => 'นักศึกษาคอร์สช่างซ่อมจักรยายนต์',
+            'youtube' => 'https://youtu.be/9CbiYUv8gUQ?si=MQYTDg-YY1e3IejB',
+            'image' => THEME_URI . '/assets/images/testimonial/new/group5-2.jpg',
+            'aspect' => 'aspect-[5/3]',
+            'width' => 'w-[250px] sm:w-[300px]',
+          ),
+        );
+
+        $home_loop_gallery_rows = array(
+          array(
+            'direction' => 'forward',
+            'speed' => 15000,
+            'items' => array_slice($home_loop_gallery_items, 0, 18),
+          ),
+          array(
+            'direction' => 'forward',
+            'speed' => 6500,
+            'items' => array_slice($home_loop_gallery_items, 18),
+          ),
+        );
         ?>
 
         <section class="xl:pb-20 sm:pb-16 pb-10 overflow-hidden"
@@ -1260,6 +1528,78 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec-home-loop xl:py-24 sm:py-20 py-16 overflow-hidden"
+                 data-aos="fade-in">
+          <div class="w-full">
+            <div class="text-center mb-8">
+              <h2 class="leading-snug xl:text-fs64 md:text-fs50 text-fs34 sm:mb-4 mb-2">
+                <span class="font-bold text-primary">จากใจผู้เรียนจริง</span><br class="md:hidden block">
+                <span class="inline-block">ไม่ว่าเป็นใคร</span><br>
+                <span class="inline-block">อายุเท่าไหร่ก็เรียนได้</span>
+              </h2>
+            </div>
+
+            <div class="sec-home-loop__rows space-y-4">
+              <?php foreach ($home_loop_gallery_rows as $loop_row) :
+                if (!is_array($loop_row)) {
+                  continue;
+                }
+                $loop_direction = !empty($loop_row['direction']) && $loop_row['direction'] === 'reverse' ? 'reverse' : 'forward';
+                $loop_speed = !empty($loop_row['speed']) ? (int) $loop_row['speed'] : 15000;
+                $loop_items = !empty($loop_row['items']) && is_array($loop_row['items']) ? $loop_row['items'] : array();
+              ?>
+                <div class="swiper swiper-home-loop"
+                     data-loop-direction="<?php echo esc_attr($loop_direction); ?>"
+                     data-loop-speed="<?php echo esc_attr($loop_speed); ?>">
+                  <div class="swiper-wrapper items-stretch">
+                    <?php foreach ($loop_items as $loop_index => $loop_item) :
+                      if (!is_array($loop_item)) {
+                        continue;
+                      }
+
+                      $loop_title = trim((string) ($loop_item['title'] ?? ''));
+                      $loop_caption = trim((string) ($loop_item['caption'] ?? ''));
+                      $loop_image = trim((string) ($loop_item['image'] ?? ''));
+                      $loop_youtube = trim((string) ($loop_item['youtube'] ?? ''));
+                      $loop_width = trim((string) ($loop_item['width'] ?? 'w-[220px] sm:w-[250px]'));
+
+                      if ($loop_image === '' || $loop_youtube === '') {
+                        continue;
+                      }
+                    ?>
+                      <div class="swiper-slide h-auto! w-auto!">
+                        <a
+                          href="<?php echo esc_url($loop_youtube); ?>"
+                          data-fancybox="home-loop-video"
+                          data-type="iframe"
+                          data-caption="<?php echo esc_attr($loop_caption); ?>"
+                          aria-label="<?php echo esc_attr($loop_title); ?>"
+                          class="loop-media-card group block h-full <?php echo esc_attr($loop_width); ?>"
+                        >
+                          <div class="loop-media-card__frame">
+                            <img
+                              src="<?php echo esc_url($loop_image); ?>"
+                              alt="<?php echo esc_attr($loop_title); ?>"
+                              loading="lazy"
+                              decoding="async"
+                              class="loop-media-card__image w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            >
+                            <div class="loop-media-card__scrim"></div>
+                            <div class="loop-media-card__content">
+                              <span class="loop-media-card__title"><?php echo esc_html($loop_title); ?></span>
+                            </div>
+                            <span class="loop-media-card__play" aria-hidden="true"></span>
+                          </div>
+                        </a>
+                      </div>
+                    <?php endforeach; ?>
+                  </div>
+                </div>
+              <?php endforeach; ?>
             </div>
           </div>
         </section>
